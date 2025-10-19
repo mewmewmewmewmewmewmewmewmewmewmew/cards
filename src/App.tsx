@@ -18,6 +18,7 @@ import React, { useEffect, useMemo, useState } from "react";
 // - Fixed "duplicate key" error by generating guaranteed-unique IDs for cards.
 // - Added language toggle for Japanese/English card names, notes, and origins.
 // - Added card flip animation in detail modal for cards with a back image.
+// - Added image preloader with a loading bar for a smoother initial experience.
 
 // ------------------------------
 // 1) Types & sample data
@@ -443,11 +444,18 @@ export default function PokeCardGallery() {
   const [remoteCards, setRemoteCards] = useState<PokeCard[] | null>(null);
   const [releaseSortDesc, setReleaseSortDesc] = useState(false);
   const [language, setLanguage] = useState<'EN' | 'JP'>('JP');
+  
+  const [dataStatus, setDataStatus] = useState<'loading' | 'loaded' | 'fallback'>('loading');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
 
   useEffect(() => { document.title = "Japanese Mews"; }, []);
 
   useEffect(() => {
-    if (!SHEET_ID) return;
+    if (!SHEET_ID) {
+      setDataStatus('fallback');
+      return;
+    }
     const fetchAllSheets = async () => {
       const sources: { name: string, flag: 'isMew' | 'isCameo' | 'isIntl' }[] = [
         { name: TAB_MAPPINGS.mew, flag: 'isMew' },
@@ -476,16 +484,71 @@ export default function PokeCardGallery() {
 
       if (successfulGroups.length > 0) {
         setRemoteCards(mergeCardsNoDedupe(successfulGroups));
+        setDataStatus('loaded');
       } else {
         setRemoteCards(null);
+        setDataStatus('fallback');
       }
     };
     fetchAllSheets();
   }, []);
 
-  const sortBy: SortKey = releaseSortDesc ? "releaseDesc" : "releaseAsc";
-  const sourceCards = remoteCards ?? SAMPLE_CARDS;
-  const filtered = useMemo(() => applyFilters(sourceCards, { q, mew, cameo, intl, sortBy }), [q, mew, cameo, intl, sourceCards, sortBy]);
+  const sourceCards = useMemo(() => remoteCards ?? SAMPLE_CARDS, [remoteCards]);
+
+  useEffect(() => {
+    if (dataStatus === 'loading') return;
+
+    const imageUrls = sourceCards.flatMap(card => [card.image, card.imageBack]).filter(Boolean) as string[];
+    if (imageUrls.length === 0) {
+      setImagesLoaded(true);
+      return;
+    }
+
+    let loadedCount = 0;
+    const totalCount = imageUrls.length;
+    setLoadingProgress(0);
+    setImagesLoaded(false);
+
+    imageUrls.forEach(url => {
+      const img = new Image();
+      img.src = url;
+      const onFinish = () => {
+        loadedCount++;
+        const progress = Math.round((loadedCount / totalCount) * 100);
+        setLoadingProgress(progress);
+        if (loadedCount === totalCount) {
+          setTimeout(() => setImagesLoaded(true), 400);
+        }
+      };
+      img.onload = onFinish;
+      img.onerror = onFinish;
+    });
+  }, [sourceCards, dataStatus]);
+
+
+  const filtered = useMemo(() => applyFilters(sourceCards, { q, mew, cameo, intl, sortBy: releaseSortDesc ? "releaseDesc" : "releaseAsc" }), [q, mew, cameo, intl, sourceCards, releaseSortDesc]);
+
+  if (!imagesLoaded) {
+    return (
+      <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
+        <div className="text-4xl">🃏</div>
+        <h1 className="text-lg font-semibold text-gray-200">
+          {dataStatus === 'loading' ? 'Loading card data...' : 'Loading card images...'}
+        </h1>
+        {dataStatus !== 'loading' && (
+          <>
+            <div className="w-64 bg-[#2a2a2a] rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-[#cb97a5] h-2.5 rounded-full transition-all duration-300 ease-linear"
+                style={{ width: `${loadingProgress}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-gray-400">{loadingProgress}%</p>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-[#101010] font-sans text-gray-100">
@@ -511,7 +574,7 @@ export default function PokeCardGallery() {
                 {releaseSortDesc ? "Date ▼" : "Date ▲"}
               </button>
               <div className="relative w-44 sm:w-60">
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full h-8 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] px-3 pr-8 text-[13px] text-gray-200 placeholder:text-gray-500 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full h-8 rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 pr-8 text-[13px] text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]" />
                 {q && (
                   <button onClick={() => setQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-gray-200 hover:bg-[#2f2f2f]" aria-label="Clear search">
                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -527,7 +590,7 @@ export default function PokeCardGallery() {
         {filtered.length === 0 ? (
           <EmptyState />)
         : (
-          <ul key={`sort:${sortBy}`} className="grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <ul key={`sort:${releaseSortDesc ? "releaseDesc" : "releaseAsc"}`} className="grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((card) => {
               const displayName = (language === 'JP' && card.nameJP) ? card.nameJP : card.nameEN;
               return (
@@ -728,7 +791,4 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
-
-
-
 
