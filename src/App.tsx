@@ -435,7 +435,7 @@ export default function App() {
       <CursorEffect />
 
       {!imagesLoaded ? (
-        <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
+        <div className="fixed inset-0 bg-[#101010] z-20 flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
           <div className="relative h-28 w-28">
             <img
               src="http://mew.net/cards/logo.png"
