@@ -48,7 +48,7 @@ export type PokeCard = {
   originEN?: string;
   originJP?: string;
   release?: string;
-  population?: { psa8: number; psa9: number; psa10: number; bgsBL: number };
+  population?: { psa8: number; psa9: number; psa10: number; bgsBL: number | null };
   isMew?: boolean;
   isCameo?: boolean;
   isIntl?: boolean;
@@ -233,8 +233,17 @@ function parseCSV(csv: string): PokeCard[] {
 
     const typesField = get(idxTypes);
     const types = typesField ? typesField.split('|').map(t => t.trim()).filter(Boolean) : [];
-    const pop = { psa8: Number(get(idxPSA8) || 0), psa9: Number(get(idxPSA9) || 0), psa10: Number(get(idxPSA10) || 0), bgsBL: Number(get(idxBGSBL) || 0) };
-    const maybePop = pop.psa8 || pop.psa9 || pop.psa10 || pop.bgsBL ? pop : undefined;
+    const bgsBLRaw = get(idxBGSBL);
+    const pop = { 
+        psa8: Number(get(idxPSA8) || 0), 
+        psa9: Number(get(idxPSA9) || 0), 
+        psa10: Number(get(idxPSA10) || 0), 
+        bgsBL: bgsBLRaw === '' ? null : Number(bgsBLRaw)
+    };
+    const hasPsaData = pop.psa8 > 0 || pop.psa9 > 0 || pop.psa10 > 0;
+    const hasBgsData = pop.bgsBL !== null;
+    const maybePop = (hasPsaData || hasBgsData) ? pop : undefined;
+    
     const edition = (get(idxEdition) as Edition) || undefined;
     const yearRaw = get(idxYear);
     const yearNum = Number.parseInt(yearRaw, 10);
@@ -678,7 +687,7 @@ const DetailModal: React.FC<{
                   <PopStat value={card.population.psa8} label="PSA8" />
                   <PopStat value={card.population.psa9} label="PSA9" />
                   <PopStat value={card.population.psa10} label="PSA10" />
-                  <PopStat value={card.population.bgsBL > 0 ? card.population.bgsBL : '—'} label="BGS BL" pill />
+                  <PopStat value={card.population.bgsBL === null ? '—' : card.population.bgsBL} label="BGS BL" pill />
                 </div>
               </div>
             )}
@@ -723,6 +732,7 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
+
 
 
 
