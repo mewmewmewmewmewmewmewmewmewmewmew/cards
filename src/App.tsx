@@ -678,7 +678,7 @@ const DetailModal: React.FC<{
                   <PopStat value={card.population.psa8} label="PSA8" />
                   <PopStat value={card.population.psa9} label="PSA9" />
                   <PopStat value={card.population.psa10} label="PSA10" />
-                  <PopStat value={card.population.bgsBL} label="BGS BL" pill />
+                  <PopStat value={card.population.bgsBL > 0 ? card.population.bgsBL : '—'} label="BGS BL" pill />
                 </div>
               </div>
             )}
@@ -723,5 +723,6 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
+
 
 
