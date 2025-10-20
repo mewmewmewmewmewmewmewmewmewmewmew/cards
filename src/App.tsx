@@ -262,7 +262,7 @@ function mergeCardsNoDedupe(groups: Array<{ cards: PokeCard[]; flag: 'isMew' | '
 }
 
 // ------------------------------
-// 3.2) 3D tilt + glare (hover) — no soft glow
+// 3.2) 3D tilt + glare (hover)
 // ------------------------------
 const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; children: React.ReactNode }> = ({ ariaLabel, onClick, children }) => {
   const ref = React.useRef<HTMLButtonElement>(null);
@@ -317,6 +317,7 @@ const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; childre
     </button>
   );
 };
+
 
 // ------------------------------
 // Background radial gradient (fixed)
@@ -503,10 +504,15 @@ export default function PokeCardGallery() {
                       <img src={card.image} alt={displayName} className="h-full w-full object-fill" style={{ aspectRatio: '63/88' }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                     </div>
                   </TiltCardButton>
-                  <div className="mt-1.5 flex h-5 flex-wrap items-center justify-end gap-1.5 px-1">
-                    {card.year ? <InfoPill label={String(card.year)} /> : null}
-                    {card.rarity ? <InfoPill label={card.rarity} /> : null}
-                    {card.edition ? <InfoPill label={card.edition} /> : null}
+                  <div className="mt-1.5 flex h-5 items-center justify-between gap-1.5 px-1">
+                    <span className="text-[10px] font-semibold text-[#cb97a5] truncate">
+                      {card.number && card.number !== "N/A" ? card.number : ''}
+                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      {card.year ? <InfoPill label={String(card.year)} /> : null}
+                      {card.rarity ? <InfoPill label={card.rarity} /> : null}
+                      {card.edition ? <InfoPill label={card.edition} /> : null}
+                    </div>
                   </div>
                 </li>
               );
@@ -523,7 +529,7 @@ export default function PokeCardGallery() {
 // Reusable bits
 // ------------------------------
 const InfoPill: React.FC<{ label: string }> = ({ label }) => (
-  <span className="rounded bg-black/40 px-1.5 py-0.5 text-[10px] font-semibold text-gray-300 backdrop-blur-sm">
+  <span className="rounded bg-zinc-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-gray-300 backdrop-blur-sm">
     {label}
   </span>
 );
