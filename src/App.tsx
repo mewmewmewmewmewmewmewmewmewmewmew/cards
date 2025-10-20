@@ -434,15 +434,21 @@ export default function PokeCardGallery() {
   if (!imagesLoaded) {
     return (
       <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
-        <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-28 w-28" />
-        {dataStatus !== 'loading' && (
-          <div className="w-28 bg-[#2a2a2a] rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-[#cb97a5] h-1.5 rounded-full transition-all duration-300 ease-linear"
-              style={{ width: `${loadingProgress}%` }}
-            ></div>
-          </div>
-        )}
+        <div className="relative h-28 w-28">
+          <img
+            src="http://mew.net/cards/logo.png"
+            alt="Loading..."
+            className="h-full w-full absolute top-0 left-0 opacity-30"
+          />
+          <img
+            src="http://mew.net/cards/logo.png"
+            alt="Loading..."
+            className="h-full w-full absolute top-0 left-0 transition-all duration-300 ease-linear"
+            style={{
+              clipPath: `inset(${100 - loadingProgress}% 0 0 0)`
+            }}
+          />
+        </div>
       </div>
     );
   }
