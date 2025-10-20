@@ -19,6 +19,7 @@ import React, { useEffect, useMemo, useState } from "react";
 // - Added language toggle for Japanese/English card names, notes, and origins.
 // - Added card flip animation in detail modal for cards with a back image.
 // - Added image preloader with a loading bar for a smoother initial experience.
+// - Switched to Google Apps Script for secure data fetching from a private sheet.
 
 // ------------------------------
 // 1) Types & sample data
@@ -108,14 +109,11 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 }
 
 // ------------------------------
-// 3) Google Sheets loader (CSP-safe)
+// 3) Google Sheets loader (via Apps Script)
 // ------------------------------
-const SHEET_ID = "1aT1iMYQzo0Fj7nnpwq26weIsFf7KupAWEAzN2Z-L0Xc";
+// IMPORTANT: Replace this placeholder with your own Google Apps Script URL.
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc3FK3fiSRtFEGPlChV07IdbOwGw59i_FM8J9V58m5z-U77eqdsqt3-LyKR-Low49guw/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-
-function csvUrlByName(id: string, sheet: string): string {
-  return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheet)}`;
-}
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -355,10 +353,7 @@ export default function PokeCardGallery() {
   useEffect(() => { document.title = "Japanese Mews"; }, []);
 
   useEffect(() => {
-    if (!SHEET_ID) {
-      setDataStatus('fallback');
-      return;
-    }
+
     const fetchAllSheets = async () => {
       const sources: { name: string, flag: 'isMew' | 'isCameo' | 'isIntl' }[] = [
         { name: TAB_MAPPINGS.mew, flag: 'isMew' },
@@ -367,7 +362,7 @@ export default function PokeCardGallery() {
       ];
 
       const results = await Promise.allSettled(
-        sources.map(s => fetch(csvUrlByName(SHEET_ID, s.name)).then(res => {
+        sources.map(s => fetch(`${APPS_SCRIPT_URL}?sheet=${encodeURIComponent(s.name)}`).then(res => {
           if (!res.ok) throw new Error(`Failed to fetch sheet "${s.name}": ${res.statusText}`);
           return res.text();
         }))
@@ -662,7 +657,7 @@ const DetailModal: React.FC<{
                   <PopStat value={card.population.psa8} label="PSA8" />
                   <PopStat value={card.population.psa9} label="PSA9" />
                   <PopStat value={card.population.psa10} label="PSA10" />
-                  <PopStat value={card.population.bgsBL} label="BGS BL" pill />
+                  <PopStat value={card.population.bgsBL} pill />
                 </div>
               </div>
             )}
@@ -707,4 +702,5 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
+
 
