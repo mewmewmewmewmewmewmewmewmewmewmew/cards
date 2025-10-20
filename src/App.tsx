@@ -459,7 +459,7 @@ export default function PokeCardGallery() {
         <div className="mx-auto max-w-7xl px-3 py-2">
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-6 w-6" />
+              <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
               <h1 className="text-base sm:text-lg font-semibold tracking-tight">Japanese Mews</h1>
             </div>
             <div className="flex items-center gap-3">
@@ -493,7 +493,7 @@ export default function PokeCardGallery() {
         {filtered.length === 0 ? (
           <EmptyState />)
         : (
-          <ul key={`sort:${releaseSortDesc ? "releaseDesc" : "releaseAsc"}`} className="grid grid-cols-2 gap-4 sm:gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <ul key={`sort:${releaseSortDesc ? "releaseDesc" : "releaseAsc"}`} className="grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((card) => {
               const displayName = (language === 'JP' && card.nameJP) ? card.nameJP : card.nameEN;
               return (
@@ -689,8 +689,5 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
-
-
-
 
 
