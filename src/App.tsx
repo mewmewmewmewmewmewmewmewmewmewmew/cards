@@ -342,8 +342,8 @@ export default function PokeCardGallery() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [mew, setMew] = useState(true);
-  const [cameo, setCameo] = useState(true);
-  const [intl, setIntl] = useState(true);
+  const [cameo, setCameo] = useState(false);
+  const [intl, setIntl] = useState(false);
   const [remoteCards, setRemoteCards] = useState<PokeCard[] | null>(null);
   const [releaseSortDesc, setReleaseSortDesc] = useState(false);
   const [language, setLanguage] = useState<'EN' | 'JP'>('JP');
@@ -434,11 +434,11 @@ export default function PokeCardGallery() {
   if (!imagesLoaded) {
     return (
       <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
-        <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-10 w-10" />
+        <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-28 w-28" />
         {dataStatus !== 'loading' && (
-          <div className="w-64 bg-[#2a2a2a] rounded-full h-2.5 overflow-hidden">
+          <div className="w-28 bg-[#2a2a2a] rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-[#cb97a5] h-2.5 rounded-full transition-all duration-300 ease-linear"
+              className="bg-[#cb97a5] h-1.5 rounded-full transition-all duration-300 ease-linear"
               style={{ width: `${loadingProgress}%` }}
             ></div>
           </div>
@@ -450,7 +450,7 @@ export default function PokeCardGallery() {
   return (
     <div className="relative min-h-screen bg-[#101010] font-sans text-gray-100">
       <BackgroundRadial />
-      <header className="sticky top-0 z-50 border-b border-[#2a2a2a]/60 bg-transparent backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-[#2a2a2a]/60 bg-black/30 backdrop-blur">
         <div className="mx-auto max-w-7xl px-3 py-2">
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -467,7 +467,7 @@ export default function PokeCardGallery() {
                 type="button"
                 onClick={() => setReleaseSortDesc(v => !v)}
                 aria-label={releaseSortDesc ? "Sort by date: new to old" : "Sort by date: old to new"}
-                className="text-[12px] text-gray-400 hover:text-gray-200 px-1 py-0.5 rounded outline-none focus:outline-none focus:ring-1 focus:ring-[#cb97a5]"
+                className="text-[12px] text-gray-400 hover:text-gray-200 px-1 py-0.5 rounded outline-none focus:outline-none"
               >
                 {releaseSortDesc ? "Date ▼" : "Date ▲"}
               </button>
@@ -532,8 +532,8 @@ const Toggle: React.FC<{ label: string; active: boolean; onClick: () => void }> 
   <button
     onClick={onClick}
     className={classNames(
-      "rounded-full border px-2 py-0.5 text-[11px] font-medium shadow-sm focus:outline-none focus:ring-1",
-      active ? "border-[#cb97a5] bg-[#cb97a5]/15 text-[#cb97a5] ring-[#cb97a5]" : "border-[#2a2a2a] bg-[#1a1a1a] text-gray-300 hover:bg-[#1f1f1f] ring-transparent"
+      "rounded-full border px-2 py-0.5 text-[11px] font-medium shadow-sm focus:outline-none focus:ring-1 transition-colors",
+      active ? "border-[#cb97a5] bg-[#cb97a5]/15 text-[#cb97a5] ring-[#cb97a5]" : "border-gray-500 bg-transparent text-gray-300 hover:bg-[#cb97a5]/10 ring-transparent"
     )}
     aria-pressed={active}
   >{label}</button>
@@ -623,19 +623,20 @@ const DetailModal: React.FC<{
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-4xl font-semibold text-gray-100 leading-tight">{displayName}</h2>
-                {card.number && card.number !== "N/A" && (
-                  <p className="mt-0.5 text-base font-semibold text-[#cb97a5]">{card.number}</p>
-                )}
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {card.number && card.number !== "N/A" && (
+                    <p className="text-base font-semibold text-[#cb97a5]">{card.number}</p>
+                  )}
+                  {card.rarity && <Tag label={card.rarity} />}
+                  {card.edition && (<span className="rounded bg-[#cb97a5]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#cb97a5]">{card.edition}</span>)}
+                </div>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Tag label={String(card.year)} />
-              {card.rarity && <Tag label={card.rarity} />}
               {card.set.includes("Promo") && (<span className="rounded bg-[#cb97a5]/15 px-2 py-0.5 text-[11px] font-semibold text-[#cb97a5]">Promo</span>)}
               {card.isIntl && (<span className="rounded bg-[#cb97a5]/15 px-2 py-0.5 text-[11px] font-semibold text-[#cb97a5]">Intl</span>)}
               {card.isCameo && (<span className="rounded bg-[#cb97a5]/15 px-2 py-0.5 text-[11px] font-semibold text-[#cb97a5]">Cameo</span>)}
-              {card.edition && (<span className="rounded bg-[#cb97a5]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#cb97a5]">{card.edition}</span>)}
             </div>
 
             <div className="grid grid-cols-1 gap-2">
@@ -700,4 +701,6 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
+
+
 
