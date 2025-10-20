@@ -320,15 +320,12 @@ const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; childre
 // ------------------------------
 // Background radial gradient (fixed)
 // ------------------------------
-const BackgroundRadial: React.FC = () => (
+const BackgroundGradient: React.FC = () => (
   <div
     aria-hidden="true"
     className="pointer-events-none fixed inset-0 z-0"
     style={{
-      background:
-        `radial-gradient(700px circle at 50% 100%, rgba(203,151,165,0.22), transparent 62%),
-         radial-gradient(900px circle at 85% 110%, rgba(203,151,165,0.18), transparent 66%),
-         radial-gradient(700px circle at 15% -10%, rgba(203,151,165,0.12), transparent 60%)`,
+      background: `linear-gradient(to top left, rgba(203, 151, 165, 0.15), transparent 40%)`,
     }}
   />
 );
@@ -353,7 +350,11 @@ export default function PokeCardGallery() {
   useEffect(() => { document.title = "Japanese Mews"; }, []);
 
   useEffect(() => {
-
+    if (APPS_SCRIPT_URL === "PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE" || !APPS_SCRIPT_URL) {
+      console.error("Please replace the APPS_SCRIPT_URL placeholder with your actual Google Apps Script URL.");
+      setDataStatus('fallback');
+      return;
+    }
     const fetchAllSheets = async () => {
       const sources: { name: string, flag: 'isMew' | 'isCameo' | 'isIntl' }[] = [
         { name: TAB_MAPPINGS.mew, flag: 'isMew' },
@@ -450,7 +451,7 @@ export default function PokeCardGallery() {
 
   return (
     <div className="relative min-h-screen bg-[#101010] font-sans text-gray-100">
-      <BackgroundRadial />
+      <BackgroundGradient />
       <header className="sticky top-0 z-50 border-b border-[#2a2a2a]/60 bg-black/30 backdrop-blur">
         <div className="mx-auto max-w-7xl px-3 py-2">
           <div className="flex w-full items-center justify-between gap-3">
@@ -702,5 +703,4 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
-
 
