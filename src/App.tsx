@@ -350,11 +350,7 @@ export default function PokeCardGallery() {
   useEffect(() => { document.title = "Japanese Mews"; }, []);
 
   useEffect(() => {
-    if (APPS_SCRIPT_URL === "PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE" || !APPS_SCRIPT_URL) {
-      console.error("Please replace the APPS_SCRIPT_URL placeholder with your actual Google Apps Script URL.");
-      setDataStatus('fallback');
-      return;
-    }
+
     const fetchAllSheets = async () => {
       const sources: { name: string, flag: 'isMew' | 'isCameo' | 'isIntl' }[] = [
         { name: TAB_MAPPINGS.mew, flag: 'isMew' },
