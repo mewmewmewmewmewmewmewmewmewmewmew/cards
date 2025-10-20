@@ -98,6 +98,30 @@ function classNames(...xs: Array<string | false | null | undefined>): string {
   return xs.filter(Boolean).join(" ");
 }
 
+// IMPROVEMENT: Add a date formatting utility
+function formatDate(dateString: string | undefined): string | undefined {
+  if (!dateString) {
+    return undefined;
+  }
+  // Handles cases where the date might be a full string or just YYYY-MM-DD
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    // Return original string if it's not a valid date
+    return dateString;
+  }
+  // Use UTC methods to avoid timezone issues where the date could be off by one day.
+  const year = date.getUTCFullYear();
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = date.getUTCDate().toString().padStart(2, '0');
+
+  // Check for a plausible year, otherwise it might be a parsing error.
+  if (year < 1990 || year > 2050) {
+      return dateString;
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
 // Force image fallback for hosts that block hotlinking
 const IMG_FALLBACK = `data:image/svg+xml;utf8,\
 <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 420'>\
@@ -350,6 +374,7 @@ export default function PokeCardGallery() {
   useEffect(() => { document.title = "Japanese Mews"; }, []);
 
   useEffect(() => {
+
     const fetchAllSheets = async () => {
       const sources: { name: string, flag: 'isMew' | 'isCameo' | 'isIntl' }[] = [
         { name: TAB_MAPPINGS.mew, flag: 'isMew' },
@@ -638,7 +663,7 @@ const DetailModal: React.FC<{
 
             <div className="grid grid-cols-1 gap-2">
               <div className="grid grid-cols-2 gap-2">
-                <InfoBubble label="Release Date" value={card.release || (card.year ? String(card.year) : undefined)} />
+                <InfoBubble label="Release Date" value={formatDate(card.release) || (card.year ? String(card.year) : undefined)} />
                 <InfoBubble label="Era" value={card.era} />
               </div>
               <InfoBubble label="Illustrator" value={card.illustrator} />
@@ -698,4 +723,5 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
+
 
