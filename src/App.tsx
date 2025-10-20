@@ -54,104 +54,6 @@ export type PokeCard = {
   edition?: Edition;
 };
 
-const SAMPLE_CARDS: PokeCard[] = [
-  {
-    id: "mew-coro-151",
-    nameEN: "Mew",
-    nameJP: "ミュウ",
-    number: "151/PCG-P",
-    set: "CoroCoro Promo",
-    year: 2005,
-    rarity: "Promo",
-    types: ["Psychic"],
-    language: "JP",
-    image: "https://www.pokemon-card.com/assets/images/card_images/large/PCG-P/0151_PCG-P.jpg",
-    imageBack: "https://archives.bulbagarden.net/media/upload/thumb/1/18/Card_back.jpg/250px-Card_back.jpg",
-    notesEN: "CoroCoro Comic promo Mew.",
-    notesJP: "コロコロコミックプロモミュウ。",
-    illustrator: "Ken Sugimori",
-    era: "PCG",
-    originEN: "Japan",
-    originJP: "日本",
-    population: { psa8: 120, psa9: 340, psa10: 210, bgsBL: 3 },
-    isMew: true,
-  },
-  {
-    id: "mew-gold-star-jp",
-    nameEN: "Mew ☆",
-    nameJP: "ミュウ☆",
-    number: "*",
-    set: "Holon Phantoms JP",
-    year: 2006,
-    rarity: "Ultra Rare",
-    types: ["Psychic"],
-    language: "JP",
-    image: "https://archives.bulbagarden.net/media/upload/c/c1/HolonPhantomsJPMewStar.jpg",
-    notesEN: "Japanese Gold Star Mew.",
-    illustrator: "Masakazu Fukuda",
-    era: "PCG",
-    originEN: "Japan",
-    population: { psa8: 60, psa9: 200, psa10: 95, bgsBL: 2 },
-    isMew: true,
-    edition: "1st",
-  },
-  {
-    id: "mew-ancient-jp",
-    nameEN: "Ancient Mew",
-    nameJP: "ミュウ(ANCIENT)",
-    number: "N/A",
-    set: "Movie Promo JP",
-    year: 1999,
-    rarity: "Promo",
-    types: ["Psychic"],
-    language: "JP",
-    image: "https://archives.bulbagarden.net/media/upload/7/7c/Ancient_Mew_card.jpg",
-    notesEN: "Ancient Mew Japanese movie promo.",
-    illustrator: "Keiji Kinebuchi",
-    era: "OLD",
-    originEN: "Japan",
-    population: { psa8: 800, psa9: 1600, psa10: 400, bgsBL: 10 },
-    isMew: true,
-  },
-  {
-    id: "mew-intl-exclusive",
-    nameEN: "Mew",
-    number: "9/Black Star Promo",
-    set: "Wizards Black Star Promo",
-    year: 2001,
-    rarity: "Promo",
-    types: ["Psychic"],
-    language: "EN",
-    image: "https://images.pokemontcg.io/basep/9_hires.png",
-    notesEN: "Exclusive English promo not released in Japan.",
-    illustrator: "Christopher Rush",
-    era: "WBSP",
-    originEN: "USA",
-    edition: "Unlim",
-    population: { psa8: 500, psa9: 1200, psa10: 300, bgsBL: 5 },
-    isMew: true,
-    isIntl: true,
-  },
-  {
-    id: "mew-cameo-lugia",
-    nameEN: "Lugia",
-    nameJP: "ルギア",
-    number: "249/XY-P",
-    set: "XY Promo",
-    year: 2015,
-    rarity: "Promo",
-    types: ["Psychic"],
-    language: "JP",
-    image: "https://www.pokemon-card.com/assets/images/card_images/large/XY-P/0249_XY-P.jpg",
-    notesEN: "Mew appears in the background artwork as a cameo.",
-    illustrator: "Mitsuhiro Arita",
-    era: "XY",
-    originEN: "Japan",
-    population: { psa8: 20, psa9: 55, psa10: 18, bgsBL: 1 },
-    isCameo: true,
-  },
-];
-
 // ------------------------------
 // 2) Pure helpers
 // ------------------------------
@@ -493,10 +395,10 @@ export default function PokeCardGallery() {
     fetchAllSheets();
   }, []);
 
-  const sourceCards = useMemo(() => remoteCards ?? SAMPLE_CARDS, [remoteCards]);
+  const sourceCards = useMemo(() => remoteCards ?? [], [remoteCards]);
 
   useEffect(() => {
-    if (dataStatus === 'loading') return;
+    if (dataStatus === 'loading' && sourceCards.length === 0) return;
 
     const imageUrls = sourceCards.flatMap(card => [card.image, card.imageBack]).filter(Boolean) as string[];
     if (imageUrls.length === 0) {
@@ -531,7 +433,7 @@ export default function PokeCardGallery() {
   if (!imagesLoaded) {
     return (
       <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
-        <div className="text-4xl">🃏</div>
+        <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-10 w-10" />
         <h1 className="text-lg font-semibold text-gray-200">
           {dataStatus === 'loading' ? 'Loading card data...' : 'Loading card images...'}
         </h1>
@@ -555,16 +457,17 @@ export default function PokeCardGallery() {
       <BackgroundRadial />
       <header className="sticky top-0 z-50 border-b border-[#2a2a2a]/60 bg-transparent backdrop-blur">
         <div className="mx-auto max-w-7xl px-3 py-2">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xl">🃏</span>
-            <h1 className="text-base sm:text-lg font-semibold tracking-tight">Japanese Mews</h1>
-            <div className="flex-grow sm:flex-grow-0" />
-            <div className="flex items-center gap-1">
-              <Toggle label="Mew" active={mew} onClick={() => setMew(v => !v)} />
-              <Toggle label="Cameo" active={cameo} onClick={() => setCameo(v => !v)} />
-              <Toggle label="Intl" active={intl} onClick={() => setIntl(v => !v)} />
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-6 w-6" />
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight">Japanese Mews</h1>
             </div>
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <Toggle label="Mew" active={mew} onClick={() => setMew(v => !v)} />
+                <Toggle label="Cameo" active={cameo} onClick={() => setCameo(v => !v)} />
+                <Toggle label="Intl" active={intl} onClick={() => setIntl(v => !v)} />
+              </div>
               <button
                 type="button"
                 onClick={() => setReleaseSortDesc(v => !v)}
@@ -590,20 +493,15 @@ export default function PokeCardGallery() {
         {filtered.length === 0 ? (
           <EmptyState />)
         : (
-          <ul key={`sort:${releaseSortDesc ? "releaseDesc" : "releaseAsc"}`} className="grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <ul key={`sort:${releaseSortDesc ? "releaseDesc" : "releaseAsc"}`} className="grid grid-cols-2 gap-4 sm:gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((card) => {
               const displayName = (language === 'JP' && card.nameJP) ? card.nameJP : card.nameEN;
               return (
                 <li key={card.id}>
                   <TiltCardButton onClick={() => setSelected(card)} ariaLabel={`Open details for ${displayName} ${card.set} ${card.number}`}>
-                    <div className="relative aspect-[63/88] w-full rounded-[3%] overflow-hidden bg-[#0f0f0f]">
+                    <div className="relative aspect-[63/88] w-full rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
                       <img src={card.image} alt={displayName} className="h-full w-full object-fill" style={{ aspectRatio: '63/88' }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                     </div>
-                    {card.edition ? (
-                      <div className="pointer-events-none absolute left-2 top-2 flex gap-1">
-                        <span className="rounded bg-[#cb97a5]/20 px-2 py-0.5 text-[11px] font-semibold text-[#cb97a5] backdrop-blur-sm">{card.edition}</span>
-                      </div>
-                    ) : null}
                   </TiltCardButton>
                 </li>
               );
@@ -689,7 +587,7 @@ const DetailModal: React.FC<{
         <div className="grid grid-cols-1 sm:grid-cols-2">
           <div className="flex flex-col items-center p-4 sm:p-6">
             <div
-              className="w-full max-w-[520px] [perspective:2500px]"
+              className="w-full max-w-[520px] [perspective:2500px] [transform-style:preserve-3d]"
               onMouseEnter={() => { if (card.imageBack) { setRotation(r => r + 180); } }}
               onMouseLeave={() => { if (card.imageBack) { setRotation(r => r + 180); } }}
             >
@@ -698,12 +596,12 @@ const DetailModal: React.FC<{
                 style={{ transform: `rotateY(${rotation}deg)` }}
               >
                 {/* Front */}
-                <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] rounded-[3%] overflow-hidden bg-[#0f0f0f]">
+                <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
                   <img src={card.image} alt={`${displayName} front`} className="h-full w-full object-fill" style={{ aspectRatio: "63/88" }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                 </div>
                 {/* Back */}
                 {card.imageBack && (
-                  <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-[3%] overflow-hidden bg-[#0f0f0f]">
+                  <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
                     <img src={card.imageBack} alt={`${displayName} back`} className="h-full w-full object-fill" style={{ aspectRatio: "63/88" }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                   </div>
                 )}
@@ -791,4 +689,8 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
+
+
+
+
 
