@@ -350,8 +350,8 @@ export default function PokeCardGallery() {
   useEffect(() => { document.title = "Japanese Mews"; }, []);
 
   useEffect(() => {
-    if (APPS_SCRIPT_URL === "PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE" || !APPS_SCRIPT_URL) {
-      console.error("Please replace the APPS_SCRIPT_URL placeholder with your actual Google Apps Script URL.");
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === "PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
+      console.error("Please add your Google Apps Script URL to the APPS_SCRIPT_URL constant.");
       setDataStatus('fallback');
       return;
     }
@@ -451,7 +451,7 @@ export default function PokeCardGallery() {
 
   return (
     <div className="relative min-h-screen bg-[#101010] font-sans text-gray-100">
-      <BackgroundGradient />
+      {/* <BackgroundGradient /> */}
       <header className="sticky top-0 z-50 border-b border-[#2a2a2a]/60 bg-black/30 backdrop-blur">
         <div className="mx-auto max-w-7xl px-3 py-2">
           <div className="flex w-full items-center justify-between gap-3">
@@ -658,7 +658,7 @@ const DetailModal: React.FC<{
                   <PopStat value={card.population.psa8} label="PSA8" />
                   <PopStat value={card.population.psa9} label="PSA9" />
                   <PopStat value={card.population.psa10} label="PSA10" />
-                  <PopStat value={card.population.bgsBL} pill />
+                  <PopStat value={card.population.bgsBL} label="BGS BL" pill />
                 </div>
               </div>
             )}
