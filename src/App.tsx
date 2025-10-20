@@ -591,7 +591,7 @@ const DetailModal: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
-      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-t-2xl sm:rounded-2xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
@@ -701,6 +701,4 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
-
-
 
