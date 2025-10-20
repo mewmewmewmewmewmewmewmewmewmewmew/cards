@@ -451,7 +451,7 @@ export default function PokeCardGallery() {
 
   return (
     <div className="relative min-h-screen bg-[#101010] font-sans text-gray-100">
-      {/* <BackgroundGradient /> */}
+      <BackgroundGradient />
       <header className="sticky top-0 z-50 border-b border-[#2a2a2a]/60 bg-black/30 backdrop-blur">
         <div className="mx-auto max-w-7xl px-3 py-2">
           <div className="flex w-full items-center justify-between gap-3">
