@@ -435,19 +435,13 @@ export default function PokeCardGallery() {
     return (
       <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
         <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-10 w-10" />
-        <h1 className="text-lg font-semibold text-gray-200">
-          {dataStatus === 'loading' ? 'Loading card data...' : 'Loading card images...'}
-        </h1>
         {dataStatus !== 'loading' && (
-          <>
-            <div className="w-64 bg-[#2a2a2a] rounded-full h-2.5 overflow-hidden">
-              <div
-                className="bg-[#cb97a5] h-2.5 rounded-full transition-all duration-300 ease-linear"
-                style={{ width: `${loadingProgress}%` }}
-              ></div>
-            </div>
-            <p className="text-sm text-gray-400">{loadingProgress}%</p>
-          </>
+          <div className="w-64 bg-[#2a2a2a] rounded-full h-2.5 overflow-hidden">
+            <div
+              className="bg-[#cb97a5] h-2.5 rounded-full transition-all duration-300 ease-linear"
+              style={{ width: `${loadingProgress}%` }}
+            ></div>
+          </div>
         )}
       </div>
     );
@@ -706,5 +700,4 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
-
 
