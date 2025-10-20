@@ -309,7 +309,7 @@ const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; childre
       onMouseMove={onMove}
       onMouseLeave={reset}
       onMouseEnter={() => { const el = ref.current; if (el) el.style.willChange = 'transform'; }}
-      className="group relative block w-full overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#121212] text-left shadow-sm focus:outline-none transition duration-150"
+      className="group relative block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101010] focus-visible:ring-[#cb97a5] rounded-[4.2%]"
       style={{ transformStyle: 'preserve-3d' } as React.CSSProperties}
     >
       {children}
@@ -503,6 +503,11 @@ export default function PokeCardGallery() {
                       <img src={card.image} alt={displayName} className="h-full w-full object-fill" style={{ aspectRatio: '63/88' }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                     </div>
                   </TiltCardButton>
+                  <div className="mt-1.5 flex h-5 flex-wrap items-center justify-end gap-1.5 px-1">
+                    {card.year ? <InfoPill label={String(card.year)} /> : null}
+                    {card.rarity ? <InfoPill label={card.rarity} /> : null}
+                    {card.edition ? <InfoPill label={card.edition} /> : null}
+                  </div>
                 </li>
               );
             })}
@@ -517,6 +522,12 @@ export default function PokeCardGallery() {
 // ------------------------------
 // Reusable bits
 // ------------------------------
+const InfoPill: React.FC<{ label: string }> = ({ label }) => (
+  <span className="rounded bg-black/40 px-1.5 py-0.5 text-[10px] font-semibold text-gray-300 backdrop-blur-sm">
+    {label}
+  </span>
+);
+
 const Toggle: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
   <button
     onClick={onClick}
