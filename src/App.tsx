@@ -13,7 +13,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 // --- EASY TOGGLE FOR PASSWORD PROTECTION ---
 // Set this to `false` to disable the password prompt entirely.
-const IS_PASSWORD_PROTECTED = true;
+const IS_PASSWORD_PROTECTED = false;
 
 export type Edition = '1st' | 'Unlim';
 
@@ -112,7 +112,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 // 3) Google Sheets loader (via Apps Script)
 // ------------------------------
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc3FK3fiSRtFEGPlChV07IdbOwGw59i_FM8J9V58m5z-U77eqdsqt3-LyKR-Low49guw/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwsPsBUeWIJxsi-Ov3VFsVlPuR4RCt5rUoFjjSpo0L4dTbVwk2Lrm9jA5ftfX1eSPGtg/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
 
 function parseBool(x: string | undefined): boolean | undefined {
@@ -349,6 +349,7 @@ export default function PokeCardGallery() {
   const [dataStatus, setDataStatus] = useState<'loading' | 'loaded' | 'fallback'>('loading');
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => { document.title = "Mews (JP)"; }, []);
 
@@ -369,8 +370,10 @@ export default function PokeCardGallery() {
         { name: TAB_MAPPINGS.intl, flag: 'isIntl' },
       ];
 
+      const authParam = IS_PASSWORD_PROTECTED ? `&password=${encodeURIComponent(password)}` : '&auth=none';
+
       const results = await Promise.allSettled(
-        sources.map(s => fetch(`${APPS_SCRIPT_URL}?sheet=${encodeURIComponent(s.name)}&password=${encodeURIComponent(password)}`).then(res => {
+        sources.map(s => fetch(`${APPS_SCRIPT_URL}?sheet=${encodeURIComponent(s.name)}${authParam}`).then(res => {
           if (!res.ok) throw new Error(`Failed to fetch sheet "${s.name}": ${res.statusText}`);
           return res.text();
         }))
@@ -394,6 +397,7 @@ export default function PokeCardGallery() {
       } else {
         setRemoteCards(null);
         setDataStatus('fallback');
+        setFetchError("Failed to load card data. This could be due to a network issue or incorrect Google Apps Script permissions. Please ensure the script is deployed correctly with access for 'Anyone' and the URL is correct.");
       }
     };
     fetchAllSheets();
@@ -403,7 +407,12 @@ export default function PokeCardGallery() {
 
   // Image preloading effect
   useEffect(() => {
+    if (dataStatus === 'fallback') {
+        setImagesLoaded(true);
+        return;
+    }
     if (dataStatus === 'loading' && sourceCards.length === 0) return;
+    
     const imageUrls = sourceCards.flatMap(card => [card.image, card.imageBack]).filter(Boolean) as string[];
     if (imageUrls.length === 0) {
       setImagesLoaded(true);
@@ -502,9 +511,11 @@ export default function PokeCardGallery() {
       </header>
 
       <main className="relative z-10 mx-auto max-w-7xl px-4 pt-8 pb-16">
-        {filtered.length === 0 ? (
-          <EmptyState />)
-        : (
+        {fetchError ? (
+          <ErrorState title="Data Loading Error" message={fetchError} />
+        ) : filtered.length === 0 ? (
+          <EmptyState />
+        ) : (
           <ul key={`sort:${releaseSortDesc ? "releaseDesc" : "releaseAsc"}`} className="grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((card) => {
               const displayName = (language === 'JP' && card.nameJP) ? card.nameJP : card.nameEN;
@@ -612,6 +623,14 @@ const PopStat: React.FC<{ value: number | string | null; label: string; pill?: b
   <div className="text-center">
     <div className="text-2xl font-semibold text-gray-100 leading-none">{value === null ? '—' : value}</div>
     <div className="mt-0.5 text-[11px] text-gray-400">{pill ? <span className="rounded bg-black px-2 py-0.5 font-semibold text-gray-100">{label}</span> : label}</div>
+  </div>
+);
+
+const ErrorState: React.FC<{ title: string; message: string }> = ({ title, message }) => (
+  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-red-500/50 bg-[#121212] px-6 py-16 text-center text-gray-400">
+    <div className="text-4xl">⚠️</div>
+    <h2 className="text-lg font-semibold text-red-400">{title}</h2>
+    <p className="text-sm max-w-md">{message}</p>
   </div>
 );
 
