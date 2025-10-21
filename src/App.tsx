@@ -31,6 +31,8 @@ import React, { useEffect, useMemo, useState } from "react";
 // - Unified loading/password screens to prevent logo movement and remove the unlock button.
 // - Added logo pulse animation during password check and removed error text/placeholder.
 // - Refactored authentication logic to ensure password check pulse animation works correctly.
+// - Made the logo fade consistent across all loading phases.
+// - Changed password field background to match page, and change on focus.
 
 // ------------------------------
 // 1) Types & sample data
@@ -524,7 +526,7 @@ export default function PokeCardGallery() {
     return (
         <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
             <div className="relative h-28 w-28">
-                <img src="https://mew.net/cards/logo.png" alt="Loading..." className="h-full w-full animate-pulse opacity-50" />
+                <img src="https://mew.net/cards/logo.png" alt="Loading..." className="h-full w-full animate-pulse opacity-30" />
             </div>
             <div className="h-16" />
         </div>
@@ -695,7 +697,7 @@ const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; i
                     type="password"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    className="w-28 text-center h-10 rounded-lg border border-white/20 bg-white/10 px-3 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-0"
+                    className="w-28 text-center h-10 rounded-lg border border-white/20 bg-[#101010] focus:bg-[#232323] px-3 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-0"
                     placeholder=""
                     autoFocus
                     disabled={isAuthenticating}
@@ -852,4 +854,6 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
+
+
 
