@@ -380,7 +380,7 @@ export default function PokeCardGallery() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [imagesLoaded, setImagesLoaded] = useState(false);
 
-  useEffect(() => { document.title = "Japanese Mews"; }, []);
+  useEffect(() => { document.title = "Mews (JP)"; }, []);
 
   useEffect(() => {
 
