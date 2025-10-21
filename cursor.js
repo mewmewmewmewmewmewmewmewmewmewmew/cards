@@ -1,3 +1,4 @@
+console.log("cursor.js loaded");
 (() => {
   const start = Date.now();
   const origin = { x: 0, y: 0 };
