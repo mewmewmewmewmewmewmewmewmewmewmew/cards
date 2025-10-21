@@ -29,7 +29,7 @@
       colors: ['249 146 253', '252 254 255'],
       sizes: ['1.4rem', '1rem', '0.6rem'],
       animations: ['fall-1', 'fall-2', 'fall-3'],
-      useEmoji: false, // set false if you later add Font Awesome and want icons
+      useEmoji: true, // set false if you later add Font Awesome and want icons
     };
 
     let count = 0;
