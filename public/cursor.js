@@ -1,12 +1,15 @@
 (() => {
+  // Wait for DOM so we can safely create/attach elements
   const ready = (fn) => {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', fn, { once: true });
-    } else fn();
+    } else {
+      fn();
+    }
   };
 
   ready(() => {
-    // ensure overlay exists
+    // Ensure an overlay exists (create if missing)
     let layer = document.getElementById('cursor-layer');
     if (!layer) {
       layer = document.createElement('div');
@@ -23,9 +26,10 @@
       duration: 1500,
       minTimeBetween: 250,
       minDistBetween: 75,
-      colors: ['249 146 253', '252 254 255'], // rgb triplets
+      colors: ['249 146 253', '252 254 255'],
       sizes: ['1.4rem', '1rem', '0.6rem'],
       animations: ['fall-1', 'fall-2', 'fall-3'],
+      useEmoji: true, // set false if you later add Font Awesome and want icons
     };
 
     let count = 0;
@@ -36,11 +40,11 @@
     const elapsed = (t0, t1) => t1 - t0;
 
     const createStar = (pos) => {
-      // Use Font Awesome icon
-      const el = document.createElement('i');
-      el.className = 'cursor-star fa-solid fa-sparkles'; // NOTE: fa-sparkles (plural)
-      const color = pick(config.colors);
+      const el = document.createElement(config.useEmoji ? 'span' : 'i');
+      el.className = 'cursor-star' + (config.useEmoji ? '' : ' fa-solid fa-sparkles');
+      if (config.useEmoji) el.textContent = '✨';
 
+      const color = pick(config.colors);
       el.style.left = px(pos.x);
       el.style.top = px(pos.y);
       el.style.fontSize = pick(config.sizes);
@@ -53,7 +57,11 @@
       setTimeout(() => el.remove(), config.duration);
     };
 
-    const updateLastStar = (pos) => { last.starTimestamp = Date.now(); last.starPosition = pos; };
+    const updateLastStar = (pos) => {
+      last.starTimestamp = Date.now();
+      last.starPosition = pos;
+    };
+
     const updateLastMouse = (pos) => { last.mousePosition = pos; };
     const ensureInitialMouse = (pos) => {
       if (last.mousePosition.x === 0 && last.mousePosition.y === 0) last.mousePosition = pos;
