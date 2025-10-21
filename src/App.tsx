@@ -486,7 +486,7 @@ export default function PokeCardGallery() {
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
-              <h1 className="text-base sm:text-lg font-semibold tracking-tight">Japanese Mews</h1>
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight">Mews (JP)</h1>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
