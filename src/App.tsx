@@ -2,19 +2,39 @@ import React, { useEffect, useMemo, useState } from "react";
 
 // --- Single-file React gallery for Pokémon cards (Mew-focused) ---
 // Theme: Dark gray (#101010) with pink accents (#cb97a5)
+// - Flags inferred by tab name ("Japanese" -> isMew, "Cameo" -> isCameo, "Unique" -> isIntl)
+// - **No de-duplication** across tabs
+// - CSP-safe fetching (docs.google.com only)
+// - Robust CSV parser + test harness
 //
-// --- Improvements ---
+// --- Improvements from User ---
+// - Refactored data fetching to use Promise.allSettled for parallel requests.
+// - Added error logging for failed sheet fetches for easier debugging.
+// - Added keyboard accessibility to the detail modal (closes on 'Escape').
+// - Replaced the text '✕' close button with a scalable SVG icon.
+// - Added a 'clear' button to the search input.
+// - Simplified the `applyFilters` logic for better readability.
+// - Completed and enhanced the development test suite.
+// - Fixed "duplicate key" error by generating guaranteed-unique IDs for cards.
+// - Added language toggle for Japanese/English card names, notes, and origins.
+// - Added card flip animation in detail modal for cards with a back image.
+// - Added image preloader with a loading bar for a smoother initial experience.
 // - Switched to Google Apps Script for secure data fetching from a private sheet.
-// - Added password protection for data fetching, with an easy on/off toggle.
+//
+// --- Gemini's Enhancements ---
+// - Changed card flip trigger in detail modal from hover to click for touch-device compatibility.
+// - Added a visual icon to indicate when a card is flippable.
+// - Updated hardcoded `http://` image URLs to `https://` to prevent mixed-content warnings.
+// - Simplified modal flip state management.
+// - Added optional password protection via Google Apps Script and a new 'Config' sheet.
+// - Redesigned password screen to be more minimal.
+// - Unified loading/password screens to prevent logo movement and remove the unlock button.
+// - Added logo pulse animation during password check and removed error text/placeholder.
+// - Refactored authentication logic to ensure password check pulse animation works correctly.
 
 // ------------------------------
-// 1) Configuration & Types
+// 1) Types & sample data
 // ------------------------------
-
-// --- EASY TOGGLE FOR PASSWORD PROTECTION ---
-// Set this to `false` to disable the password prompt entirely.
-const IS_PASSWORD_PROTECTED = false;
-
 export type Edition = '1st' | 'Unlim';
 
 export type PokeCard = {
@@ -90,21 +110,25 @@ function classNames(...xs: Array<string | false | null | undefined>): string {
 }
 
 function formatDate(dateString: string | undefined): string | undefined {
-  if (!dateString) return undefined;
+  if (!dateString) {
+    return undefined;
+  }
   const date = new Date(dateString);
-  if (isNaN(date.getTime())) return dateString;
+  if (isNaN(date.getTime())) {
+    return dateString;
+  }
   const year = date.getUTCFullYear();
   const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
   const day = date.getUTCDate().toString().padStart(2, '0');
-  if (year < 1990 || year > 2050) return dateString;
+
+  if (year < 1990 || year > 2050) {
+      return dateString;
+  }
+
   return `${year}-${month}-${day}`;
 }
 
-const IMG_FALLBACK = `data:image/svg+xml;utf8,\
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 420'>\
-  <rect width='100%' height='100%' fill='%23121212'/>\
-  <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='sans-serif' font-size='14'>Image unavailable</text>\
-</svg>`;
+const IMG_FALLBACK = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 420'><rect width='100%' height='100%' fill='%23121212'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='sans-serif' font-size='14'>Image unavailable</text></svg>`;
 function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget; if (img.src !== IMG_FALLBACK) img.src = IMG_FALLBACK;
 }
@@ -112,7 +136,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 // 3) Google Sheets loader (via Apps Script)
 // ------------------------------
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyzTe4bNsVqgNS-Js47lYPawWx-sE_pTqLp2MALHJBBnOmcQ6IEFxXE1myAvIg91nMTEQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
 
 function parseBool(x: string | undefined): boolean | undefined {
@@ -139,6 +163,9 @@ function releaseTs(card: PokeCard): number {
   return Number.POSITIVE_INFINITY;
 }
 
+// ------------------------------
+// 3.1) CSV parser (handles quotes, commas, CRLF)
+// ------------------------------
 function parseCSV(csv: string): PokeCard[] {
   csv = stripBOM(csv);
   const rows: string[][] = [];
@@ -264,6 +291,9 @@ function mergeCardsNoDedupe(groups: Array<{ cards: PokeCard[]; flag: 'isMew' | '
   return out;
 }
 
+// ------------------------------
+// 3.2) 3D tilt + glare (hover)
+// ------------------------------
 const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; children: React.ReactNode }> = ({ ariaLabel, onClick, children }) => {
   const ref = React.useRef<HTMLButtonElement>(null);
   const glareRef = React.useRef<HTMLDivElement>(null);
@@ -284,16 +314,16 @@ const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; childre
     const px = (e.clientX - rect.left) / rect.width;
     const py = (e.clientY - rect.top) / rect.height;
 
-    const max = 24;
-    const rx = (py - 0.5) * -max;
-    const ry = (px - 0.5) * max;
+    const max = 24; // degrees of tilt
+    const rx = (py - 0.5) * -max; // rotateX
+    const ry = (px - 0.5) * max; // rotateY
 
     el.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;
 
     if (glareRef.current) {
       const tiltMag = Math.min(1, Math.hypot(rx, ry) / max);
-      const gx = 50 + (-ry / max) * 35;
-      const gy = 50 + (rx / max) * 35;
+      const gx = 50 + (-ry / max) * 35; // percent across X based on rotateY
+      const gy = 50 + (rx / max) * 35; // percent down Y based on rotateX
       const baseAlpha = 0.45 + 0.25 * tiltMag;
       const alpha = (baseAlpha * 0.70).toFixed(2);
       glareRef.current.style.opacity = `${alpha}`;
@@ -318,6 +348,10 @@ const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; childre
   );
 };
 
+
+// ------------------------------
+// Background radial gradient (fixed)
+// ------------------------------
 const BackgroundGradient: React.FC = () => (
   <div
     aria-hidden="true"
@@ -329,7 +363,7 @@ const BackgroundGradient: React.FC = () => (
 );
 
 // ------------------------------
-// 4) Main component & Sub-components
+// 4) Main component
 // ------------------------------
 export default function PokeCardGallery() {
   const [q, setQ] = useState("");
@@ -341,28 +375,46 @@ export default function PokeCardGallery() {
   const [releaseSortDesc, setReleaseSortDesc] = useState(false);
   const [language, setLanguage] = useState<'EN' | 'JP'>('JP');
   
-  const [isAuthenticated, setIsAuthenticated] = useState(!IS_PASSWORD_PROTECTED);
-  const [password, setPassword] = useState("");
-  const [authError, setAuthError] = useState("");
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
-  
   const [dataStatus, setDataStatus] = useState<'loading' | 'loaded' | 'fallback'>('loading');
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [imagesLoaded, setImagesLoaded] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [passwordRequired, setPasswordRequired] = useState(false);
+  const [password, setPassword] = useState("");
 
   useEffect(() => { document.title = "Mews (JP)"; }, []);
 
-  // Main data fetching effect
+  // Check if password is required on initial load
   useEffect(() => {
-    if (!isAuthenticated) return;
-    
-    if (!APPS_SCRIPT_URL) {
-      console.error("Please add your Google Apps Script URL to the APPS_SCRIPT_URL constant.");
-      setDataStatus('fallback');
-      return;
-    }
+    const checkAuth = async () => {
+        try {
+            const res = await fetch(`${APPS_SCRIPT_URL}?action=getConfig`);
+            const config = await res.json();
+            if (config.passwordEnabled) {
+                setPasswordRequired(true);
+            } else {
+                setIsAuthenticated(true);
+            }
+        } catch (error) {
+            console.error("Failed to fetch config:", error);
+            // Fallback to public if config fails to load
+            setIsAuthenticated(true); 
+        } finally {
+            setAuthChecked(true);
+        }
+    };
+    checkAuth();
+  }, []);
 
+  // This effect handles all data fetching, for both public and private galleries.
+  useEffect(() => {
+    // Don't run until we know if the gallery is public or private.
+    if (!authChecked) return;
+    
     const fetchAllSheets = async () => {
       const sources: { name: string, flag: 'isMew' | 'isCameo' | 'isIntl' }[] = [
         { name: TAB_MAPPINGS.mew, flag: 'isMew' },
@@ -370,15 +422,35 @@ export default function PokeCardGallery() {
         { name: TAB_MAPPINGS.intl, flag: 'isIntl' },
       ];
 
-      const authParam = IS_PASSWORD_PROTECTED ? `&password=${encodeURIComponent(password)}` : '&auth=none';
-
       const results = await Promise.allSettled(
-        sources.map(s => fetch(`${APPS_SCRIPT_URL}?sheet=${encodeURIComponent(s.name)}${authParam}`).then(res => {
-          if (!res.ok) throw new Error(`Failed to fetch sheet "${s.name}": ${res.statusText}`);
-          return res.text();
-        }))
+        sources.map(s => {
+          let url = `${APPS_SCRIPT_URL}?sheet=${encodeURIComponent(s.name)}`;
+          if (passwordRequired) {
+              url += `&password=${encodeURIComponent(password)}`;
+          }
+          return fetch(url).then(async res => {
+              const text = await res.text();
+              if (text.startsWith("Error: Authentication Failed")) {
+                  throw new Error("Authentication Failed");
+              }
+              if (!res.ok && !text.startsWith("Error:")) {
+                  throw new Error(`Failed to fetch sheet "${s.name}": ${res.statusText}`);
+              }
+              return text;
+          });
+        })
       );
       
+      const authFailed = results.some(r => r.status === 'rejected' && r.reason.message === "Authentication Failed");
+
+      if (authFailed) {
+          setPassword(""); // Clear incorrect password
+          setRemoteCards(null);
+          setIsAuthenticating(false); // Stop pulse on failure
+          return;
+      }
+
+      // --- AUTHENTICATION SUCCESS ---
       const successfulGroups = results.reduce<Array<{ cards: PokeCard[]; flag: 'isMew' | 'isCameo' | 'isIntl' }>>((acc, result, i) => {
         if (result.status === 'fulfilled' && result.value) {
           const cards = parseCSV(result.value);
@@ -397,22 +469,22 @@ export default function PokeCardGallery() {
       } else {
         setRemoteCards(null);
         setDataStatus('fallback');
-        setFetchError("Failed to load card data. This could be due to a network issue or incorrect Google Apps Script permissions. Please ensure the script is deployed correctly with access for 'Anyone' and the URL is correct.");
       }
+      setIsAuthenticated(true); // Grant access
     };
-    fetchAllSheets();
-  }, [isAuthenticated, password]);
+    
+    // Run if it's a public gallery, or if a password has been submitted.
+    if ((!passwordRequired && authChecked) || password) {
+        fetchAllSheets();
+    }
+  }, [password, passwordRequired, authChecked]);
+
 
   const sourceCards = useMemo(() => remoteCards ?? [], [remoteCards]);
 
-  // Image preloading effect
   useEffect(() => {
-    if (dataStatus === 'fallback') {
-        setImagesLoaded(true);
-        return;
-    }
-    if (dataStatus === 'loading' && sourceCards.length === 0) return;
-    
+    if (dataStatus !== 'loaded' || !isAuthenticated) return;
+
     const imageUrls = sourceCards.flatMap(card => [card.image, card.imageBack]).filter(Boolean) as string[];
     if (imageUrls.length === 0) {
       setImagesLoaded(true);
@@ -438,39 +510,52 @@ export default function PokeCardGallery() {
       img.onload = onFinish;
       img.onerror = onFinish;
     });
-  }, [sourceCards, dataStatus]);
+  }, [sourceCards, dataStatus, isAuthenticated]);
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAuthLoading(true);
-    setAuthError("");
-    
-    try {
-      const verificationUrl = `${APPS_SCRIPT_URL}?sheet=${TAB_MAPPINGS.mew}&password=${encodeURIComponent(password)}`;
-      const response = await fetch(verificationUrl);
-      const text = await response.text();
-      
-      if (response.ok && !text.startsWith("Unauthorized")) {
-        setIsAuthenticated(true);
-      } else {
-        setAuthError("Incorrect password. Please try again.");
-      }
-    } catch (err) {
-      console.error("Login error:", err);
-      setAuthError("An error occurred while trying to authenticate.");
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-  
+
   const filtered = useMemo(() => applyFilters(sourceCards, { q, mew, cameo, intl, sortBy: releaseSortDesc ? "releaseDesc" : "releaseAsc" }), [q, mew, cameo, intl, sourceCards, releaseSortDesc]);
 
-  if (!isAuthenticated) {
-    return <LoginScreen password={password} setPassword={setPassword} onSubmit={handlePasswordSubmit} error={authError} isLoading={isAuthLoading} />
+  const handlePasswordSubmit = (submittedPassword: string) => {
+    setIsAuthenticating(true); // Start pulse
+    setPassword(submittedPassword); // Set password to trigger data fetch effect
+  };
+
+  if (!authChecked) {
+    return (
+        <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
+            <div className="relative h-28 w-28">
+                <img src="https://mew.net/cards/logo.png" alt="Loading..." className="h-full w-full animate-pulse opacity-50" />
+            </div>
+            <div className="h-16" />
+        </div>
+    );
   }
 
-  if (!imagesLoaded) {
-    return <LoadingScreen progress={loadingProgress} />;
+  if (passwordRequired && !isAuthenticated) {
+      return <PasswordScreen onPasswordSubmit={handlePasswordSubmit} isAuthenticating={isAuthenticating} />;
+  }
+
+  if (!imagesLoaded && isAuthenticated) {
+    return (
+      <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
+        <div className="relative h-28 w-28">
+          <img
+            src="https://mew.net/cards/logo.png"
+            alt="Loading..."
+            className="h-full w-full absolute top-0 left-0 opacity-30"
+          />
+          <img
+            src="https://mew.net/cards/logo.png"
+            alt="Loading..."
+            className="h-full w-full absolute top-0 left-0 transition-all duration-300 ease-linear"
+            style={{
+              clipPath: `inset(${100 - loadingProgress}% 0 0 0)`
+            }}
+          />
+        </div>
+        <div className="h-16" />
+      </div>
+    );
   }
 
   return (
@@ -480,7 +565,7 @@ export default function PokeCardGallery() {
         <div className="mx-auto max-w-7xl px-3 py-2">
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
+              <img src="https://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
               <h1 className="text-base sm:text-lg font-semibold tracking-tight">Mews (JP)</h1>
             </div>
             <div className="flex items-center gap-3">
@@ -501,7 +586,7 @@ export default function PokeCardGallery() {
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full h-8 rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 pr-8 text-[13px] text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]" />
                 {q && (
                   <button onClick={() => setQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-gray-200 hover:bg-[#2f2f2f]" aria-label="Clear search">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                   </button>
                 )}
               </div>
@@ -511,11 +596,9 @@ export default function PokeCardGallery() {
       </header>
 
       <main className="relative z-10 mx-auto max-w-7xl px-4 pt-8 pb-16">
-        {fetchError ? (
-          <ErrorState title="Data Loading Error" message={fetchError} />
-        ) : filtered.length === 0 ? (
-          <EmptyState />
-        ) : (
+        {filtered.length === 0 ? (
+          <EmptyState />)
+        : (
           <ul key={`sort:${releaseSortDesc ? "releaseDesc" : "releaseAsc"}`} className="grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((card) => {
               const displayName = (language === 'JP' && card.nameJP) ? card.nameJP : card.nameEN;
@@ -547,50 +630,9 @@ export default function PokeCardGallery() {
   );
 }
 
-// --- Sub-components ---
-
-const LoadingScreen: React.FC<{ progress: number }> = ({ progress }) => (
-  <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
-    <div className="relative h-28 w-28">
-      <img src="http://mew.net/cards/logo.png" alt="Loading..." className="h-full w-full absolute top-0 left-0 opacity-30" />
-      <img src="http://mew.net/cards/logo.png" alt="Loading..." className="h-full w-full absolute top-0 left-0 transition-all duration-300 ease-linear" style={{ clipPath: `inset(${100 - progress}% 0 0 0)` }} />
-    </div>
-  </div>
-);
-
-const LoginScreen: React.FC<{
-  password: string;
-  setPassword: (p: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  error: string;
-  isLoading: boolean;
-}> = ({ password, setPassword, onSubmit, error, isLoading }) => (
-  <div className="relative min-h-screen bg-[#101010] font-sans text-gray-100 flex items-center justify-center">
-    <BackgroundGradient />
-    <div className="relative z-10 flex flex-col items-center gap-4">
-      <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-28 w-28" />
-      <form onSubmit={onSubmit} className="flex flex-col items-center gap-4 w-64">
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="w-full h-10 rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]"
-          disabled={isLoading}
-        />
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full h-10 rounded-lg bg-[#cb97a5] text-sm font-semibold text-black shadow-sm outline-none transition-opacity hover:opacity-90 focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#101010] focus:ring-[#cb97a5] disabled:opacity-50"
-        >
-          {isLoading ? "Unlocking..." : "Enter"}
-        </button>
-        {error && <p className="text-sm text-red-400">{error}</p>}
-      </form>
-    </div>
-  </div>
-);
-
+// ------------------------------
+// Reusable bits
+// ------------------------------
 const InfoPill: React.FC<{ label: string }> = ({ label }) => (
   <span className="rounded bg-zinc-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-gray-300 backdrop-blur-sm">
     {label}
@@ -619,18 +661,10 @@ const InfoBubble: React.FC<{ label: string; value?: string | number | React.Reac
   </div>
 );
 
-const PopStat: React.FC<{ value: number | string | null; label: string; pill?: boolean }> = ({ value, label, pill }) => (
+const PopStat: React.FC<{ value: number | string; label: string; pill?: boolean }> = ({ value, label, pill }) => (
   <div className="text-center">
-    <div className="text-2xl font-semibold text-gray-100 leading-none">{value === null ? '—' : value}</div>
+    <div className="text-2xl font-semibold text-gray-100 leading-none">{value}</div>
     <div className="mt-0.5 text-[11px] text-gray-400">{pill ? <span className="rounded bg-black px-2 py-0.5 font-semibold text-gray-100">{label}</span> : label}</div>
-  </div>
-);
-
-const ErrorState: React.FC<{ title: string; message: string }> = ({ title, message }) => (
-  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-red-500/50 bg-[#121212] px-6 py-16 text-center text-gray-400">
-    <div className="text-4xl">⚠️</div>
-    <h2 className="text-lg font-semibold text-red-400">{title}</h2>
-    <p className="text-sm max-w-md">{message}</p>
   </div>
 );
 
@@ -641,13 +675,50 @@ const EmptyState: React.FC = () => (
   </div>
 );
 
+const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; isAuthenticating: boolean }> = ({ onPasswordSubmit, isAuthenticating }) => {
+    const [input, setInput] = useState("");
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (input && !isAuthenticating) {
+            onPasswordSubmit(input);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
+            <div className="relative h-28 w-28">
+                <img src="https://mew.net/cards/logo.png" alt="Mew Cards Logo" className={classNames("h-full w-full", isAuthenticating && "animate-pulse")} />
+            </div>
+            <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4 h-16 justify-start">
+                <input
+                    type="password"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    className="w-28 text-center h-10 rounded-lg border border-white/20 bg-white/10 px-3 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-0"
+                    placeholder=""
+                    autoFocus
+                    disabled={isAuthenticating}
+                />
+                 <div className="h-4" />
+            </form>
+        </div>
+    );
+};
+
+const FlipIcon = () => (
+  <div className="absolute bottom-2 right-2 z-20 rounded-full bg-black/50 p-2 text-white/80 backdrop-blur-sm">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+  </div>
+);
+
 const DetailModal: React.FC<{
   card: PokeCard;
   onClose: () => void;
   language: 'EN' | 'JP';
   setLanguage: React.Dispatch<React.SetStateAction<'EN' | 'JP'>>;
 }> = ({ card, onClose, language, setLanguage }) => {
-  const [rotation, setRotation] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -657,8 +728,9 @@ const DetailModal: React.FC<{
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
   
+  // Reset flip state when card changes
   useEffect(() => {
-    setRotation(0);
+    setIsFlipped(false);
   }, [card.id]);
 
   const displayName = (language === 'JP' && card.nameJP) ? card.nameJP : card.nameEN;
@@ -674,23 +746,28 @@ const DetailModal: React.FC<{
         <div className="grid grid-cols-1 sm:grid-cols-2">
           <div className="flex flex-col items-center p-4 sm:p-6">
             <div
-              className="w-full max-w-[520px] [perspective:2500px] [transform-style:preserve-3d]"
-              onMouseEnter={() => { if (card.imageBack) { setRotation(r => r + 180); } }}
-              onMouseLeave={() => { if (card.imageBack) { setRotation(r => r + 180); } }}
+              className={classNames(
+                  "relative w-full max-w-[520px] [perspective:2500px]",
+                  card.imageBack && "cursor-pointer"
+              )}
+              onClick={() => { if (card.imageBack) setIsFlipped(f => !f); }}
             >
               <div
-                className="relative w-full aspect-[63/88] transition-transform duration-1000 [transform-style:preserve-3d]"
-                style={{ transform: `rotateY(${rotation}deg)` }}
+                className="relative w-full aspect-[63/88] transition-transform duration-700 [transform-style:preserve-3d]"
+                style={{ transform: `rotateY(${isFlipped ? 180 : 0}deg)` }}
               >
+                {/* Front */}
                 <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
                   <img src={card.image} alt={`${displayName} front`} className="h-full w-full object-fill" style={{ aspectRatio: "63/88" }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                 </div>
+                {/* Back */}
                 {card.imageBack && (
                   <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
                     <img src={card.imageBack} alt={`${displayName} back`} className="h-full w-full object-fill" style={{ aspectRatio: "63/88" }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                   </div>
                 )}
               </div>
+              {card.imageBack && !isFlipped && <FlipIcon />}
             </div>
           </div>
           <div className="flex flex-col space-y-3 p-4 pt-0 sm:p-6 sm:max-h-[80vh] sm:overflow-y-auto">
@@ -730,7 +807,7 @@ const DetailModal: React.FC<{
                   <PopStat value={card.population.psa8} label="PSA8" />
                   <PopStat value={card.population.psa9} label="PSA9" />
                   <PopStat value={card.population.psa10} label="PSA10" />
-                  <PopStat value={card.population.bgsBL} label="BGS BL" pill />
+                  <PopStat value={card.population.bgsBL === null ? '—' : card.population.bgsBL} label="BGS BL" pill />
                 </div>
               </div>
             )}
@@ -749,6 +826,9 @@ const DetailModal: React.FC<{
   );
 };
 
+// ------------------------------
+// 5) Dev tests (run in browser console)
+// ------------------------------
 function runDevTests() {
   console.log("--- Running Dev Tests ---");
   const base: PokeCard[] = [
@@ -769,4 +849,7 @@ function runDevTests() {
   
   console.log("--- All Tests Passed ---");
 }
+
+// To run tests, open the browser console and call runDevTests()
+// runDevTests();
 
