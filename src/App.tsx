@@ -112,7 +112,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 // 3) Google Sheets loader (via Apps Script)
 // ------------------------------
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwsPsBUeWIJxsi-Ov3VFsVlPuR4RCt5rUoFjjSpo0L4dTbVwk2Lrm9jA5ftfX1eSPGtg/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyzTe4bNsVqgNS-Js47lYPawWx-sE_pTqLp2MALHJBBnOmcQ6IEFxXE1myAvIg91nMTEQ/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
 
 function parseBool(x: string | undefined): boolean | undefined {
