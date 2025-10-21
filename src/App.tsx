@@ -33,6 +33,7 @@ import React, { useEffect, useMemo, useState } from "react";
 // - Refactored authentication logic to ensure password check pulse animation works correctly.
 // - Made the logo fade consistent across all loading phases.
 // - Changed password field background to match page, and change on focus.
+// - Made the password field non-focused on load by removing autoFocus.
 
 // ------------------------------
 // 1) Types & sample data
@@ -699,7 +700,6 @@ const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; i
                     onChange={(e) => setInput(e.target.value)}
                     className="w-28 text-center h-10 rounded-lg border border-white/20 bg-[#101010] focus:bg-[#232323] px-3 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-0"
                     placeholder=""
-                    autoFocus
                     disabled={isAuthenticating}
                 />
                  <div className="h-4" />
@@ -854,6 +854,4 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
-
-
 
