@@ -2,28 +2,19 @@ import React, { useEffect, useMemo, useState } from "react";
 
 // --- Single-file React gallery for Pokémon cards (Mew-focused) ---
 // Theme: Dark gray (#101010) with pink accents (#cb97a5)
-// - Flags inferred by tab name ("Japanese" -> isMew, "Cameo" -> isCameo, "Unique" -> isIntl)
-// - **No de-duplication** across tabs
-// - CSP-safe fetching (docs.google.com only)
-// - Robust CSV parser + test harness
 //
 // --- Improvements ---
-// - Refactored data fetching to use Promise.allSettled for parallel requests.
-// - Added error logging for failed sheet fetches for easier debugging.
-// - Added keyboard accessibility to the detail modal (closes on 'Escape').
-// - Replaced the text '✕' close button with a scalable SVG icon.
-// - Added a 'clear' button to the search input.
-// - Simplified the `applyFilters` logic for better readability.
-// - Completed and enhanced the development test suite.
-// - Fixed "duplicate key" error by generating guaranteed-unique IDs for cards.
-// - Added language toggle for Japanese/English card names, notes, and origins.
-// - Added card flip animation in detail modal for cards with a back image.
-// - Added image preloader with a loading bar for a smoother initial experience.
 // - Switched to Google Apps Script for secure data fetching from a private sheet.
+// - Added password protection for data fetching, with an easy on/off toggle.
 
 // ------------------------------
-// 1) Types & sample data
+// 1) Configuration & Types
 // ------------------------------
+
+// --- EASY TOGGLE FOR PASSWORD PROTECTION ---
+// Set this to `false` to disable the password prompt entirely.
+const IS_PASSWORD_PROTECTED = true;
+
 export type Edition = '1st' | 'Unlim';
 
 export type PokeCard = {
@@ -98,31 +89,17 @@ function classNames(...xs: Array<string | false | null | undefined>): string {
   return xs.filter(Boolean).join(" ");
 }
 
-// IMPROVEMENT: Add a date formatting utility
 function formatDate(dateString: string | undefined): string | undefined {
-  if (!dateString) {
-    return undefined;
-  }
-  // Handles cases where the date might be a full string or just YYYY-MM-DD
+  if (!dateString) return undefined;
   const date = new Date(dateString);
-  if (isNaN(date.getTime())) {
-    // Return original string if it's not a valid date
-    return dateString;
-  }
-  // Use UTC methods to avoid timezone issues where the date could be off by one day.
+  if (isNaN(date.getTime())) return dateString;
   const year = date.getUTCFullYear();
   const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
   const day = date.getUTCDate().toString().padStart(2, '0');
-
-  // Check for a plausible year, otherwise it might be a parsing error.
-  if (year < 1990 || year > 2050) {
-      return dateString;
-  }
-
+  if (year < 1990 || year > 2050) return dateString;
   return `${year}-${month}-${day}`;
 }
 
-// Force image fallback for hosts that block hotlinking
 const IMG_FALLBACK = `data:image/svg+xml;utf8,\
 <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 420'>\
   <rect width='100%' height='100%' fill='%23121212'/>\
@@ -135,7 +112,6 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 // 3) Google Sheets loader (via Apps Script)
 // ------------------------------
-// IMPORTANT: Replace this placeholder with your own Google Apps Script URL.
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc3FK3fiSRtFEGPlChV07IdbOwGw59i_FM8J9V58m5z-U77eqdsqt3-LyKR-Low49guw/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
 
@@ -152,7 +128,6 @@ function slugify(...parts: Array<string | undefined>): string {
   return s.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "row";
 }
 
-// Release timestamp used for sorting; falls back to Jan 1 of `year` when `release` is missing/invalid
 function releaseTs(card: PokeCard): number {
   if (card.release) {
     const t = Date.parse(card.release);
@@ -161,12 +136,9 @@ function releaseTs(card: PokeCard): number {
   if (Number.isFinite(card.year) && card.year > 0) {
     return new Date(card.year, 0, 1).getTime();
   }
-  return Number.POSITIVE_INFINITY; // push unknowns to the end for ascending
+  return Number.POSITIVE_INFINITY;
 }
 
-// ------------------------------
-// 3.1) CSV parser (handles quotes, commas, CRLF)
-// ------------------------------
 function parseCSV(csv: string): PokeCard[] {
   csv = stripBOM(csv);
   const rows: string[][] = [];
@@ -292,9 +264,6 @@ function mergeCardsNoDedupe(groups: Array<{ cards: PokeCard[]; flag: 'isMew' | '
   return out;
 }
 
-// ------------------------------
-// 3.2) 3D tilt + glare (hover)
-// ------------------------------
 const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; children: React.ReactNode }> = ({ ariaLabel, onClick, children }) => {
   const ref = React.useRef<HTMLButtonElement>(null);
   const glareRef = React.useRef<HTMLDivElement>(null);
@@ -315,16 +284,16 @@ const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; childre
     const px = (e.clientX - rect.left) / rect.width;
     const py = (e.clientY - rect.top) / rect.height;
 
-    const max = 24; // degrees of tilt
-    const rx = (py - 0.5) * -max; // rotateX
-    const ry = (px - 0.5) * max; // rotateY
+    const max = 24;
+    const rx = (py - 0.5) * -max;
+    const ry = (px - 0.5) * max;
 
     el.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;
 
     if (glareRef.current) {
       const tiltMag = Math.min(1, Math.hypot(rx, ry) / max);
-      const gx = 50 + (-ry / max) * 35; // percent across X based on rotateY
-      const gy = 50 + (rx / max) * 35; // percent down Y based on rotateX
+      const gx = 50 + (-ry / max) * 35;
+      const gy = 50 + (rx / max) * 35;
       const baseAlpha = 0.45 + 0.25 * tiltMag;
       const alpha = (baseAlpha * 0.70).toFixed(2);
       glareRef.current.style.opacity = `${alpha}`;
@@ -349,10 +318,6 @@ const TiltCardButton: React.FC<{ ariaLabel: string; onClick: () => void; childre
   );
 };
 
-
-// ------------------------------
-// Background radial gradient (fixed)
-// ------------------------------
 const BackgroundGradient: React.FC = () => (
   <div
     aria-hidden="true"
@@ -364,7 +329,7 @@ const BackgroundGradient: React.FC = () => (
 );
 
 // ------------------------------
-// 4) Main component
+// 4) Main component & Sub-components
 // ------------------------------
 export default function PokeCardGallery() {
   const [q, setQ] = useState("");
@@ -376,13 +341,26 @@ export default function PokeCardGallery() {
   const [releaseSortDesc, setReleaseSortDesc] = useState(false);
   const [language, setLanguage] = useState<'EN' | 'JP'>('JP');
   
+  const [isAuthenticated, setIsAuthenticated] = useState(!IS_PASSWORD_PROTECTED);
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  
   const [dataStatus, setDataStatus] = useState<'loading' | 'loaded' | 'fallback'>('loading');
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [imagesLoaded, setImagesLoaded] = useState(false);
 
   useEffect(() => { document.title = "Mews (JP)"; }, []);
 
+  // Main data fetching effect
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === "PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
+      console.error("Please add your Google Apps Script URL to the APPS_SCRIPT_URL constant.");
+      setDataStatus('fallback');
+      return;
+    }
 
     const fetchAllSheets = async () => {
       const sources: { name: string, flag: 'isMew' | 'isCameo' | 'isIntl' }[] = [
@@ -392,7 +370,7 @@ export default function PokeCardGallery() {
       ];
 
       const results = await Promise.allSettled(
-        sources.map(s => fetch(`${APPS_SCRIPT_URL}?sheet=${encodeURIComponent(s.name)}`).then(res => {
+        sources.map(s => fetch(`${APPS_SCRIPT_URL}?sheet=${encodeURIComponent(s.name)}&password=${encodeURIComponent(password)}`).then(res => {
           if (!res.ok) throw new Error(`Failed to fetch sheet "${s.name}": ${res.statusText}`);
           return res.text();
         }))
@@ -419,13 +397,13 @@ export default function PokeCardGallery() {
       }
     };
     fetchAllSheets();
-  }, []);
+  }, [isAuthenticated, password]);
 
   const sourceCards = useMemo(() => remoteCards ?? [], [remoteCards]);
 
+  // Image preloading effect
   useEffect(() => {
     if (dataStatus === 'loading' && sourceCards.length === 0) return;
-
     const imageUrls = sourceCards.flatMap(card => [card.image, card.imageBack]).filter(Boolean) as string[];
     if (imageUrls.length === 0) {
       setImagesLoaded(true);
@@ -453,29 +431,37 @@ export default function PokeCardGallery() {
     });
   }, [sourceCards, dataStatus]);
 
-
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAuthLoading(true);
+    setAuthError("");
+    
+    try {
+      const verificationUrl = `${APPS_SCRIPT_URL}?sheet=${TAB_MAPPINGS.mew}&password=${encodeURIComponent(password)}`;
+      const response = await fetch(verificationUrl);
+      const text = await response.text();
+      
+      if (response.ok && !text.startsWith("Unauthorized")) {
+        setIsAuthenticated(true);
+      } else {
+        setAuthError("Incorrect password. Please try again.");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setAuthError("An error occurred while trying to authenticate.");
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+  
   const filtered = useMemo(() => applyFilters(sourceCards, { q, mew, cameo, intl, sortBy: releaseSortDesc ? "releaseDesc" : "releaseAsc" }), [q, mew, cameo, intl, sourceCards, releaseSortDesc]);
 
+  if (!isAuthenticated) {
+    return <LoginScreen password={password} setPassword={setPassword} onSubmit={handlePasswordSubmit} error={authError} isLoading={isAuthLoading} />
+  }
+
   if (!imagesLoaded) {
-    return (
-      <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
-        <div className="relative h-28 w-28">
-          <img
-            src="http://mew.net/cards/logo.png"
-            alt="Loading..."
-            className="h-full w-full absolute top-0 left-0 opacity-30"
-          />
-          <img
-            src="http://mew.net/cards/logo.png"
-            alt="Loading..."
-            className="h-full w-full absolute top-0 left-0 transition-all duration-300 ease-linear"
-            style={{
-              clipPath: `inset(${100 - loadingProgress}% 0 0 0)`
-            }}
-          />
-        </div>
-      </div>
-    );
+    return <LoadingScreen progress={loadingProgress} />;
   }
 
   return (
@@ -550,9 +536,50 @@ export default function PokeCardGallery() {
   );
 }
 
-// ------------------------------
-// Reusable bits
-// ------------------------------
+// --- Sub-components ---
+
+const LoadingScreen: React.FC<{ progress: number }> = ({ progress }) => (
+  <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 transition-opacity duration-300">
+    <div className="relative h-28 w-28">
+      <img src="http://mew.net/cards/logo.png" alt="Loading..." className="h-full w-full absolute top-0 left-0 opacity-30" />
+      <img src="http://mew.net/cards/logo.png" alt="Loading..." className="h-full w-full absolute top-0 left-0 transition-all duration-300 ease-linear" style={{ clipPath: `inset(${100 - progress}% 0 0 0)` }} />
+    </div>
+  </div>
+);
+
+const LoginScreen: React.FC<{
+  password: string;
+  setPassword: (p: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  error: string;
+  isLoading: boolean;
+}> = ({ password, setPassword, onSubmit, error, isLoading }) => (
+  <div className="relative min-h-screen bg-[#101010] font-sans text-gray-100 flex items-center justify-center">
+    <BackgroundGradient />
+    <div className="relative z-10 flex flex-col items-center gap-4">
+      <img src="http://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-28 w-28" />
+      <form onSubmit={onSubmit} className="flex flex-col items-center gap-4 w-64">
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          className="w-full h-10 rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-4 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]"
+          disabled={isLoading}
+        />
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full h-10 rounded-lg bg-[#cb97a5] text-sm font-semibold text-black shadow-sm outline-none transition-opacity hover:opacity-90 focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#101010] focus:ring-[#cb97a5] disabled:opacity-50"
+        >
+          {isLoading ? "Unlocking..." : "Enter"}
+        </button>
+        {error && <p className="text-sm text-red-400">{error}</p>}
+      </form>
+    </div>
+  </div>
+);
+
 const InfoPill: React.FC<{ label: string }> = ({ label }) => (
   <span className="rounded bg-zinc-800/60 px-1.5 py-0.5 text-[10px] font-semibold text-gray-300 backdrop-blur-sm">
     {label}
@@ -581,9 +608,9 @@ const InfoBubble: React.FC<{ label: string; value?: string | number | React.Reac
   </div>
 );
 
-const PopStat: React.FC<{ value: number | string; label: string; pill?: boolean }> = ({ value, label, pill }) => (
+const PopStat: React.FC<{ value: number | string | null; label: string; pill?: boolean }> = ({ value, label, pill }) => (
   <div className="text-center">
-    <div className="text-2xl font-semibold text-gray-100 leading-none">{value}</div>
+    <div className="text-2xl font-semibold text-gray-100 leading-none">{value === null ? '—' : value}</div>
     <div className="mt-0.5 text-[11px] text-gray-400">{pill ? <span className="rounded bg-black px-2 py-0.5 font-semibold text-gray-100">{label}</span> : label}</div>
   </div>
 );
@@ -611,7 +638,6 @@ const DetailModal: React.FC<{
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
   
-  // Reset flip state when card changes
   useEffect(() => {
     setRotation(0);
   }, [card.id]);
@@ -637,11 +663,9 @@ const DetailModal: React.FC<{
                 className="relative w-full aspect-[63/88] transition-transform duration-1000 [transform-style:preserve-3d]"
                 style={{ transform: `rotateY(${rotation}deg)` }}
               >
-                {/* Front */}
                 <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
                   <img src={card.image} alt={`${displayName} front`} className="h-full w-full object-fill" style={{ aspectRatio: "63/88" }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                 </div>
-                {/* Back */}
                 {card.imageBack && (
                   <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
                     <img src={card.imageBack} alt={`${displayName} back`} className="h-full w-full object-fill" style={{ aspectRatio: "63/88" }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
@@ -687,7 +711,7 @@ const DetailModal: React.FC<{
                   <PopStat value={card.population.psa8} label="PSA8" />
                   <PopStat value={card.population.psa9} label="PSA9" />
                   <PopStat value={card.population.psa10} label="PSA10" />
-                  <PopStat value={card.population.bgsBL === null ? '—' : card.population.bgsBL} label="BGS BL" pill />
+                  <PopStat value={card.population.bgsBL} label="BGS BL" pill />
                 </div>
               </div>
             )}
@@ -706,9 +730,6 @@ const DetailModal: React.FC<{
   );
 };
 
-// ------------------------------
-// 5) Dev tests (run in browser console)
-// ------------------------------
 function runDevTests() {
   console.log("--- Running Dev Tests ---");
   const base: PokeCard[] = [
@@ -729,10 +750,4 @@ function runDevTests() {
   
   console.log("--- All Tests Passed ---");
 }
-
-// To run tests, open the browser console and call runDevTests()
-// runDevTests();
-
-
-
 
