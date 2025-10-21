@@ -1,90 +1,86 @@
 (() => {
-  const start = Date.now();
-  const originPosition = { x: 0, y: 0 };
-
-  const last = {
-    starTimestamp: start,
-    starPosition: originPosition,
-    mousePosition: originPosition
-  };
-
-  const config = {
-    starAnimationDuration: 1500,
-    minimumTimeBetweenStars: 250,
-    minimumDistanceBetweenStars: 75,
-    colors: ["249 146 253", "252 254 255"],
-    sizes: ["1.4rem", "1rem", "0.6rem"],
-    animations: ["fall-1", "fall-2", "fall-3"]
-  };
-
-  let count = 0;
-
-  const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-  const selectRandom = items => items[rand(0, items.length - 1)];
-  const px = v => `${v}px`;
-  const calcDistance = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
-  const calcElapsedTime = (start, end) => end - start;
-
-  const appendElement = el => document.body.appendChild(el);
-  const removeElement = (el, delay) => setTimeout(() => el.remove(), delay);
-
-  const createStar = position => {
-    const star = document.createElement("i");
-    const color = selectRandom(config.colors);
-
-    // FIX 1: correct FA class (plural)
-    star.className = "star fa-solid fa-sparkles";
-
-    star.style.left = px(position.x);
-    star.style.top = px(position.y);
-    star.style.fontSize = selectRandom(config.sizes);
-    star.style.color = `rgb(${color})`;
-    star.style.textShadow = `0 0 1.5rem rgb(${color} / 0.5)`;
-    star.style.animationName = config.animations[count++ % 3];
-
-    // FIX 2: correct property name
-    star.style.animationDuration = `${config.starAnimationDuration}ms`;
-
-    appendElement(star);
-    removeElement(star, config.starAnimationDuration);
-  };
-
-  const updateLastStar = position => {
-    last.starTimestamp = Date.now();
-    last.starPosition = position;
-  };
-
-  const updateLastMousePosition = position => (last.mousePosition = position);
-
-  const adjustLastMousePosition = position => {
-    if (last.mousePosition.x === 0 && last.mousePosition.y === 0) {
-      last.mousePosition = position;
+  // Wait for DOM so we can safely create/attach elements
+  const ready = (fn) => {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fn, { once: true });
+    } else {
+      fn();
     }
   };
 
-  const handleOnMove = e => {
-    const mousePosition = { x: e.clientX, y: e.clientY };
-    adjustLastMousePosition(mousePosition);
-
-    const now = Date.now();
-    const hasMovedFarEnough =
-      calcDistance(last.starPosition, mousePosition) >=
-      config.minimumDistanceBetweenStars;
-    const hasBeenLongEnough =
-      calcElapsedTime(last.starTimestamp, now) >
-      config.minimumTimeBetweenStars;
-
-    if (hasMovedFarEnough || hasBeenLongEnough) {
-      createStar(mousePosition);
-      updateLastStar(mousePosition);
+  ready(() => {
+    // Ensure an overlay exists (create if missing)
+    let layer = document.getElementById('cursor-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'cursor-layer';
+      layer.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(layer);
     }
 
-    updateLastMousePosition(mousePosition);
-  };
+    const start = Date.now();
+    const origin = { x: 0, y: 0 };
+    const last = { starTimestamp: start, starPosition: origin, mousePosition: origin };
 
-  // Use pointer events (covers mouse/touch/pen)
-  window.addEventListener("pointermove", handleOnMove, { passive: true });
-  // Touch fallback (if you want)
-  window.addEventListener("touchmove", e => handleOnMove(e.touches[0]), { passive: true });
-  document.body.addEventListener("mouseleave", () => updateLastMousePosition(originPosition));
+    const config = {
+      duration: 1500,
+      minTimeBetween: 250,
+      minDistBetween: 75,
+      colors: ['249 146 253', '252 254 255'],
+      sizes: ['1.4rem', '1rem', '0.6rem'],
+      animations: ['fall-1', 'fall-2', 'fall-3'],
+      useEmoji: false, // set false if you later add Font Awesome and want icons
+    };
+
+    let count = 0;
+    const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const pick = (arr) => arr[rand(0, arr.length - 1)];
+    const px = (v) => `${v}px`;
+    const distance = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+    const elapsed = (t0, t1) => t1 - t0;
+
+    const createStar = (pos) => {
+      const el = document.createElement(config.useEmoji ? 'span' : 'i');
+      el.className = 'cursor-star' + (config.useEmoji ? '' : ' fa-solid fa-sparkles');
+      if (config.useEmoji) el.textContent = '✨';
+
+      const color = pick(config.colors);
+      el.style.left = px(pos.x);
+      el.style.top = px(pos.y);
+      el.style.fontSize = pick(config.sizes);
+      el.style.color = `rgb(${color})`;
+      el.style.textShadow = `0 0 1.5rem rgb(${color} / 0.5)`;
+      el.style.animationName = config.animations[count++ % config.animations.length];
+      el.style.animationDuration = `${config.duration}ms`;
+
+      layer.appendChild(el);
+      setTimeout(() => el.remove(), config.duration);
+    };
+
+    const updateLastStar = (pos) => {
+      last.starTimestamp = Date.now();
+      last.starPosition = pos;
+    };
+
+    const updateLastMouse = (pos) => { last.mousePosition = pos; };
+    const ensureInitialMouse = (pos) => {
+      if (last.mousePosition.x === 0 && last.mousePosition.y === 0) last.mousePosition = pos;
+    };
+
+    const handleMove = (e) => {
+      const p = { x: e.clientX, y: e.clientY };
+      ensureInitialMouse(p);
+      const now = Date.now();
+      const farEnough = distance(last.starPosition, p) >= config.minDistBetween;
+      const longEnough = elapsed(last.starTimestamp, now) > config.minTimeBetween;
+      if (farEnough || longEnough) {
+        createStar(p);
+        updateLastStar(p);
+      }
+      updateLastMouse(p);
+    };
+
+    window.addEventListener('pointermove', handleMove, { passive: true });
+    document.body.addEventListener('mouseleave', () => updateLastMouse(origin));
+  });
 })();
