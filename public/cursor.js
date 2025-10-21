@@ -22,8 +22,8 @@
       duration: 1500,
       minTimeBetween: 250,
       minDistBetween: 75,
-      colors: ['249 146 253', '252 254 255'],
-      sizes: ['1.4rem', '1rem', '0.6rem'],
+      colors: ['238 185 213', '252 254 255'],
+      sizes: ['1.0rem', '0.7rem', '0.4rem'],
       animations: ['fall-1', 'fall-2', 'fall-3'],
       useEmoji: false,             // ✅ switch to Font Awesome
       faClass: 'fa-solid fa-star' // try 'fa-solid fa-star' if sparkles doesn't show
