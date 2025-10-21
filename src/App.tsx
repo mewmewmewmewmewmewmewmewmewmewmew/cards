@@ -13,7 +13,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 // --- EASY TOGGLE FOR PASSWORD PROTECTION ---
 // Set this to `false` to disable the password prompt entirely.
-const IS_PASSWORD_PROTECTED = true;
+const IS_PASSWORD_PROTECTED = false;
 
 export type Edition = '1st' | 'Unlim';
 
