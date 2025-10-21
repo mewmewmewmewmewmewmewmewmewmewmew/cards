@@ -15,7 +15,7 @@
   will-change: transform, opacity;
   animation-duration: 1500ms;
   animation-fill-mode: forwards;
-  filter: drop-shadow(0 0 1.5rem rgba(255,255,255,.5));
+  filter: drop-shadow(0 0 1.5rem rgba(255,255,255,.25));
   user-select: none;
 }
 
