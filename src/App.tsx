@@ -356,7 +356,7 @@ export default function PokeCardGallery() {
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === "PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
+    if (!APPS_SCRIPT_URL) {
       console.error("Please add your Google Apps Script URL to the APPS_SCRIPT_URL constant.");
       setDataStatus('fallback');
       return;
