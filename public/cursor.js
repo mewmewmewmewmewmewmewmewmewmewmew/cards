@@ -1,15 +1,11 @@
 (() => {
-  // Wait for DOM so we can safely create/attach elements
   const ready = (fn) => {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', fn, { once: true });
-    } else {
-      fn();
-    }
+    } else fn();
   };
 
   ready(() => {
-    // Ensure an overlay exists (create if missing)
     let layer = document.getElementById('cursor-layer');
     if (!layer) {
       layer = document.createElement('div');
@@ -29,7 +25,8 @@
       colors: ['249 146 253', '252 254 255'],
       sizes: ['1.4rem', '1rem', '0.6rem'],
       animations: ['fall-1', 'fall-2', 'fall-3'],
-      useEmoji: true, // set false if you later add Font Awesome and want icons
+      useEmoji: false,             // ✅ switch to Font Awesome
+      faClass: 'fa-solid fa-sparkles' // try 'fa-solid fa-star' if sparkles doesn't show
     };
 
     let count = 0;
@@ -41,8 +38,8 @@
 
     const createStar = (pos) => {
       const el = document.createElement(config.useEmoji ? 'span' : 'i');
-      el.className = 'cursor-star' + (config.useEmoji ? '' : ' fa-solid fa-sparkles');
-      if (config.useEmoji) el.textContent = '✨';
+      el.className = (config.useEmoji ? 'cursor-star' : `cursor-star ${config.faClass}`);
+      if (config.useEmoji) el.textContent = '✨';  // not used now
 
       const color = pick(config.colors);
       el.style.left = px(pos.x);
@@ -57,23 +54,18 @@
       setTimeout(() => el.remove(), config.duration);
     };
 
-    const updateLastStar = (pos) => {
-      last.starTimestamp = Date.now();
-      last.starPosition = pos;
-    };
-
-    const updateLastMouse = (pos) => { last.mousePosition = pos; };
-    const ensureInitialMouse = (pos) => {
-      if (last.mousePosition.x === 0 && last.mousePosition.y === 0) last.mousePosition = pos;
+    const updateLastStar = (p) => { last.starTimestamp = Date.now(); last.starPosition = p; };
+    const updateLastMouse = (p) => { last.mousePosition = p; };
+    const ensureInitialMouse = (p) => {
+      if (last.mousePosition.x === 0 && last.mousePosition.y === 0) last.mousePosition = p;
     };
 
     const handleMove = (e) => {
       const p = { x: e.clientX, y: e.clientY };
       ensureInitialMouse(p);
       const now = Date.now();
-      const farEnough = distance(last.starPosition, p) >= config.minDistBetween;
-      const longEnough = elapsed(last.starTimestamp, now) > config.minTimeBetween;
-      if (farEnough || longEnough) {
+      if (distance(last.starPosition, p) >= config.minDistBetween ||
+          elapsed(last.starTimestamp, now) > config.minTimeBetween) {
         createStar(p);
         updateLastStar(p);
       }
