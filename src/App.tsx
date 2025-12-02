@@ -527,7 +527,7 @@ export default function PokeCardGallery() {
     return (
         <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
             <div className="relative h-28 w-28">
-                <img src="https://mew.net/cards/logo.png" alt="Loading..." className="h-full w-full animate-pulse opacity-30" />
+                <img src="https://mew.cards/img/logo.png" alt="Loading..." className="h-full w-full animate-pulse opacity-30" />
             </div>
             <div className="h-16" />
         </div>
@@ -543,12 +543,12 @@ export default function PokeCardGallery() {
       <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
         <div className="relative h-28 w-28">
           <img
-            src="https://mew.net/cards/logo.png"
+            src="https://mew.cards/img/logo.png"
             alt="Loading..."
             className="h-full w-full absolute top-0 left-0 opacity-30"
           />
           <img
-            src="https://mew.net/cards/logo.png"
+            src="https://mew.cards/img/logo.png"
             alt="Loading..."
             className="h-full w-full absolute top-0 left-0 transition-all duration-300 ease-linear"
             style={{
@@ -568,7 +568,7 @@ export default function PokeCardGallery() {
         <div className="mx-auto max-w-7xl px-3 py-2">
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <img src="https://mew.net/cards/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
+              <img src="https://mew.cards/img/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
               <h1 className="text-base sm:text-lg font-semibold tracking-tight">Mews (JP)</h1>
             </div>
             <div className="flex items-center gap-3">
@@ -691,7 +691,7 @@ const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; i
     return (
         <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
             <div className="relative h-28 w-28">
-                <img src="https://mew.net/cards/logo.png" alt="Mew Cards Logo" className={classNames("h-full w-full", isAuthenticating && "animate-pulse")} />
+                <img src="https://mew.cards/img/logo.png" alt="Mew Cards Logo" className={classNames("h-full w-full", isAuthenticating && "animate-pulse")} />
             </div>
             <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4 h-16 justify-start">
                 <input
