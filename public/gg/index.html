@@ -34,7 +34,6 @@
             background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
             background-size: 20px 20px;
             transition: background-color 0.3s ease, color 0.3s ease;
-            /* Removed overflow: hidden from here to prevent permanent lock */
         }
 
         /* Loading Screen Styles */
@@ -329,10 +328,22 @@
     <!-- Changed to relative to support absolute positioning of children on desktop -->
     <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 overflow-hidden">
         
+        <!-- SIDEBAR REOPEN BUTTON (Desktop Only) -->
+        <!-- Fixed to left edge, centered vertically. Initially hidden. -->
+        <button id="sidebar-open-btn" onclick="toggleSidebar()" class="hidden absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-white dark:bg-slate-800 p-3 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all hover:scale-110 group" title="Open Controls">
+             <i data-lucide="panel-left-open" class="w-6 h-6"></i>
+        </button>
+
         <!-- Controls Section -->
         <!-- Mobile: order-2 (Bottom), relative. Desktop: Absolute Left, Centered Vertically, Z-20 -->
-        <div class="w-full lg:w-80 flex-none order-2 lg:absolute lg:left-8 lg:top-1/2 lg:-translate-y-1/2 lg:z-20 bg-white rounded-2xl shadow-xl p-6 border border-slate-100 flex flex-col gap-6 transition-colors duration-300 h-fit max-h-[85vh] overflow-y-auto">
+        <!-- Added ID='sidebar' and transitions for collapsing -->
+        <div id="sidebar" class="w-full lg:w-80 flex-none order-2 lg:absolute lg:left-8 lg:top-1/2 lg:-translate-y-1/2 lg:z-20 bg-white rounded-2xl shadow-xl p-6 border border-slate-100 flex flex-col gap-6 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] h-fit max-h-[85vh] overflow-y-auto">
             
+            <!-- COLLAPSE BUTTON (Desktop Only) -->
+            <button onclick="toggleSidebar()" class="hidden lg:flex absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" title="Collapse Panel">
+                <i data-lucide="panel-left-close" class="w-5 h-5"></i>
+            </button>
+
             <!-- 1. Grading Company Selection -->
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">1. Grading Company</label>
@@ -560,6 +571,25 @@
         // Loader Elements
         const loadingScreen = document.getElementById('loading-screen');
         const loadingLogoFg = document.getElementById('loading-logo-fg');
+        
+        // Sidebar Toggle Logic
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOpenBtn = document.getElementById('sidebar-open-btn');
+
+        function toggleSidebar() {
+            if (sidebar.classList.contains('translate-x-[-120%]')) {
+                // OPEN
+                sidebar.classList.remove('translate-x-[-120%]', 'opacity-0', 'pointer-events-none');
+                sidebarOpenBtn.classList.add('hidden');
+                sidebarOpenBtn.classList.remove('flex');
+            } else {
+                // CLOSE
+                sidebar.classList.add('translate-x-[-120%]', 'opacity-0', 'pointer-events-none');
+                sidebarOpenBtn.classList.remove('hidden');
+                sidebarOpenBtn.classList.add('flex');
+            }
+        }
+
 
         // CONSTANTS FOR PSA POSITIONING
         const PSA_REF_WIDTH = 1200; 
@@ -802,14 +832,6 @@
             }
         }
 
-        // New Cert Functionality
-        function findByCert() {
-            const cert = prompt("Enter PSA Certificate Number:");
-            if (cert && cert.trim().length > 0) {
-                window.open(`https://www.psacard.com/cert/${cert.trim()}/psa`, '_blank');
-            }
-        }
-
         const fileInput = document.getElementById('fileInput');
         const cardPlaceholder = document.getElementById('cardPlaceholder');
         
@@ -861,78 +883,21 @@
 
         function clearImage() { userCardImage.src = ''; userCardImage.classList.add('hidden'); cardPlaceholder.classList.remove('hidden'); fileInput.value = ''; }
 
-        // Robust proxy-based Save Function (Restored)
-        // This handles CORS by fetching remote images via a public proxy, converting to Base64,
-        // snapping the picture, and then restoring the original URLs.
-        async function getBase64FromUrl(url) {
-            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-            try {
-                const response = await fetch(proxyUrl);
-                const blob = await response.blob();
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                });
-            } catch (error) {
-                console.error("Proxy fetch failed for:", url, error);
-                return null;
-            }
-        }
-
-        async function downloadPreview() {
-            const btn = document.getElementById('saveBtn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = `<span>Saving...</span>`;
-            
-            // 1. Flatten 3D transform for clean capture
-            const wrapper = document.getElementById('previewWrapper');
-            const originalTransform = wrapper.style.transform;
-            wrapper.style.transform = 'none';
-
-            // 2. Identify external images
-            const slabImg = document.getElementById('slabImageOverlay');
-            const guardImg = document.getElementById('guardImageOverlay');
-            
-            const originalSlabSrc = slabImg.src;
-            const originalGuardSrc = guardImg.src;
-            
-            // 3. Fetch Base64 versions via Proxy (only if they are visible/active)
-            try {
-                if (slabImg && !slabImg.classList.contains('hidden') && slabImg.src.startsWith('http')) {
-                    const base64 = await getBase64FromUrl(slabImg.src);
-                    if (base64) slabImg.src = base64;
-                }
-                
-                if (guardImg && !guardImg.classList.contains('hidden') && guardImg.src.startsWith('http')) {
-                    const base64 = await getBase64FromUrl(guardImg.src);
-                    if (base64) guardImg.src = base64;
-                }
-
-                // 4. Generate Canvas
-                const canvas = await html2canvas(wrapper, {
-                    useCORS: true,
-                    scale: 2,
-                    backgroundColor: null
-                });
-
-                // 5. Download
+        // Reverting downloadPreview to simple version
+        function downloadPreview() {
+            html2canvas(previewWrapper, {
+                useCORS: true,
+                backgroundColor: null,
+                scale: 2 // Higher resolution
+            }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = 'graded-guard-preview.png';
                 link.href = canvas.toDataURL('image/png');
                 link.click();
-
-            } catch (err) {
+            }).catch(err => {
                 console.error("Save failed:", err);
-                alert("Could not save image. Network error or proxy timeout.");
-            } finally {
-                // 6. Restore original state
-                slabImg.src = originalSlabSrc;
-                guardImg.src = originalGuardSrc;
-                wrapper.style.transform = originalTransform;
-                btn.innerHTML = originalText;
-            }
+                alert("Could not save image. This is likely due to browser security restrictions on the slab images.");
+            });
         }
 
         // Init
