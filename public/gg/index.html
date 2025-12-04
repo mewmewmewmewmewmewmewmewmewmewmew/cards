@@ -207,7 +207,7 @@
         }
 
         /* Desktop: Move back to top-right absolute */
-        @media (min-width: 768px) {
+        @media (min-width: 1024px) {
             .theme-toggle-wrapper {
                 position: absolute;
                 top: 20px;
@@ -296,7 +296,7 @@
     </style>
 </head>
 <!-- Added 'overflow-hidden' class to body, which will be removed by JS after load -->
-<body class="min-h-screen flex flex-col items-center py-8 px-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
+<body class="h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
 
     <!-- Loading Screen -->
     <div id="loading-screen">
@@ -319,16 +319,19 @@
     </div>
 
     <!-- Header -->
-    <header class="text-center mb-8 animate-fade-in-down">
+    <header class="text-center pt-6 pb-2 px-4 animate-fade-in-down flex-none z-20 relative">
         <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-2">
             Graded Guard <br class="block md:hidden" /> <span style="color: #cb97a5;">Visualizer</span>
         </h1>
     </header>
 
-    <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+    <!-- Main Container: Full height, Flex layout for responsive ordering -->
+    <!-- Changed to relative to support absolute positioning of children on desktop -->
+    <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 overflow-hidden">
         
         <!-- Controls Section -->
-        <div class="lg:col-span-4 bg-white rounded-2xl shadow-xl p-6 border border-slate-100 flex flex-col gap-6 order-2 lg:order-1 transition-colors duration-300">
+        <!-- Mobile: order-2 (Bottom), relative. Desktop: Absolute Left, Centered Vertically, Z-20 -->
+        <div class="w-full lg:w-80 flex-none order-2 lg:absolute lg:left-8 lg:top-1/2 lg:-translate-y-1/2 lg:z-20 bg-white rounded-2xl shadow-xl p-6 border border-slate-100 flex flex-col gap-6 transition-colors duration-300 h-fit max-h-[85vh] overflow-y-auto">
             
             <!-- 1. Grading Company Selection -->
             <div>
@@ -396,7 +399,8 @@
                     </button>
                     
                     <!-- Save Button -->
-                    <button id="saveBtn" type="button" onclick="downloadPreview()" class="py-2.5 px-2 rounded-lg border border-slate-200 dark:border-slate-500 text-gray-800 dark:text-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Save Image">
+                    <!-- Updated to text-slate-900 (Darkest Grey) for maximum visibility in light mode -->
+                    <button id="saveBtn" type="button" onclick="downloadPreview()" class="py-2.5 px-2 rounded-lg border border-slate-200 dark:border-slate-500 text-slate-900 dark:text-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Save Image">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         Save
                     </button>
@@ -406,11 +410,13 @@
         </div>
 
         <!-- Preview Section -->
-        <div class="lg:col-span-8 flex flex-col items-center justify-center min-h-[500px] order-1 lg:order-2">
+        <!-- Mobile: order-1 (Top). Desktop: Full Width/Height, Absolute/Inset-0 or simply Flex fill to center behind sidebar -->
+        <div class="flex-1 w-full h-full flex flex-col items-center justify-center order-1 lg:absolute lg:inset-0 lg:z-10 pointer-events-none">
+            <!-- Added pointer-events-auto to wrapper to ensure interaction works even if container overlays sidebar (though z-index handles that) -->
             
             <!-- MAIN COMPOSITE VIEW -->
             <!-- Updated padding: p-4 for mobile, md:p-16 for desktop -->
-            <div id="previewWrapper" class="relative p-4 md:p-16 rounded-xl">
+            <div id="previewWrapper" class="relative p-4 md:p-16 rounded-xl pointer-events-auto">
                 
                 <!-- LAYER 1: The GUARD Container -->
                 <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
@@ -796,6 +802,14 @@
             }
         }
 
+        // New Cert Functionality
+        function findByCert() {
+            const cert = prompt("Enter PSA Certificate Number:");
+            if (cert && cert.trim().length > 0) {
+                window.open(`https://www.psacard.com/cert/${cert.trim()}/psa`, '_blank');
+            }
+        }
+
         const fileInput = document.getElementById('fileInput');
         const cardPlaceholder = document.getElementById('cardPlaceholder');
         
@@ -847,21 +861,78 @@
 
         function clearImage() { userCardImage.src = ''; userCardImage.classList.add('hidden'); cardPlaceholder.classList.remove('hidden'); fileInput.value = ''; }
 
-        // Reverting downloadPreview to simple version
-        function downloadPreview() {
-            html2canvas(previewWrapper, {
-                useCORS: true,
-                backgroundColor: null,
-                scale: 2 // Higher resolution
-            }).then(canvas => {
+        // Robust proxy-based Save Function (Restored)
+        // This handles CORS by fetching remote images via a public proxy, converting to Base64,
+        // snapping the picture, and then restoring the original URLs.
+        async function getBase64FromUrl(url) {
+            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+            try {
+                const response = await fetch(proxyUrl);
+                const blob = await response.blob();
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } catch (error) {
+                console.error("Proxy fetch failed for:", url, error);
+                return null;
+            }
+        }
+
+        async function downloadPreview() {
+            const btn = document.getElementById('saveBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<span>Saving...</span>`;
+            
+            // 1. Flatten 3D transform for clean capture
+            const wrapper = document.getElementById('previewWrapper');
+            const originalTransform = wrapper.style.transform;
+            wrapper.style.transform = 'none';
+
+            // 2. Identify external images
+            const slabImg = document.getElementById('slabImageOverlay');
+            const guardImg = document.getElementById('guardImageOverlay');
+            
+            const originalSlabSrc = slabImg.src;
+            const originalGuardSrc = guardImg.src;
+            
+            // 3. Fetch Base64 versions via Proxy (only if they are visible/active)
+            try {
+                if (slabImg && !slabImg.classList.contains('hidden') && slabImg.src.startsWith('http')) {
+                    const base64 = await getBase64FromUrl(slabImg.src);
+                    if (base64) slabImg.src = base64;
+                }
+                
+                if (guardImg && !guardImg.classList.contains('hidden') && guardImg.src.startsWith('http')) {
+                    const base64 = await getBase64FromUrl(guardImg.src);
+                    if (base64) guardImg.src = base64;
+                }
+
+                // 4. Generate Canvas
+                const canvas = await html2canvas(wrapper, {
+                    useCORS: true,
+                    scale: 2,
+                    backgroundColor: null
+                });
+
+                // 5. Download
                 const link = document.createElement('a');
                 link.download = 'graded-guard-preview.png';
                 link.href = canvas.toDataURL('image/png');
                 link.click();
-            }).catch(err => {
+
+            } catch (err) {
                 console.error("Save failed:", err);
-                alert("Could not save image. This is likely due to browser security restrictions on the slab images.");
-            });
+                alert("Could not save image. Network error or proxy timeout.");
+            } finally {
+                // 6. Restore original state
+                slabImg.src = originalSlabSrc;
+                guardImg.src = originalGuardSrc;
+                wrapper.style.transform = originalTransform;
+                btn.innerHTML = originalText;
+            }
         }
 
         // Init
