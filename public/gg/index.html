@@ -383,21 +383,20 @@
             <div>
                 <!-- 3 Columns Layout -->
                 <div class="grid grid-cols-3 gap-2">
-                    <!-- Find Cert Button -->
-                    <button onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
+                    <!-- Find Cert Button (Updated Text) -->
+                    <button type="button" onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
-                        Find by Cert
+                        by Cert
                     </button>
                     
                     <!-- Remove Button -->
-                    <button onclick="clearImage()" class="py-2.5 px-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Remove Image">
+                    <button type="button" onclick="clearImage()" class="py-2.5 px-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Remove Image">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                         Clear
                     </button>
                     
                     <!-- Save Button -->
-                    <!-- Updated to text-gray-800 (Dark Grey) for proper visibility in light mode + Tailwind config enabled -->
-                    <button id="saveBtn" onclick="downloadPreview()" class="py-2.5 px-2 rounded-lg border border-slate-200 dark:border-slate-500 text-gray-800 dark:text-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Save Image">
+                    <button id="saveBtn" type="button" onclick="downloadPreview()" class="py-2.5 px-2 rounded-lg border border-slate-200 dark:border-slate-500 text-gray-800 dark:text-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Save Image">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         Save
                     </button>
@@ -531,8 +530,8 @@
         const glareOverlay = document.getElementById('glareOverlay');
         
         // Layers
-        // Removed duplicate declaration of cardLayer
-        const cardLayer = document.getElementById('cardLayer');
+        // RENAME: changed cardLayer to cardLayerEl to fix Identifier 'cardLayer' has already been declared
+        const cardLayerEl = document.getElementById('cardLayer');
         const slabImageOverlay = document.getElementById('slabImageOverlay');
         const slabCssOverlay = document.getElementById('slabCssOverlay');
         const guardImageOverlay = document.getElementById('guardImageOverlay');
@@ -724,12 +723,12 @@
                 const bottomPercent = (PSA_CARD_BOTTOM_PX / PSA_REF_HEIGHT) * 100;
                 const leftPercent = (100 - widthPercent) / 2;
 
-                cardLayer.style.width = `${widthPercent}%`;
-                cardLayer.style.left = `${leftPercent}%`;
-                cardLayer.style.bottom = `${bottomPercent}%`;
-                cardLayer.style.top = 'auto'; 
-                cardLayer.style.aspectRatio = "63.5 / 88.9";
-                cardLayer.style.height = 'auto';
+                cardLayerEl.style.width = `${widthPercent}%`;
+                cardLayerEl.style.left = `${leftPercent}%`;
+                cardLayerEl.style.bottom = `${bottomPercent}%`;
+                cardLayerEl.style.top = 'auto'; 
+                cardLayerEl.style.aspectRatio = "63.5 / 88.9";
+                cardLayerEl.style.height = 'auto';
                 
                 userCardImage.style.width = '100%';
                 userCardImage.style.height = '100%';
@@ -746,12 +745,12 @@
                 slabCssOverlay.classList.add('flex');
                 labelBorder.className = "absolute inset-0 border-t-4 border-b-0 border-x-0 border-yellow-600 opacity-100 pointer-events-none"; 
                 companyLabelText.innerText = "BECKETT";
-                cardLayer.style.top = '22%';
-                cardLayer.style.height = '78%';
-                cardLayer.style.width = '100%';
-                cardLayer.style.left = '0';
-                cardLayer.style.bottom = 'auto';
-                cardLayer.style.aspectRatio = 'auto'; 
+                cardLayerEl.style.top = '22%';
+                cardLayerEl.style.height = '78%';
+                cardLayerEl.style.width = '100%';
+                cardLayerEl.style.left = '0';
+                cardLayerEl.style.bottom = 'auto';
+                cardLayerEl.style.aspectRatio = 'auto'; 
                 userCardImage.style.width = '90%';
                 userCardImage.style.height = '90%';
                 btnBgs.className = `company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center bg-white text-slate-900 shadow-sm ring-1 ring-slate-200`;
@@ -767,12 +766,12 @@
                 slabCssOverlay.classList.add('flex');
                 labelBorder.className = "absolute inset-0 border-x-4 border-blue-600 opacity-0 pointer-events-none"; 
                 companyLabelText.innerText = "CGC";
-                cardLayer.style.top = '22%';
-                cardLayer.style.height = '78%';
-                cardLayer.style.width = '100%';
-                cardLayer.style.left = '0';
-                cardLayer.style.bottom = 'auto';
-                cardLayer.style.aspectRatio = 'auto';
+                cardLayerEl.style.top = '22%';
+                cardLayerEl.style.height = '78%';
+                cardLayerEl.style.width = '100%';
+                cardLayerEl.style.left = '0';
+                cardLayerEl.style.bottom = 'auto';
+                cardLayerEl.style.aspectRatio = 'auto';
                 userCardImage.style.width = '90%';
                 userCardImage.style.height = '90%';
                 btnCgc.className = `company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center bg-white text-slate-900 shadow-sm ring-1 ring-slate-200`;
@@ -800,16 +799,14 @@
         const fileInput = document.getElementById('fileInput');
         const cardPlaceholder = document.getElementById('cardPlaceholder');
         
-        // Removed duplicate declaration of cardLayer, use existing one from DOM
-        // const cardLayer = document.getElementById('cardLayer'); 
         const cropModal = document.getElementById('cropModal');
         const imageToCrop = document.getElementById('imageToCrop');
         let cropper = null;
 
         fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
         
-        // Re-targeting DnD to the card layer
-        const dndLayer = document.getElementById('cardLayer'); // Use local var or ensure global uniqueness
+        // Re-targeting DnD to the card layer (using the renamed var to be safe)
+        const dndLayer = document.getElementById('cardLayer'); 
         dndLayer.addEventListener('dragover', (e) => { 
             e.preventDefault(); 
             document.body.classList.add('drop-active'); 
