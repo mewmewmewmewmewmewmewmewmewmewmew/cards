@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graded Guard Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Icon Library -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Cropper.js for image cropping -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+    <!-- html2canvas for saving images -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+
+        /* 3D Effects for the Guard (Layer 1 - CSS Mode) */
+        .guard-bumper {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 
+                /* Inner shadow for depth (bevel effect) */
+                inset 2px 2px 5px rgba(255, 255, 255, 0.3),
+                inset -2px -2px 5px rgba(0, 0, 0, 0.2),
+                /* Outer drop shadow */
+                0 10px 25px -5px rgba(0, 0, 0, 0.3),
+                0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* CSS-Based Slab (For BGS/CGC) */
+        .slab-css-style {
+            background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.1) 100%);
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.8);
+        }
+
+        /* Dynamic Company Dimensions */
+        
+        /* PSA: Tall, standard rounded corners */
+        .company-psa {
+            /* Aspect ratio removed to let the image's intrinsic aspect ratio dictate dimensions */
+        }
+        .guard-psa {
+            /* Padding/Radius handled by Image for PSA now, but kept for fallback/transitions */
+        }
+
+        /* BGS: Thicker, squarer */
+        .company-bgs {
+            aspect-ratio: 3.25 / 5.125;
+        }
+        .guard-bgs {
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        /* CGC: Rounded */
+        .company-cgc {
+            aspect-ratio: 3.15 / 5.3;
+        }
+        .guard-cgc {
+            border-radius: 20px;
+            padding: 12px;
+        }
+
+        .upload-zone:hover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+
+        /* Cropper Modal Styles */
+        .cropper-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- DARK MODE STYLES --- */
+        body.dark-mode {
+            background-color: #18181b; /* Zinc-900 (Dark Grey) */
+            background-image: radial-gradient(#3f3f46 1px, transparent 1px); /* Zinc-700 dots */
+            color: #f4f4f5;
+        }
+
+        body.dark-mode .bg-white {
+            background-color: #27272a; /* Zinc-800 */
+            color: #f4f4f5;
+            border-color: #3f3f46; /* Zinc-700 */
+        }
+        
+        body.dark-mode .text-slate-900 {
+            color: #fafafa;
+        }
+        
+        body.dark-mode .text-slate-800 {
+            color: #e4e4e7;
+        }
+
+        body.dark-mode .text-slate-700 {
+            color: #d4d4d8;
+        }
+        
+        body.dark-mode .text-slate-600 {
+            color: #e4e4e7; /* Bright grey for labels in dark mode */
+        }
+        
+        body.dark-mode .text-slate-500 {
+            color: #a1a1aa;
+        }
+
+        body.dark-mode .bg-slate-100 {
+            background-color: #3f3f46;
+        }
+        
+        /* Company buttons in dark mode */
+        body.dark-mode .company-btn {
+            color: #a1a1aa;
+        }
+        body.dark-mode .company-btn:hover {
+            color: #f4f4f5;
+        }
+        body.dark-mode .active-company {
+            background-color: #52525b;
+            color: #fff;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        /* Upload Zone Dark Mode */
+        body.dark-mode .upload-zone {
+            border-color: #52525b;
+        }
+        body.dark-mode .upload-zone:hover {
+            background-color: #27272a;
+            border-color: #a1a1aa;
+        }
+
+        /* Info Box Dark Mode */
+        body.dark-mode .bg-blue-50 {
+            background-color: #27272a; /* Dark Grey */
+            border-color: #3f3f46;
+        }
+        body.dark-mode .text-blue-700 {
+            color: #e4e4e7; /* Light Grey text */
+        }
+        body.dark-mode .text-blue-500 {
+            color: #a1a1aa; /* Grey Icon */
+        }
+
+        /* Title Accent */
+        body.dark-mode .text-blue-600 {
+            color: #cb97a5; /* Keep the accent visible */
+        }
+
+        /* --- TOGGLE SWITCH STYLES --- */
+        .theme-toggle-wrapper {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 50;
+        }
+        
+        .toggle-checkbox {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+
+        .toggle-label {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 50px;
+            height: 26px;
+            background-color: #e5e7eb; /* gray-200 */
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .toggle-label:before {
+            content: "";
+            position: absolute;
+            left: 2px;
+            top: 2px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background-color: white;
+            transition: transform 0.2s ease-in;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #cb97a5; /* Use accent color */
+        }
+
+        .toggle-checkbox:checked + .toggle-label:before {
+            transform: translateX(100%);
+        }
+
+        /* Icons inside toggle */
+        .toggle-icon {
+            width: 14px;
+            height: 14px;
+            color: white;
+            z-index: 10;
+        }
+        .icon-sun {
+            margin-left: 5px;
+            color: #f59e0b;
+        }
+        .icon-moon {
+            margin-right: 5px;
+            color: #fff;
+        }
+
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-8 px-4 text-slate-800 relative transition-colors duration-300">
+
+    <!-- Dark Mode Toggle -->
+    <div class="theme-toggle-wrapper">
+        <input type="checkbox" id="darkModeToggle" class="toggle-checkbox">
+        <label for="darkModeToggle" class="toggle-label">
+            <i data-lucide="sun" class="toggle-icon icon-sun w-3 h-3"></i>
+            <i data-lucide="moon" class="toggle-icon icon-moon w-3 h-3"></i>
+        </label>
+    </div>
+
+    <!-- Header -->
+    <header class="text-center mb-8 animate-fade-in-down">
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-2">
+            Graded Guard <span style="color: #cb97a5;">Visualizer</span>
+        </h1>
+    </header>
+
+    <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        <!-- Controls Section -->
+        <div class="lg:col-span-4 bg-white rounded-2xl shadow-xl p-6 border border-slate-100 flex flex-col gap-6 order-2 lg:order-1 transition-colors duration-300">
+            
+            <!-- 1. Grading Company Selection -->
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">1. Grading Company</label>
+                <div class="grid grid-cols-3 gap-2 bg-slate-100 p-1 rounded-xl">
+                    <button onclick="setCompany('psa')" id="btn-psa" class="company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center">
+                        PSA
+                    </button>
+                    <button disabled id="btn-bgs" class="company-btn py-2 px-3 rounded-lg text-sm font-bold transition-all text-center text-slate-400 cursor-not-allowed opacity-50">
+                        BGS
+                    </button>
+                    <button disabled id="btn-cgc" class="company-btn py-2 px-3 rounded-lg text-sm font-bold transition-all text-center text-slate-400 cursor-not-allowed opacity-50">
+                        CGC
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. Guard Option -->
+            <div>
+                <div class="flex justify-between items-end mb-3">
+                    <label class="block text-sm font-semibold text-slate-700 uppercase tracking-wider mb-0">2. Guard Option</label>
+                    <!-- Rotate Button -->
+                    <button onclick="toggleFlip()" class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 flex items-center gap-1 transition-colors" title="Flip Guard Vertically">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                        <span class="font-medium">Rotate</span>
+                    </button>
+                </div>
+                
+                <!-- Options: Eclipse & Fuschia -->
+                <div class="flex items-center gap-3 mb-4">
+                    <!-- Eclipse -->
+                    <button onclick="setGuardOption('#111827', 'Eclipse', 'https://mew.cards/gg/img/GG_PSA_Eclipse.png')" class="w-10 h-10 rounded-full bg-gray-900 border-2 border-transparent hover:scale-110 transition shadow-sm ring-offset-2 focus:ring-2 ring-gray-400" title="Eclipse"></button>
+                    <!-- Fuschia -->
+                    <button onclick="setGuardOption('#d946ef', 'Fuschia', 'https://mew.cards/gg/img/GG_PSA_Fuschia.png')" class="w-10 h-10 rounded-full border-2 border-transparent hover:scale-110 transition shadow-sm ring-offset-2 focus:ring-2 ring-fuchsia-400" style="background-color: #d946ef;" title="Fuschia"></button>
+                    
+                    <span id="colorNameDisplay" class="text-sm font-medium text-slate-600 ml-2">Current: Eclipse</span>
+                </div>
+                <!-- Hidden input to maintain state for JS logic -->
+                <input type="hidden" id="customColorInput" value="#111827">
+            </div>
+
+            <!-- 3. Image Upload -->
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">3. Upload Card</label>
+                <div class="upload-zone border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors relative" id="dropZone">
+                    <input type="file" id="fileInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-400 mb-2"></i>
+                    <p class="text-sm font-medium text-slate-700">Click to upload</p>
+                    <p class="text-xs text-slate-500">or drag and drop here</p>
+                </div>
+                <div class="mt-4 flex gap-2">
+                    <button onclick="clearImage()" class="text-xs text-red-500 hover:text-red-700 font-medium underline">Remove Image</button>
+                    <span class="text-xs text-slate-400">|</span>
+                    <button id="saveBtn" onclick="downloadPreview()" class="text-xs text-blue-500 hover:text-blue-700 font-medium underline flex items-center gap-1">
+                        <span>Save Image</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Preview Section -->
+        <div class="lg:col-span-8 flex flex-col items-center justify-center min-h-[500px] order-1 lg:order-2">
+            
+            <!-- MAIN COMPOSITE VIEW -->
+            <div id="previewWrapper" class="relative transform transition-transform duration-500 hover:scale-[1.02] p-4 rounded-xl">
+                
+                <!-- LAYER 1: The GUARD Container -->
+                <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
+                    
+                    <!-- NEW LAYER: Graded Guard Image (Z-50 Topmost) -->
+                    <!-- crossorigin removed for display, handled via proxy for save -->
+                    <img id="guardImageOverlay" src="https://mew.cards/gg/img/GG_PSA_Eclipse.png" 
+                         onerror="handleImageError(this)"
+                         class="absolute z-50 pointer-events-none hidden" 
+                         style="width: 106.33%; max-width: none; left: 50%; top: 50%; transform: translate(-50%, -50%); transition: transform 0.3s ease;">
+
+                    <!-- Inner Content Container (The Slab) -->
+                    <div id="slabContainer" class="company-psa w-full relative overflow-hidden bg-white/10">
+
+                        <!-- LAYER 2: The SLAB BASE IMG -->
+                        <img id="slabImageOverlay" src="https://mew.cards/gg/img/base_PSA.png" 
+                             onerror="handleImageError(this)"
+                             class="w-full h-auto relative z-10 pointer-events-none hidden">
+
+                        <!-- LAYER 3: The CARD -->
+                        <div id="cardLayer" class="absolute z-20 flex items-center justify-center pointer-events-none transition-all duration-300">
+                             <img id="userCardImage" src="" class="hidden object-contain shadow-sm" alt="User Card">
+                             
+                             <div id="cardPlaceholder" class="flex flex-col items-center justify-center text-gray-300 opacity-50">
+                                <i data-lucide="image" class="w-12 h-12 mb-2"></i>
+                                <span class="text-xs uppercase font-bold tracking-widest">Card Art</span>
+                             </div>
+                        </div>
+
+                        <!-- LAYER 4: The PLASTIC GLOSS -->
+                        <div class="absolute inset-0 z-30 pointer-events-none opacity-20 bg-gradient-to-tr from-transparent via-white to-transparent mix-blend-overlay"></div>
+                        <div class="slab-shine z-30"></div>
+
+                        <!-- LAYER 5: Legacy CSS Overlay -->
+                        <div id="slabCssOverlay" class="absolute inset-0 z-40 hidden flex-col slab-css-style">
+                             <div class="slab-shine"></div>
+                             <div id="cssLabelArea" class="h-[22%] w-full border-b border-gray-200 flex flex-col items-center justify-center bg-gray-50/50 p-2 relative z-20">
+                                <div class="w-full h-full border border-gray-200 bg-white shadow-sm flex flex-col items-center justify-center px-2 py-1 relative overflow-hidden">
+                                    <div id="labelBorder" class="absolute inset-0 border-4 border-yellow-600 opacity-100 pointer-events-none"></div>
+                                    <div class="flex justify-between w-full items-start mb-1">
+                                        <span class="text-[8px] font-bold text-gray-400 tracking-tighter">12345678</span>
+                                        <span id="companyLabelText" class="text-[10px] font-bold text-gray-800 tracking-wider">BGS</span>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="text-[10px] uppercase font-bold text-slate-800 leading-tight">2025 PREVIEW</div>
+                                    </div>
+                                    <div class="absolute bottom-1 right-2 flex items-center gap-1">
+                                        <div class="text-lg font-bold text-slate-900 leading-none">9.5</div>
+                                    </div>
+                                </div>
+                             </div>
+                             <div class="flex-1"></div> 
+                        </div>
+
+                    </div>
+                </div>
+                
+                <!-- Shadow below the whole object -->
+                <div class="absolute -bottom-8 left-10 right-10 h-4 bg-black/20 blur-xl rounded-[100%]"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- CROPPER MODAL (Unchanged) -->
+    <div id="cropModal" class="fixed inset-0 z-50 bg-black/80 hidden items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <i data-lucide="crop" class="w-5 h-5"></i> Crop Your Card
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="flex-1 bg-gray-900 p-2 overflow-hidden relative flex items-center justify-center h-[50vh] md:h-[60vh]">
+                <img id="imageToCrop" src="" alt="To Crop" class="max-w-full max-h-full block">
+            </div>
+            <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center gap-4">
+                <p class="text-xs text-slate-500 hidden md:block">
+                    Drag corners to select card. Ratio is locked.
+                </p>
+                <div class="flex gap-3 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-slate-600 font-semibold hover:bg-gray-200 transition text-sm">Cancel</button>
+                    <button onclick="applyCrop()" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-sm text-sm flex items-center gap-2">
+                        <i data-lucide="check" class="w-4 h-4"></i> Crop & Apply
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        // DOM Elements
+        const guardContainer = document.getElementById('guardContainer');
+        const slabContainer = document.getElementById('slabContainer');
+        const previewWrapper = document.getElementById('previewWrapper');
+        
+        // Layers
+        const cardLayer = document.getElementById('cardLayer');
+        const slabImageOverlay = document.getElementById('slabImageOverlay');
+        const slabCssOverlay = document.getElementById('slabCssOverlay');
+        const guardImageOverlay = document.getElementById('guardImageOverlay');
+        
+        // CSS Mode Elements
+        const labelBorder = document.getElementById('labelBorder');
+        const companyLabelText = document.getElementById('companyLabelText');
+        const colorNameDisplay = document.getElementById('colorNameDisplay');
+        const customColorInput = document.getElementById('customColorInput');
+        const userCardImage = document.getElementById('userCardImage');
+        
+        // Buttons
+        const btnPsa = document.getElementById('btn-psa');
+        const btnBgs = document.getElementById('btn-bgs');
+        const btnCgc = document.getElementById('btn-cgc');
+        
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+
+        // CONSTANTS FOR PSA POSITIONING
+        const PSA_REF_WIDTH = 1200; 
+        const PSA_REF_HEIGHT = 2102; 
+        const PSA_CARD_WIDTH_PX = 940;
+        const PSA_CARD_BOTTOM_PX = 166;
+
+        // FLIP STATE
+        let isFlipped = false;
+
+        // Dark Mode Logic
+        darkModeToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+        });
+
+        // Error Handling for Images
+        function handleImageError(img) {
+            console.warn('Image failed to load, switching to CSS fallback:', img.id);
+            img.style.display = 'none';
+
+            // Fallback logic
+            if (img.id === 'slabImageOverlay') {
+                const slabCss = document.getElementById('slabCssOverlay');
+                slabCss.classList.remove('hidden');
+                slabCss.classList.add('flex');
+                
+                const labelBorder = document.getElementById('labelBorder');
+                labelBorder.className = "absolute inset-0 border-4 border-red-600 opacity-100 pointer-events-none";
+                document.getElementById('companyLabelText').innerText = "PSA";
+                
+                document.getElementById('slabContainer').classList.add('h-full');
+                document.getElementById('slabContainer').style.aspectRatio = "3.2 / 5.35"; 
+            }
+            if (img.id === 'guardImageOverlay') {
+                const guard = document.getElementById('guardContainer');
+                guard.classList.add('guard-bumper', 'guard-psa');
+                const color = document.getElementById('customColorInput').value;
+                guard.style.backgroundColor = color;
+            }
+        }
+
+        // Logic
+        function toggleFlip() {
+            isFlipped = !isFlipped;
+            const guard = document.getElementById('guardImageOverlay');
+            if (isFlipped) {
+                guard.style.transform = "translate(-50%, -50%) scaleY(-1)";
+            } else {
+                guard.style.transform = "translate(-50%, -50%)";
+            }
+        }
+
+        function setCompany(company) {
+            guardContainer.className = `w-[320px] md:w-[360px] flex items-center justify-center relative z-0`;
+            guardContainer.style.backgroundColor = ''; 
+            document.getElementById('slabContainer').style.aspectRatio = ""; 
+            slabContainer.className = `w-full relative overflow-hidden`;
+            
+            [btnPsa, btnBgs, btnCgc].forEach(btn => {
+                btn.className = `company-btn py-2 px-3 rounded-lg text-sm font-bold transition-all text-center text-slate-500 hover:text-slate-700`;
+            });
+
+            if (company === 'psa') {
+                if(slabImageOverlay.style.display !== 'none') slabImageOverlay.classList.remove('hidden');
+                if(guardImageOverlay.style.display !== 'none') guardImageOverlay.classList.remove('hidden');
+                
+                if (slabImageOverlay.style.display === 'none') {
+                     handleImageError(slabImageOverlay);
+                } else {
+                     slabCssOverlay.classList.add('hidden');
+                     slabCssOverlay.classList.remove('flex');
+                }
+
+                if (guardImageOverlay.style.display === 'none') {
+                     handleImageError(guardImageOverlay);
+                }
+
+                const widthPercent = (PSA_CARD_WIDTH_PX / PSA_REF_WIDTH) * 100;
+                const bottomPercent = (PSA_CARD_BOTTOM_PX / PSA_REF_HEIGHT) * 100;
+                const leftPercent = (100 - widthPercent) / 2;
+
+                cardLayer.style.width = `${widthPercent}%`;
+                cardLayer.style.left = `${leftPercent}%`;
+                cardLayer.style.bottom = `${bottomPercent}%`;
+                cardLayer.style.top = 'auto'; 
+                cardLayer.style.aspectRatio = "63.5 / 88.9";
+                cardLayer.style.height = 'auto';
+                
+                userCardImage.style.width = '100%';
+                userCardImage.style.height = '100%';
+
+                btnPsa.className = `company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center bg-white text-slate-900 shadow-sm ring-1 ring-slate-200`;
+            } 
+            else if (company === 'bgs') {
+                // ... BGS Logic ...
+                guardContainer.classList.add('guard-bumper', 'guard-bgs', 'bg-gray-900');
+                slabContainer.classList.add('company-bgs', 'h-full');
+                slabImageOverlay.classList.add('hidden');
+                guardImageOverlay.classList.add('hidden');
+                slabCssOverlay.classList.remove('hidden');
+                slabCssOverlay.classList.add('flex');
+                labelBorder.className = "absolute inset-0 border-t-4 border-b-0 border-x-0 border-yellow-600 opacity-100 pointer-events-none"; 
+                companyLabelText.innerText = "BECKETT";
+                cardLayer.style.top = '22%';
+                cardLayer.style.height = '78%';
+                cardLayer.style.width = '100%';
+                cardLayer.style.left = '0';
+                cardLayer.style.bottom = 'auto';
+                cardLayer.style.aspectRatio = 'auto'; 
+                userCardImage.style.width = '90%';
+                userCardImage.style.height = '90%';
+                btnBgs.className = `company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center bg-white text-slate-900 shadow-sm ring-1 ring-slate-200`;
+                guardContainer.style.backgroundColor = '#111827';
+            } 
+            else if (company === 'cgc') {
+                // ... CGC Logic ...
+                guardContainer.classList.add('guard-bumper', 'guard-cgc', 'bg-gray-900');
+                slabContainer.classList.add('company-cgc', 'h-full');
+                slabImageOverlay.classList.add('hidden');
+                guardImageOverlay.classList.add('hidden');
+                slabCssOverlay.classList.remove('hidden');
+                slabCssOverlay.classList.add('flex');
+                labelBorder.className = "absolute inset-0 border-x-4 border-blue-600 opacity-0 pointer-events-none"; 
+                companyLabelText.innerText = "CGC";
+                cardLayer.style.top = '22%';
+                cardLayer.style.height = '78%';
+                cardLayer.style.width = '100%';
+                cardLayer.style.left = '0';
+                cardLayer.style.bottom = 'auto';
+                cardLayer.style.aspectRatio = 'auto';
+                userCardImage.style.width = '90%';
+                userCardImage.style.height = '90%';
+                btnCgc.className = `company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center bg-white text-slate-900 shadow-sm ring-1 ring-slate-200`;
+                guardContainer.style.backgroundColor = '#111827';
+            }
+        }
+
+        function setGuardOption(hex, name, imageUrl) {
+            document.getElementById('customColorInput').value = hex;
+            document.getElementById('colorNameDisplay').innerText = `Current: ${name}`;
+            const guardImg = document.getElementById('guardImageOverlay');
+            if (imageUrl && guardImg.src !== imageUrl) {
+                guardImg.src = imageUrl;
+                guardImg.style.display = ''; 
+                if (document.getElementById('btn-psa').classList.contains('active-company')) {
+                    guardImg.classList.remove('hidden');
+                }
+            }
+            const guardContainer = document.getElementById('guardContainer');
+            if (guardContainer.classList.contains('guard-bumper')) {
+                guardContainer.style.backgroundColor = hex;
+            }
+        }
+
+        const fileInput = document.getElementById('fileInput');
+        const cardPlaceholder = document.getElementById('cardPlaceholder');
+        const dropZone = document.getElementById('dropZone');
+        const cropModal = document.getElementById('cropModal');
+        const imageToCrop = document.getElementById('imageToCrop');
+        let cropper = null;
+
+        fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-blue-50', 'border-blue-400'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('bg-blue-50', 'border-blue-400'); });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('bg-blue-50', 'border-blue-400'); if (e.dataTransfer.files.length) { handleFile(e.dataTransfer.files[0]); } });
+
+        function handleFile(file) {
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if(cropper) { cropper.destroy(); cropper = null; }
+                    imageToCrop.src = e.target.result;
+                    cropModal.classList.remove('hidden'); cropModal.classList.add('flex');
+                    setTimeout(() => { cropper = new Cropper(imageToCrop, { viewMode: 1, background: false, autoCropArea: 0.9, zoomable: true, aspectRatio: 63.5 / 88.9, ready() {} }); }, 100);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function closeModal() { cropModal.classList.add('hidden'); cropModal.classList.remove('flex'); if (cropper) { cropper.destroy(); cropper = null; } fileInput.value = ''; }
+
+        function applyCrop() {
+            if (cropper) {
+                const sourceCanvas = cropper.getCroppedCanvas({ maxWidth: 1024, maxHeight: 1024, fillColor: '#fff', imageSmoothingEnabled: true, imageSmoothingQuality: 'high', });
+                const roundedCanvas = document.createElement('canvas'); roundedCanvas.width = sourceCanvas.width; roundedCanvas.height = sourceCanvas.height; const ctx = roundedCanvas.getContext('2d'); const radius = (sourceCanvas.width / 63.5) * 3;
+                ctx.beginPath(); ctx.moveTo(radius, 0); ctx.lineTo(roundedCanvas.width - radius, 0); ctx.quadraticCurveTo(roundedCanvas.width, 0, roundedCanvas.width, radius); ctx.lineTo(roundedCanvas.width, roundedCanvas.height - radius); ctx.quadraticCurveTo(roundedCanvas.width, roundedCanvas.height, roundedCanvas.width - radius, roundedCanvas.height); ctx.lineTo(radius, roundedCanvas.height); ctx.quadraticCurveTo(0, roundedCanvas.height, 0, roundedCanvas.height - radius); ctx.lineTo(0, radius); ctx.quadraticCurveTo(0, 0, radius, 0); ctx.closePath(); ctx.clip(); ctx.drawImage(sourceCanvas, 0, 0);
+                userCardImage.src = roundedCanvas.toDataURL('image/png'); userCardImage.classList.remove('hidden'); cardPlaceholder.classList.add('hidden'); closeModal();
+            }
+        }
+
+        function clearImage() { userCardImage.src = ''; userCardImage.classList.add('hidden'); cardPlaceholder.classList.remove('hidden'); fileInput.value = ''; }
+
+        // Reverting downloadPreview to simple version
+        function downloadPreview() {
+            html2canvas(previewWrapper, {
+                useCORS: true,
+                backgroundColor: null,
+                scale: 2 // Higher resolution
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'graded-guard-preview.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(err => {
+                console.error("Save failed:", err);
+                alert("Could not save image. This is likely due to browser security restrictions on the slab images.");
+            });
+        }
+
+        // Init
+        setCompany('psa');
+
+    </script>
+</body>
+</html>
