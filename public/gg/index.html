@@ -411,8 +411,8 @@
         <div class="lg:col-span-8 flex flex-col items-center justify-center min-h-[500px] order-1 lg:order-2">
             
             <!-- MAIN COMPOSITE VIEW -->
-            <!-- Hitbox padding is p-16 (approx 20% more than p-12) to create interaction zone -->
-            <div id="previewWrapper" class="relative p-16 rounded-xl">
+            <!-- Updated padding: p-4 for mobile, md:p-16 for desktop -->
+            <div id="previewWrapper" class="relative p-4 md:p-16 rounded-xl">
                 
                 <!-- LAYER 1: The GUARD Container -->
                 <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
@@ -769,12 +769,9 @@
             }
         }
 
-        // Updated function - simplified signature
         function setGuardOption(hex, name, imageUrl) {
             document.getElementById('customColorInput').value = hex;
             document.getElementById('colorNameDisplay').innerText = `Current: ${name}`;
-            
-            // 1. Update Image
             const guardImg = document.getElementById('guardImageOverlay');
             if (imageUrl && guardImg.src !== imageUrl) {
                 guardImg.src = imageUrl;
@@ -783,8 +780,6 @@
                     guardImg.classList.remove('hidden');
                 }
             }
-
-            // 2. Update Fallback CSS (for BGS/CGC) - Gradient doesn't apply to background-color, so use hex
             const guardContainer = document.getElementById('guardContainer');
             if (guardContainer.classList.contains('guard-bumper')) {
                 guardContainer.style.backgroundColor = hex;
