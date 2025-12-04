@@ -118,9 +118,11 @@
             padding: 12px;
         }
 
-        .upload-zone:hover {
-            border-color: #3b82f6;
-            background-color: #eff6ff;
+        /* Upload Zone Highlight Logic */
+        .drop-active #cardPlaceholder {
+            background-color: rgba(59, 130, 246, 0.1); /* blue-500/10 */
+            border-color: #60a5fa; /* blue-400 */
+            color: #3b82f6;
         }
 
         /* Cropper Modal Styles */
@@ -179,57 +181,32 @@
             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
         }
 
-        /* Upload Zone Dark Mode */
-        body.dark-mode .upload-zone {
+        /* Action Buttons Dark Mode */
+        body.dark-mode .border-dashed {
             border-color: #52525b;
         }
-        body.dark-mode .upload-zone:hover {
-            background-color: #27272a;
-            border-color: #a1a1aa;
-        }
-
-        /* Info Box Dark Mode */
-        body.dark-mode .bg-blue-50 {
-            background-color: #27272a; /* Dark Grey */
-            border-color: #3f3f46;
-        }
-        body.dark-mode .text-blue-700 {
-            color: #e4e4e7; /* Light Grey text */
-        }
-        body.dark-mode .text-blue-500 {
-            color: #a1a1aa; /* Grey Icon */
-        }
-
+        
         /* Title Accent */
         body.dark-mode .text-blue-600 {
             color: #cb97a5; /* Keep the accent visible */
         }
 
-        /* --- 3D TILT & GLARE STYLES --- */
-        #previewWrapper {
-            transform-style: preserve-3d;
-            will-change: transform;
-            /* Default perspective */
-            transform: perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1);
-        }
-
-        .glare-overlay {
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            mix-blend-mode: overlay; 
-            pointer-events: none;
-            z-index: 60; /* Topmost layer */
-            border-radius: inherit; /* Inherits rounded corners from slab container */
-            transition: opacity 0.1s ease;
-        }
-
         /* --- TOGGLE SWITCH STYLES --- */
         .theme-toggle-wrapper {
-            position: absolute;
-            top: 20px;
+            position: fixed;
+            bottom: 20px;
             right: 20px;
             z-index: 50;
+        }
+
+        /* Desktop: Move back to top-right absolute */
+        @media (min-width: 768px) {
+            .theme-toggle-wrapper {
+                position: absolute;
+                top: 20px;
+                bottom: auto;
+                right: 20px;
+            }
         }
         
         .toggle-checkbox {
@@ -291,6 +268,24 @@
             color: #fff;
         }
 
+        /* --- 3D TILT & GLARE STYLES --- */
+        #previewWrapper {
+            transform-style: preserve-3d;
+            will-change: transform;
+            /* Default perspective */
+            transform: perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1);
+        }
+
+        .glare-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            mix-blend-mode: overlay; 
+            pointer-events: none;
+            z-index: 60; /* Topmost layer */
+            border-radius: inherit; /* Inherits rounded corners from slab container */
+            transition: opacity 0.1s ease;
+        }
     </style>
 </head>
 <!-- Added 'overflow-hidden' class to body, which will be removed by JS after load -->
@@ -319,7 +314,7 @@
     <!-- Header -->
     <header class="text-center mb-8 animate-fade-in-down">
         <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-2">
-            Graded Guard <span style="color: #cb97a5;">Visualizer</span>
+            Graded Guard <br class="block md:hidden" /> <span style="color: #cb97a5;">Visualizer</span>
         </h1>
     </header>
 
@@ -361,14 +356,12 @@
                 <!-- Options: Eclipse & Fuschia -->
                 <div class="flex items-center gap-3 mb-4">
                     <!-- Eclipse: 50% solid #e4e4e4 top, 50% solid black bottom -->
-                    <!-- Removed border-2/border-transparent to fix edge gap -->
                     <button onclick="setGuardOption('#111827', 'Eclipse', 'https://mew.cards/gg/img/GG_PSA_Eclipse.png')" 
                             class="w-10 h-10 rounded-xl shadow-sm hover:scale-105 transition ring-offset-2 focus:ring-2 ring-gray-400 focus:outline-none" 
                             style="background: linear-gradient(to bottom, #e4e4e4 50%, #000000 50%); background-size: 100% 100%; background-repeat: no-repeat;" 
                             title="Eclipse"></button>
                     
                     <!-- Fuschia: 50% solid pink top, 50% solid purple bottom -->
-                    <!-- Removed border-2/border-transparent to fix edge gap -->
                     <button onclick="setGuardOption('#d946ef', 'Fuschia', 'https://mew.cards/gg/img/GG_PSA_Fuschia.png')" 
                             class="w-10 h-10 rounded-xl shadow-sm hover:scale-105 transition ring-offset-2 focus:ring-2 ring-fuchsia-400 focus:outline-none" 
                             style="background: linear-gradient(to bottom, #dd8ab4 50%, #6c4572 50%); background-size: 100% 100%; background-repeat: no-repeat;" 
@@ -379,28 +372,29 @@
                 <input type="hidden" id="customColorInput" value="#111827">
             </div>
 
-            <!-- 3. Image Upload -->
+            <!-- 3. Actions (Replaces previous Upload Box) -->
             <div>
-                <div class="flex justify-between items-end mb-3">
-                    <label class="block text-sm font-semibold text-slate-700 uppercase tracking-wider mb-0">3. Upload Card</label>
+                <!-- Separator Removed -->
+                
+                <!-- Buttons Grid: 3 Columns (Equal Width) -->
+                <div class="grid grid-cols-3 gap-2">
                     <!-- Find Cert Button -->
-                    <button onclick="findByCert()" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline flex items-center gap-1 transition-colors">
-                        <i data-lucide="external-link" class="w-3 h-3"></i>
-                        <span>(find image by cert)</span>
+                    <button onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
+                        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                        Find by Cert
                     </button>
-                </div>
-
-                <div class="upload-zone border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors relative" id="dropZone">
-                    <input type="file" id="fileInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                    <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-400 mb-2"></i>
-                    <p class="text-sm font-medium text-slate-700">Click to upload</p>
-                    <p class="text-xs text-slate-500">or drag and drop here</p>
-                </div>
-                <div class="mt-4 flex gap-2">
-                    <button onclick="clearImage()" class="text-xs text-red-500 hover:text-red-700 font-medium underline">Remove Image</button>
-                    <span class="text-xs text-slate-400">|</span>
-                    <button id="saveBtn" onclick="downloadPreview()" class="text-xs text-blue-500 hover:text-blue-700 font-medium underline flex items-center gap-1">
-                        <span>Save Image</span>
+                    
+                    <!-- Remove Button -->
+                    <button onclick="clearImage()" class="py-2.5 px-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Remove Image">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        Clear
+                    </button>
+                    
+                    <!-- Save Button -->
+                    <!-- Removed background color classes (bg-slate-50 dark:bg-slate-900/30) -->
+                    <button id="saveBtn" onclick="downloadPreview()" class="py-2.5 px-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Save Image">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        Save
                     </button>
                 </div>
             </div>
@@ -418,7 +412,6 @@
                 <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
                     
                     <!-- NEW LAYER: Graded Guard Image (Z-50 Topmost) -->
-                    <!-- crossorigin removed for display, handled via proxy for save -->
                     <img id="guardImageOverlay" src="https://mew.cards/gg/img/GG_PSA_Eclipse.png" 
                          onerror="handleImageError(this)"
                          class="absolute z-50 pointer-events-none hidden" 
@@ -436,13 +429,23 @@
                              onerror="handleImageError(this)"
                              class="w-full h-auto relative z-10 pointer-events-none hidden">
 
-                        <!-- LAYER 3: The CARD -->
-                        <div id="cardLayer" class="absolute z-20 flex items-center justify-center pointer-events-none transition-all duration-300">
-                             <img id="userCardImage" src="" class="hidden object-contain shadow-sm" alt="User Card">
+                        <!-- LAYER 3: The CARD & UPLOAD ZONE -->
+                        <!-- Added 'cursor-pointer' and 'group' to enable upload interaction -->
+                        <div id="cardLayer" 
+                             onclick="document.getElementById('fileInput').click()"
+                             class="absolute z-20 flex items-center justify-center transition-all duration-300 cursor-pointer group">
                              
-                             <div id="cardPlaceholder" class="flex flex-col items-center justify-center text-gray-300 opacity-50">
-                                <i data-lucide="image" class="w-12 h-12 mb-2"></i>
-                                <span class="text-xs uppercase font-bold tracking-widest">Card Art</span>
+                             <!-- Hidden File Input inside the click target -->
+                             <input type="file" id="fileInput" accept="image/*" class="hidden">
+
+                             <img id="userCardImage" src="" class="hidden object-contain shadow-sm pointer-events-none" alt="User Card">
+                             
+                             <!-- Placeholder / Drag Target -->
+                             <div id="cardPlaceholder" class="w-full h-full flex items-center justify-center">
+                                <!-- Updated classes: grayscale by default, full color on hover. Opacity is 100%. -->
+                                <img src="https://mew.cards/gg/img/upload.png" 
+                                     alt="Upload Here" 
+                                     class="w-full h-full object-contain opacity-100 grayscale group-hover:grayscale-0 transition-all duration-300" />
                              </div>
                         </div>
 
@@ -522,6 +525,7 @@
         const glareOverlay = document.getElementById('glareOverlay');
         
         // Layers
+        // Removed duplicate declaration of cardLayer
         const cardLayer = document.getElementById('cardLayer');
         const slabImageOverlay = document.getElementById('slabImageOverlay');
         const slabCssOverlay = document.getElementById('slabCssOverlay');
@@ -557,7 +561,8 @@
             'https://mew.cards/gg/img/logo.png',
             'https://mew.cards/gg/img/base_PSA.png',
             'https://mew.cards/gg/img/GG_PSA_Eclipse.png',
-            'https://mew.cards/gg/img/GG_PSA_Fuschia.png'
+            'https://mew.cards/gg/img/GG_PSA_Fuschia.png',
+            'https://mew.cards/gg/img/upload.png'
         ];
 
         let loadedCount = 0;
@@ -786,17 +791,38 @@
             }
         }
 
+        // New Cert Functionality
+        function findByCert() {
+            const cert = prompt("Enter PSA Certificate Number:");
+            if (cert && cert.trim().length > 0) {
+                window.open(`https://www.psacard.com/cert/${cert.trim()}/psa`, '_blank');
+            }
+        }
+
         const fileInput = document.getElementById('fileInput');
         const cardPlaceholder = document.getElementById('cardPlaceholder');
-        const dropZone = document.getElementById('dropZone');
+        
         const cropModal = document.getElementById('cropModal');
         const imageToCrop = document.getElementById('imageToCrop');
         let cropper = null;
 
         fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-blue-50', 'border-blue-400'); });
-        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('bg-blue-50', 'border-blue-400'); });
-        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('bg-blue-50', 'border-blue-400'); if (e.dataTransfer.files.length) { handleFile(e.dataTransfer.files[0]); } });
+        
+        // Re-targeting DnD to the card layer
+        const dndLayer = document.getElementById('cardLayer'); // Use local var or ensure global uniqueness
+        dndLayer.addEventListener('dragover', (e) => { 
+            e.preventDefault(); 
+            document.body.classList.add('drop-active'); 
+        });
+        dndLayer.addEventListener('dragleave', (e) => { 
+            e.preventDefault(); 
+            document.body.classList.remove('drop-active'); 
+        });
+        dndLayer.addEventListener('drop', (e) => { 
+            e.preventDefault(); 
+            document.body.classList.remove('drop-active'); 
+            if (e.dataTransfer.files.length) { handleFile(e.dataTransfer.files[0]); } 
+        });
 
         function handleFile(file) {
             if (file && file.type.startsWith('image/')) {
