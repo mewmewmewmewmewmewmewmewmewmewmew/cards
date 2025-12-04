@@ -346,7 +346,7 @@
 
             <!-- 2. Guard Option -->
             <div>
-                <div class="flex justify-between items-end mb-3">
+                <div class="flex justify-between items-end mb-1">
                     <label class="block text-sm font-semibold text-slate-700 uppercase tracking-wider mb-0">2. Guard Option</label>
                     <!-- Rotate Button -->
                     <button onclick="toggleFlip()" class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 flex items-center gap-1 transition-colors" title="Flip Guard Vertically">
@@ -354,15 +354,26 @@
                         <span class="font-medium">Rotate</span>
                     </button>
                 </div>
+
+                <!-- Current Selection Text Moved Here -->
+                <span id="colorNameDisplay" class="block text-sm font-medium text-slate-600 mb-3">Current: Eclipse</span>
                 
                 <!-- Options: Eclipse & Fuschia -->
                 <div class="flex items-center gap-3 mb-4">
-                    <!-- Eclipse -->
-                    <button onclick="setGuardOption('#111827', 'Eclipse', 'https://mew.cards/gg/img/GG_PSA_Eclipse.png')" class="w-10 h-10 rounded-full bg-gray-900 border-2 border-transparent hover:scale-110 transition shadow-sm ring-offset-2 focus:ring-2 ring-gray-400" title="Eclipse"></button>
-                    <!-- Fuschia -->
-                    <button onclick="setGuardOption('#d946ef', 'Fuschia', 'https://mew.cards/gg/img/GG_PSA_Fuschia.png')" class="w-10 h-10 rounded-full border-2 border-transparent hover:scale-110 transition shadow-sm ring-offset-2 focus:ring-2 ring-fuchsia-400" style="background-color: #d946ef;" title="Fuschia"></button>
+                    <!-- Eclipse: 50% solid #e4e4e4 top, 50% solid black bottom -->
+                    <!-- Removed border-2/border-transparent to fix edge gap -->
+                    <button onclick="setGuardOption('#111827', 'Eclipse', 'https://mew.cards/gg/img/GG_PSA_Eclipse.png')" 
+                            class="w-10 h-10 rounded-xl shadow-sm hover:scale-105 transition ring-offset-2 focus:ring-2 ring-gray-400 focus:outline-none" 
+                            style="background: linear-gradient(to bottom, #e4e4e4 50%, #000000 50%); background-size: 100% 100%; background-repeat: no-repeat;" 
+                            title="Eclipse"></button>
                     
-                    <span id="colorNameDisplay" class="text-sm font-medium text-slate-600 ml-2">Current: Eclipse</span>
+                    <!-- Fuschia: 50% solid pink top, 50% solid purple bottom -->
+                    <!-- Removed border-2/border-transparent to fix edge gap -->
+                    <button onclick="setGuardOption('#d946ef', 'Fuschia', 'https://mew.cards/gg/img/GG_PSA_Fuschia.png')" 
+                            class="w-10 h-10 rounded-xl shadow-sm hover:scale-105 transition ring-offset-2 focus:ring-2 ring-fuchsia-400 focus:outline-none" 
+                            style="background: linear-gradient(to bottom, #dd8ab4 50%, #6c4572 50%); background-size: 100% 100%; background-repeat: no-repeat;" 
+                            title="Fuschia"></button>
+                    
                 </div>
                 <!-- Hidden input to maintain state for JS logic -->
                 <input type="hidden" id="customColorInput" value="#111827">
@@ -758,9 +769,12 @@
             }
         }
 
+        // Updated function - simplified signature
         function setGuardOption(hex, name, imageUrl) {
             document.getElementById('customColorInput').value = hex;
             document.getElementById('colorNameDisplay').innerText = `Current: ${name}`;
+            
+            // 1. Update Image
             const guardImg = document.getElementById('guardImageOverlay');
             if (imageUrl && guardImg.src !== imageUrl) {
                 guardImg.src = imageUrl;
@@ -769,6 +783,8 @@
                     guardImg.classList.remove('hidden');
                 }
             }
+
+            // 2. Update Fallback CSS (for BGS/CGC) - Gradient doesn't apply to background-color, so use hex
             const guardContainer = document.getElementById('guardContainer');
             if (guardContainer.classList.contains('guard-bumper')) {
                 guardContainer.style.backgroundColor = hex;
