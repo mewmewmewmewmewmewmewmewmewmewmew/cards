@@ -176,6 +176,25 @@
             color: #cb97a5; /* Keep the accent visible */
         }
 
+        /* --- 3D TILT & GLARE STYLES --- */
+        #previewWrapper {
+            transform-style: preserve-3d;
+            will-change: transform;
+            /* Default perspective */
+            transform: perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1);
+        }
+
+        .glare-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            mix-blend-mode: overlay; 
+            pointer-events: none;
+            z-index: 60; /* Topmost layer */
+            border-radius: inherit; /* Inherits rounded corners from slab container */
+            transition: opacity 0.1s ease;
+        }
+
         /* --- TOGGLE SWITCH STYLES --- */
         .theme-toggle-wrapper {
             position: absolute;
@@ -340,7 +359,8 @@
         <div class="lg:col-span-8 flex flex-col items-center justify-center min-h-[500px] order-1 lg:order-2">
             
             <!-- MAIN COMPOSITE VIEW -->
-            <div id="previewWrapper" class="relative transform transition-transform duration-500 hover:scale-[1.02] p-4 rounded-xl">
+            <!-- Hitbox padding is p-16 (approx 20% more than p-12) to create interaction zone -->
+            <div id="previewWrapper" class="relative p-16 rounded-xl">
                 
                 <!-- LAYER 1: The GUARD Container -->
                 <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
@@ -353,7 +373,11 @@
                          style="width: 106.33%; max-width: none; left: 50%; top: 50%; transform: translate(-50%, -50%); transition: transform 0.3s ease;">
 
                     <!-- Inner Content Container (The Slab) -->
-                    <div id="slabContainer" class="company-psa w-full relative overflow-hidden bg-white/10">
+                    <!-- Added rounded-xl to clip the glare to the slab shape -->
+                    <div id="slabContainer" class="company-psa w-full relative overflow-hidden bg-white/10 rounded-[18px]">
+
+                        <!-- NEW: Glare Overlay (Inside Slab Container to clip to rounded corners) -->
+                        <div id="glareOverlay" class="glare-overlay"></div>
 
                         <!-- LAYER 2: The SLAB BASE IMG -->
                         <img id="slabImageOverlay" src="https://mew.cards/gg/img/base_PSA.png" 
@@ -443,6 +467,7 @@
         const guardContainer = document.getElementById('guardContainer');
         const slabContainer = document.getElementById('slabContainer');
         const previewWrapper = document.getElementById('previewWrapper');
+        const glareOverlay = document.getElementById('glareOverlay');
         
         // Layers
         const cardLayer = document.getElementById('cardLayer');
@@ -482,6 +507,62 @@
                 document.body.classList.remove('dark-mode');
             }
         });
+
+        // --- 3D TILT PHYSICS (REFINED) ---
+        previewWrapper.addEventListener('mousemove', (e) => {
+            const rect = previewWrapper.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Normalized coordinates (0 to 1)
+            const px = x / rect.width;
+            const py = y / rect.height;
+            
+            // 1. FEATHERING LOGIC
+            // Create a curve that is 1.0 in the center and fades to 0.0 at edges
+            // sin(x * PI) creates a nice bell curve from 0->1->0
+            const featherX = Math.sin(px * Math.PI);
+            const featherY = Math.sin(py * Math.PI);
+            // Power curve to make the "sweet spot" wider. 0.1 at edges, 1 in center.
+            const interactionStrength = Math.pow(featherX * featherY, 0.5);
+
+            const maxTilt = 3; // Reduced from 5 to 3 for subtlety
+            
+            // Calculate rotation with dampening
+            const rotateX = (0.5 - py) * maxTilt * 2 * interactionStrength; 
+            const rotateY = (px - 0.5) * maxTilt * 2 * interactionStrength; 
+            
+            // Apply Transform
+            // REMOVED scale3d factor as requested
+            previewWrapper.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1, 1, 1)`;
+            
+            // Glare Logic - Dependent on Tilt
+            // We map the tilt angle to a percentage for the gradient center
+            const glareX = 50 + (rotateY * 15); // Increased multiplier to make glare move more with tilt
+            const glareY = 50 - (rotateX * 15);
+            
+            const tiltMag = Math.min(1, Math.hypot(rotateX, rotateY) / maxTilt);
+            const alpha = (0.35 * tiltMag).toFixed(2); 
+            
+            glareOverlay.style.opacity = alpha;
+            // Gradient center moves with the angle of the card
+            glareOverlay.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.6), transparent 60%)`;
+        });
+
+        previewWrapper.addEventListener('mouseleave', () => {
+            // Reset to flat state
+            previewWrapper.style.transition = 'transform 0.5s ease';
+            previewWrapper.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+            
+            // Fade out glare
+            glareOverlay.style.opacity = '0';
+            
+            // Clear transition after it finishes so mousemove feels instant again
+            setTimeout(() => {
+                previewWrapper.style.transition = '';
+            }, 500);
+        });
+
 
         // Error Handling for Images
         function handleImageError(img) {
@@ -619,14 +700,6 @@
             const guardContainer = document.getElementById('guardContainer');
             if (guardContainer.classList.contains('guard-bumper')) {
                 guardContainer.style.backgroundColor = hex;
-            }
-        }
-
-        // New Cert Functionality
-        function findByCert() {
-            const cert = prompt("Enter PSA Certificate Number:");
-            if (cert && cert.trim().length > 0) {
-                window.open(`https://www.psacard.com/cert/${cert.trim()}/psa`, '_blank');
             }
         }
 
