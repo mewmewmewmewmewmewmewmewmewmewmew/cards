@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Graded Guard Visualizer</title>
+    <!-- Favicon -->
+    <link rel="icon" href="https://mew.cards/gg/img/logo.png" type="image/png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Icon Library -->
@@ -24,7 +27,7 @@
             background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
             background-size: 20px 20px;
             transition: background-color 0.3s ease, color 0.3s ease;
-            overflow: hidden; /* Prevent scrolling during load */
+            /* Removed overflow: hidden from here to prevent permanent lock */
         }
 
         /* Loading Screen Styles */
@@ -290,7 +293,8 @@
 
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center py-8 px-4 text-slate-800 relative transition-colors duration-300">
+<!-- Added 'overflow-hidden' class to body, which will be removed by JS after load -->
+<body class="min-h-screen flex flex-col items-center py-8 px-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
 
     <!-- Loading Screen -->
     <div id="loading-screen">
@@ -557,7 +561,7 @@
             if (loadedCount >= IMAGES_TO_PRELOAD.length) {
                 setTimeout(() => {
                     loadingScreen.classList.add('hidden-loader');
-                    document.body.style.overflow = ''; // Restore scrolling
+                    document.body.classList.remove('overflow-hidden'); // Restore scrolling here
                 }, 500); // Slight delay for smoothness
             }
         }
@@ -608,6 +612,7 @@
             const rotateY = (px - 0.5) * maxTilt * 2 * interactionStrength; 
             
             // Apply Transform
+            // REMOVED scale3d factor as requested
             previewWrapper.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1, 1, 1)`;
             
             // Glare Logic
@@ -767,14 +772,6 @@
             const guardContainer = document.getElementById('guardContainer');
             if (guardContainer.classList.contains('guard-bumper')) {
                 guardContainer.style.backgroundColor = hex;
-            }
-        }
-
-        // New Cert Functionality
-        function findByCert() {
-            const cert = prompt("Enter PSA Certificate Number:");
-            if (cert && cert.trim().length > 0) {
-                window.open(`https://www.psacard.com/cert/${cert.trim()}/psa`, '_blank');
             }
         }
 
