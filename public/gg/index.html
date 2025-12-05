@@ -402,15 +402,18 @@
                 lucide.createIcons();
             }
             
+            // Just trigger the fetch, which triggers the preload
             fetchGuardOptions();
             
-            IMAGES_TO_PRELOAD.forEach(url => {
-                const img = new Image();
-                img.onload = updateLoader;
-                img.onerror = () => { console.warn("Failed to preload:", url); updateLoader(); };
-                img.src = url;
-            });
-            
+            // Failsafe for loader: Hide after 8 seconds no matter what
+            setTimeout(() => {
+                const loader = document.getElementById('loading-screen');
+                if (loader && !loader.classList.contains('hidden-loader')) {
+                    loader.classList.add('hidden-loader');
+                    document.body.classList.remove('overflow-hidden');
+                }
+            }, 8000);
+
             const ringObserver = new MutationObserver((mutations) => {
                  mutations.forEach((mutation) => {
                      if (mutation.attributeName === 'class') {
@@ -440,6 +443,8 @@
         const glareOverlay = document.getElementById('glareOverlay');
         const guardOptionsContainer = document.getElementById('guardOptionsContainer');
         const colorNameDisplay = document.getElementById('colorNameDisplay');
+        const loadingLogoFg = document.getElementById('loading-logo-fg');
+        const loadingScreen = document.getElementById('loading-screen');
         
         const cardLayerEl = document.getElementById('cardLayer');
         const slabImageOverlay = document.getElementById('slabImageOverlay');
@@ -452,9 +457,6 @@
         const btnCgc = document.getElementById('btn-cgc');
         
         const darkModeToggle = document.getElementById('darkModeToggle');
-        
-        const loadingScreen = document.getElementById('loading-screen');
-        const loadingLogoFg = document.getElementById('loading-logo-fg');
         
         const sidebar = document.getElementById('sidebar');
         const sidebarOpenBtn = document.getElementById('sidebar-open-btn');
@@ -483,23 +485,27 @@
         const PSA_CARD_BOTTOM_PX = 166;
 
         // PRELOAD LOGIC
-        const IMAGES_TO_PRELOAD = [
+        // Base assets that are always needed
+        const BASE_ASSETS = [
             'https://mew.cards/gg/img/logo.png',
             'https://mew.cards/gg/img/base_PSA.png',
-            'https://mew.cards/gg/img/GG_PSA_Eclipse.png',
-            'https://mew.cards/gg/img/GG_PSA_Fuschia.png',
             'https://mew.cards/gg/img/upload.png'
         ];
 
+        let resourcesToLoad = [];
         let loadedCount = 0;
-        let currentSelectionName = 'None';
         
         function updateLoader() {
             loadedCount++;
-            const percentage = Math.round((loadedCount / (IMAGES_TO_PRELOAD.length + 1)) * 100);
-            loadingLogoFg.style.clipPath = `inset(${100 - percentage}% 0 0 0)`;
+            // Prevent divide by zero if resourcesToLoad is empty
+            const total = resourcesToLoad.length || 1; 
+            const percentage = Math.round((loadedCount / total) * 100);
+            
+            if (loadingLogoFg) {
+                loadingLogoFg.style.clipPath = `inset(${100 - percentage}% 0 0 0)`;
+            }
 
-            if (loadedCount >= IMAGES_TO_PRELOAD.length + 1) {
+            if (loadedCount >= total) {
                 setTimeout(() => {
                     loadingScreen.classList.add('hidden-loader');
                     document.body.classList.remove('overflow-hidden'); 
@@ -511,6 +517,7 @@
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ5OLGw_I77Cxa-6Lq15tV3-pPFgBqcVzQmhYH8SiuyDK8vdvGn4rRH8DAFxdh00IWXXY6savQ5yiPx/pub?output=csv';
         let allGuardOptions = [];
         let currentCompany = 'PSA'; 
+        let currentSelectionName = 'None';
 
         // FALLBACK DATA
         const FALLBACK_OPTIONS = [
@@ -557,11 +564,12 @@
         }
 
         async function fetchGuardOptions() {
+            let parsed = [];
             try {
                 const response = await fetch(`${SHEET_URL}&t=${Date.now()}`);
                 if(!response.ok) throw new Error("Bad response");
                 const text = await response.text();
-                const parsed = parseCSV(text);
+                parsed = parseCSV(text);
                 
                 if(parsed.length > 0) {
                     allGuardOptions = parsed;
@@ -573,8 +581,29 @@
                 allGuardOptions = FALLBACK_OPTIONS;
             }
             
+            // START PRELOADING HERE
+            // 1. Collect all image URLs from the data options
+            const dynamicImages = allGuardOptions
+                .map(opt => opt.Image ? `https://mew.cards/gg/img/${opt.Image}` : null)
+                .filter(url => url !== null);
+
+            // 2. Combine with base assets and deduplicate
+            resourcesToLoad = [...new Set([...BASE_ASSETS, ...dynamicImages])];
+            
+            // 3. Start loading them
+            if (resourcesToLoad.length > 0) {
+                resourcesToLoad.forEach(url => {
+                    const img = new Image();
+                    img.onload = updateLoader;
+                    img.onerror = () => { console.warn("Failed to load asset:", url); updateLoader(); };
+                    img.src = url;
+                });
+            } else {
+                updateLoader(); // Force load if empty
+            }
+
+            // Initialize App UI
             setCompany('psa'); 
-            updateLoader(); 
         }
 
         function renderGuardOptions(grader) {
@@ -595,8 +624,7 @@
                 btn.id = `btn-${safeName}`;
                 btn.title = opt.Name || 'Unknown';
                 
-                // REMOVED border class from main button to fix background clipping issue
-                // The border is now applied via the child overlay div
+                // Button Base Style
                 btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 hover:ring-2 transition-all duration-200 ring-offset-2 focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700`;
                 
                 const c1 = normalizeHex(opt['Color 1']);
@@ -622,7 +650,7 @@
                 sheen.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
                 btn.appendChild(sheen);
                 
-                // NEW: Border Overlay div - sits on top of everything to provide border without clipping background
+                // Border Overlay
                 const borderOverlay = document.createElement('div');
                 borderOverlay.className = 'absolute inset-0 rounded-full border border-black/10 dark:border-white/10 pointer-events-none';
                 btn.appendChild(borderOverlay);
@@ -658,14 +686,12 @@
             });
         }
 
-        // ... Rest of the script logic stays the same ...
         let isFlipped = false;
 
         darkModeToggle.addEventListener('change', (e) => {
             if (e.target.checked) document.body.classList.add('dark-mode');
             else document.body.classList.remove('dark-mode');
             
-            // Update Ring Offset for hover effects when mode changes
             const offsetColor = e.target.checked ? '#27272a' : '#ffffff';
             const allBtns = document.querySelectorAll('.guard-option-btn');
             allBtns.forEach(btn => {
@@ -701,7 +727,6 @@
         });
 
         function handleImageError(img) {
-            // Only hide if it's supposed to be visible (prevents hiding the placeholder on load)
             if(img.src && img.src !== window.location.href) {
                  console.warn('Image failed to load:', img.id, img.src);
                  img.style.display = 'none';
@@ -744,7 +769,6 @@
                 slabImageOverlay.style.display = 'block'; 
                 slabImageOverlay.classList.remove('hidden');
                 
-                // Only show guard if an option is actually selected
                 if(currentSelectionName !== 'None') {
                     guardImageOverlay.style.display = 'block';
                     guardImageOverlay.classList.remove('hidden');
@@ -784,7 +808,7 @@
 
         function setGuardOption(hex, name, imageUrl, btnId, highlightColor) {
             document.getElementById('customColorInput').value = hex;
-            currentSelectionName = name; // Update selection state
+            currentSelectionName = name; 
             document.getElementById('colorNameDisplay').innerText = `Current: ${name}`;
             
             const guardImg = document.getElementById('guardImageOverlay');
@@ -806,13 +830,11 @@
             buttons.forEach(btn => {
                 btn.classList.remove('ring-2'); 
                 btn.style.boxShadow = ''; 
-                // Don't remove prop --tw-ring-color as it's needed for hover
             });
 
             const activeBtn = document.getElementById(btnId);
             if (activeBtn) {
                  activeBtn.classList.add('ring-2'); 
-                 // Color prop is already set on creation
                  const isDark = document.body.classList.contains('dark-mode');
                  const offsetColor = isDark ? '#18181b' : '#f3f4f6'; 
                  activeBtn.style.setProperty('--tw-ring-offset-color', offsetColor);
@@ -873,10 +895,9 @@
             fileInput.value = ''; 
         }
         
-        // UPDATED: Uses 'onclone' to bake filters safely without touching live DOM
         window.downloadPreview = function() {
             const originalImg = document.getElementById('userCardImage');
-            const currentFilter = originalImg.style.filter; // Capture current slider values
+            const currentFilter = originalImg.style.filter; 
 
             html2canvas(previewWrapper, { 
                 useCORS: true, 
@@ -885,27 +906,15 @@
                 onclone: (clonedDoc) => {
                     const clonedImg = clonedDoc.getElementById('userCardImage');
                     
-                    // Only process if image exists, is visible, and has filters
                     if (currentFilter && currentFilter !== 'none' && !originalImg.classList.contains('hidden') && originalImg.naturalWidth > 0) {
                         try {
-                            // Create a temporary canvas
                             const canvas = clonedDoc.createElement('canvas');
                             const ctx = canvas.getContext('2d');
-                            
-                            // Match original image dimensions
                             canvas.width = originalImg.naturalWidth;
                             canvas.height = originalImg.naturalHeight;
-                            
-                            // Apply the filters to the context
                             ctx.filter = currentFilter;
-                            
-                            // Draw the ORIGINAL image (source of truth) onto the canvas
                             ctx.drawImage(originalImg, 0, 0, canvas.width, canvas.height);
-                            
-                            // Replace the CLONED image source with the baked pixel data
                             clonedImg.src = canvas.toDataURL('image/png');
-                            
-                            // Important: Remove the CSS filter from the clone so it doesn't apply twice
                             clonedImg.style.filter = 'none'; 
                         } catch (e) {
                             console.warn("Filter baking failed inside onclone:", e);
@@ -913,8 +922,11 @@
                     }
                 }
             }).then(canvas => {
+                const safeName = currentSelectionName.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-');
+                const filename = `${currentCompany}_${safeName}.png`;
+
                 const link = document.createElement('a'); 
-                link.download = 'graded-guard-preview.png'; 
+                link.download = filename; 
                 link.href = canvas.toDataURL('image/png'); 
                 link.click();
             }).catch(err => {
@@ -923,7 +935,6 @@
             });
         }
         
-        // UPDATED: Now prompts user for Cert # and opens the PSA page
         window.findByCert = () => {
             const cert = prompt("Please enter the PSA Certification Number:");
             if (cert && cert.trim()) {
