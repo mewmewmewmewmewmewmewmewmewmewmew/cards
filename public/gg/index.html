@@ -319,19 +319,21 @@
 
     <!-- Crop Modal -->
     <div id="cropModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+        <!-- UPDATED: Increased width to 90vw and height to 85vh for a much larger workspace -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl w-[90vw] h-[85vh] max-w-7xl shadow-2xl overflow-hidden flex flex-col">
+            <div class="flex-none p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                 <h3 class="font-bold text-slate-900 dark:text-white">Adjust Image</h3>
                 <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             
-            <div class="flex-1 bg-black/5 dark:bg-black/50 p-4 relative min-h-[300px] flex items-center justify-center">
-                <div class="h-[400px] w-full">
-                    <img id="imageToCrop" src="" alt="Crop Preview" class="max-w-full block">
+            <div class="flex-1 bg-black/5 dark:bg-black/50 p-4 relative flex items-center justify-center overflow-hidden">
+                <!-- UPDATED: Removed fixed height, uses h-full to fill the modal -->
+                <div class="h-full w-full">
+                    <img id="imageToCrop" src="" alt="Crop Preview" class="max-w-full max-h-full block">
                 </div>
             </div>
 
-            <div class="p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-white dark:bg-slate-900">
+            <div class="flex-none p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-white dark:bg-slate-900">
                 <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
                 <button onclick="applyCrop()" class="px-6 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-lg transition-all">Apply Art</button>
             </div>
@@ -814,8 +816,12 @@
             }).catch(err => alert("Save failed. Check console"));
         }
         
+        // UPDATED: Now prompts user for Cert # and opens the PSA page
         window.findByCert = () => {
-            alert("This feature connects to PSA API in the production version. For now, please upload an image manually!");
+            const cert = prompt("Please enter the PSA Certification Number:");
+            if (cert && cert.trim()) {
+                window.open(`https://www.psacard.com/cert/${cert.trim()}`, '_blank');
+            }
         };
     </script>
 </body>
