@@ -546,8 +546,8 @@
                 }
 
                 btn.style.background = bgStyle;
-                // FIX: Force gradient to fill 100% of the circle and prevent tiling artifacts
-                btn.style.backgroundSize = '100% 100%';
+                // FIX: Fill 105% to ensure full coverage and hide anti-aliasing seams at edges
+                btn.style.backgroundSize = '105% 105%';
                 btn.style.backgroundRepeat = 'no-repeat';
                 btn.style.backgroundPosition = 'center';
                 
