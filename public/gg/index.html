@@ -872,10 +872,54 @@
             document.getElementById('cardPlaceholder').classList.remove('hidden'); 
             fileInput.value = ''; 
         }
+        
+        // UPDATED: "Bakes" CSS filters into the image data before capturing
         window.downloadPreview = function() {
+            const img = document.getElementById('userCardImage');
+            const originalSrc = img.src;
+            const originalFilter = img.style.filter;
+            
+            // 1. Check if we have an active image with filters
+            if (originalFilter && originalFilter !== 'none' && !img.classList.contains('hidden') && img.naturalWidth > 0) {
+                try {
+                    // 2. Create a temporary canvas to render the filtered image
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    
+                    // 3. Apply the filters to the context and draw
+                    ctx.filter = originalFilter;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // 4. Swap the img src with the "baked" version and remove CSS filter temporarily
+                    img.src = canvas.toDataURL('image/png');
+                    img.style.filter = 'none';
+                } catch (e) {
+                    console.warn("Filter baking failed (likely CORS), proceeding with raw image capture.", e);
+                }
+            }
+
+            // 5. Capture with html2canvas
             html2canvas(previewWrapper, { useCORS: true, backgroundColor: null, scale: 2 }).then(canvas => {
-                const link = document.createElement('a'); link.download = 'graded-guard-preview.png'; link.href = canvas.toDataURL('image/png'); link.click();
-            }).catch(err => alert("Save failed. Check console"));
+                const link = document.createElement('a'); 
+                link.download = 'graded-guard-preview.png'; 
+                link.href = canvas.toDataURL('image/png'); 
+                link.click();
+                
+                // 6. Restore original state
+                if (originalSrc && originalSrc !== img.src) {
+                    img.src = originalSrc;
+                    img.style.filter = originalFilter;
+                }
+            }).catch(err => {
+                alert("Save failed. Check console");
+                // Restore state on error
+                if (originalSrc && originalSrc !== img.src) {
+                    img.src = originalSrc;
+                    img.style.filter = originalFilter;
+                }
+            });
         }
         
         // UPDATED: Now prompts user for Cert # and opens the PSA page
