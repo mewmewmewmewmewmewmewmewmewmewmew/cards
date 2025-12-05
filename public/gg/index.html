@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Graded Guard Visualizer</title>
-    <!-- Favicon (Updated to square image) -->
+    <!-- Favicon -->
     <link rel="icon" href="https://mew.cards/gg/img/favicon.png" type="image/png">
     
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Configure Tailwind to use the .dark-mode class instead of system preferences -->
+    <!-- Configure Tailwind -->
     <script>
         tailwind.config = {
             darkMode: ['class', '.dark-mode'],
@@ -19,11 +19,11 @@
     <!-- Icon Library -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- Cropper.js for image cropping -->
+    <!-- Cropper.js -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
-    <!-- html2canvas for saving images -->
+    <!-- html2canvas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
@@ -34,14 +34,13 @@
             background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
             background-size: 20px 20px;
             transition: background-color 0.3s ease, color 0.3s ease;
-            /* Removed overflow: hidden from here to prevent permanent lock */
         }
 
         /* Loading Screen Styles */
         #loading-screen {
             position: fixed;
             inset: 0;
-            background-color: #101010; /* Dark Theme Background */
+            background-color: #101010; 
             z-index: 9999;
             display: flex;
             flex-direction: column;
@@ -56,40 +55,18 @@
             pointer-events: none;
         }
 
-        .logo-container {
-            position: relative;
-            width: 112px; /* h-28 equivalent */
-            height: 112px;
-        }
-
         /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1; 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #c1c1c1; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8; 
-        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
-        /* 3D Effects for the Guard (Layer 1 - CSS Mode) */
+        /* 3D Effects */
         .guard-bumper {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 
-                /* Inner shadow for depth (bevel effect) */
-                inset 2px 2px 5px rgba(255, 255, 255, 0.3),
-                inset -2px -2px 5px rgba(0, 0, 0, 0.2),
-                /* Outer drop shadow */
-                0 10px 25px -5px rgba(0, 0, 0, 0.3),
-                0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            box-shadow: inset 2px 2px 5px rgba(255, 255, 255, 0.3), inset -2px -2px 5px rgba(0, 0, 0, 0.2), 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
 
-        /* CSS-Based Slab (For BGS/CGC) */
         .slab-css-style {
             background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.1) 100%);
             backdrop-filter: blur(2px);
@@ -97,216 +74,82 @@
             box-shadow: inset 0 0 20px rgba(255,255,255,0.8);
         }
 
-        /* Dynamic Company Dimensions */
-        
-        /* PSA: Tall, standard rounded corners */
-        .company-psa {
-            /* Aspect ratio removed to let the image's intrinsic aspect ratio dictate dimensions */
-        }
-        .guard-psa {
-            /* Padding/Radius handled by Image for PSA now, but kept for fallback/transitions */
-        }
-
-        /* BGS: Thicker, squarer */
-        .company-bgs {
-            aspect-ratio: 3.25 / 5.125;
-        }
-        .guard-bgs {
-            border-radius: 12px;
-            padding: 14px;
-        }
-
-        /* CGC: Rounded */
-        .company-cgc {
-            aspect-ratio: 3.15 / 5.3;
-        }
-        .guard-cgc {
-            border-radius: 20px;
-            padding: 12px;
-        }
-
-        /* Upload Zone Highlight Logic */
         .drop-active #cardPlaceholder {
-            background-color: rgba(59, 130, 246, 0.1); /* blue-500/10 */
-            border-color: #60a5fa; /* blue-400 */
+            background-color: rgba(59, 130, 246, 0.1);
+            border-color: #60a5fa; 
             color: #3b82f6;
         }
 
-        /* Cropper Modal Styles */
-        .cropper-container {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* --- DARK MODE STYLES --- */
+        /* Dark Mode Styles */
         body.dark-mode {
-            background-color: #18181b; /* Zinc-900 (Dark Grey) */
-            background-image: radial-gradient(#3f3f46 1px, transparent 1px); /* Zinc-700 dots */
+            background-color: #18181b;
+            background-image: radial-gradient(#3f3f46 1px, transparent 1px);
             color: #f4f4f5;
         }
-
-        body.dark-mode .bg-white {
-            background-color: #27272a; /* Zinc-800 */
-            color: #f4f4f5;
-            border-color: #3f3f46; /* Zinc-700 */
+        body.dark-mode .bg-white { background-color: #27272a; color: #f4f4f5; border-color: #3f3f46; }
+        body.dark-mode .text-slate-900 { color: #fafafa; }
+        body.dark-mode .text-slate-800 { color: #e4e4e7; }
+        body.dark-mode .text-slate-700 { color: #d4d4d8; }
+        body.dark-mode .text-slate-600 { color: #e4e4e7; }
+        body.dark-mode .text-slate-500 { color: #a1a1aa; }
+        body.dark-mode .bg-slate-100 { background-color: #3f3f46; }
+        
+        /* Company buttons */
+        .company-btn { color: #64748b; }
+        .company-btn:hover { color: #334155; }
+        .active-company { 
+            background-color: #ffffff; 
+            color: #0f172a; 
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); 
         }
         
-        body.dark-mode .text-slate-900 {
-            color: #fafafa;
-        }
-        
-        body.dark-mode .text-slate-800 {
-            color: #e4e4e7;
-        }
-
-        body.dark-mode .text-slate-700 {
-            color: #d4d4d8;
-        }
-        
-        body.dark-mode .text-slate-600 {
-            color: #e4e4e7; /* Bright grey for labels in dark mode */
-        }
-        
-        body.dark-mode .text-slate-500 {
-            color: #a1a1aa;
-        }
-
-        body.dark-mode .bg-slate-100 {
-            background-color: #3f3f46;
-        }
-        
-        /* Company buttons in dark mode */
-        body.dark-mode .company-btn {
-            color: #a1a1aa;
-        }
-        body.dark-mode .company-btn:hover {
-            color: #f4f4f5;
-        }
-        body.dark-mode .active-company {
-            background-color: #52525b;
-            color: #fff;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-        }
-
-        /* Action Buttons Dark Mode */
-        body.dark-mode .border-dashed {
+        body.dark-mode .company-btn { color: #a1a1aa; }
+        body.dark-mode .company-btn:hover { color: #f4f4f5; }
+        body.dark-mode .active-company { 
+            background-color: #52525b; 
+            color: #fff; 
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5); 
             border-color: #52525b;
         }
-        
-        /* Title Accent */
-        body.dark-mode .text-blue-600 {
-            color: #cb97a5; /* Keep the accent visible */
-        }
 
-        /* --- TOGGLE SWITCH STYLES --- */
-        .theme-toggle-wrapper {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 50;
-        }
+        body.dark-mode .border-dashed { border-color: #52525b; }
+        body.dark-mode .text-blue-600 { color: #cb97a5; }
 
-        /* Desktop: Move back to top-right absolute */
+        /* Theme Toggle */
+        .theme-toggle-wrapper { position: fixed; bottom: 20px; right: 20px; z-index: 50; }
         @media (min-width: 1024px) {
-            .theme-toggle-wrapper {
-                position: absolute;
-                top: 20px;
-                bottom: auto;
-                right: 20px;
-            }
+            .theme-toggle-wrapper { position: absolute; top: 20px; bottom: auto; right: 20px; }
         }
         
-        .toggle-checkbox {
-            position: absolute;
-            opacity: 0;
-            cursor: pointer;
-            height: 0;
-            width: 0;
-        }
+        .toggle-checkbox { position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0; }
+        .toggle-label { position: relative; display: flex; align-items: center; justify-content: space-between; width: 50px; height: 26px; background-color: #e5e7eb; border-radius: 9999px; cursor: pointer; transition: background-color 0.2s ease-in; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        .toggle-label:before { content: ""; position: absolute; left: 2px; top: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: white; transition: transform 0.2s ease-in; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .toggle-checkbox:checked + .toggle-label { background-color: #cb97a5; }
+        .toggle-checkbox:checked + .toggle-label:before { transform: translateX(100%); }
+        .toggle-icon { width: 14px; height: 14px; color: white; z-index: 10; }
+        .icon-sun { margin-left: 5px; color: #f59e0b; }
+        .icon-moon { margin-right: 5px; color: #fff; }
 
-        .toggle-label {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 50px;
-            height: 26px;
-            background-color: #e5e7eb; /* gray-200 */
-            border-radius: 9999px;
-            cursor: pointer;
-            transition: background-color 0.2s ease-in;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .toggle-label:before {
-            content: "";
-            position: absolute;
-            left: 2px;
-            top: 2px;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            background-color: white;
-            transition: transform 0.2s ease-in;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .toggle-checkbox:checked + .toggle-label {
-            background-color: #cb97a5; /* Use accent color */
-        }
-
-        .toggle-checkbox:checked + .toggle-label:before {
-            transform: translateX(100%);
-        }
-
-        /* Icons inside toggle */
-        .toggle-icon {
-            width: 14px;
-            height: 14px;
-            color: white;
-            z-index: 10;
-        }
-        .icon-sun {
-            margin-left: 5px;
-            color: #f59e0b;
-        }
-        .icon-moon {
-            margin-right: 5px;
-            color: #fff;
-        }
-
-        /* --- 3D TILT & GLARE STYLES --- */
-        #previewWrapper {
-            transform-style: preserve-3d;
-            will-change: transform;
-            /* Default perspective */
-            transform: perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1);
-        }
-
-        .glare-overlay {
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            mix-blend-mode: overlay; 
-            pointer-events: none;
-            z-index: 60; /* Topmost layer */
-            border-radius: inherit; /* Inherits rounded corners from slab container */
-            transition: opacity 0.1s ease;
+        /* 3D Tilt */
+        #previewWrapper { transform-style: preserve-3d; will-change: transform; transform: perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1); }
+        .glare-overlay { position: absolute; inset: 0; opacity: 0; mix-blend-mode: overlay; pointer-events: none; z-index: 60; border-radius: inherit; transition: opacity 0.1s ease; }
+        
+        /* Ring Fix */
+        .guard-option-btn.ring-2 {
+            box-shadow: 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color), 0 0 0 calc(var(--tw-ring-offset-width) + 2px) var(--tw-ring-color);
+            border: none;
         }
     </style>
 </head>
-<!-- Added 'overflow-hidden' class to body, which will be removed by JS after load -->
-<body class="h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
+<!-- UPDATED: Changed h-screen to h-dvh (dynamic viewport height) for better mobile browser support -->
+<body class="h-dvh flex flex-col py-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
 
     <!-- Loading Screen -->
     <div id="loading-screen">
-        <div class="logo-container">
-            <!-- Background Ghost Logo -->
+        <div class="w-28 h-28 relative">
             <img src="https://mew.cards/gg/img/logo.png" alt="Loading..." class="absolute top-0 left-0 w-full h-full object-contain opacity-30">
-            <!-- Foreground Filling Logo -->
             <img id="loading-logo-fg" src="https://mew.cards/gg/img/logo.png" alt="Loading..." class="absolute top-0 left-0 w-full h-full object-contain transition-all duration-100 ease-linear" style="clip-path: inset(100% 0 0 0);">
         </div>
-        <div class="h-16"></div> <!-- Spacer -->
     </div>
 
     <!-- Dark Mode Toggle -->
@@ -325,22 +168,18 @@
         </h1>
     </header>
 
-    <!-- Main Container: Full height, Flex layout for responsive ordering -->
-    <!-- Changed to relative to support absolute positioning of children on desktop -->
-    <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 overflow-hidden">
+    <!-- Main Container -->
+    <!-- UPDATED: Changed overflow-hidden to overflow-y-auto to allow scrolling on mobile -->
+    <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 overflow-y-auto overflow-x-hidden">
         
-        <!-- SIDEBAR REOPEN BUTTON (Desktop Only) -->
-        <!-- Fixed to left edge, centered vertically. Initially hidden. -->
+        <!-- SIDEBAR REOPEN BUTTON -->
         <button id="sidebar-open-btn" onclick="toggleSidebar()" class="hidden absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-white dark:bg-slate-800 p-3 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all hover:scale-110 group" title="Open Controls">
              <i data-lucide="panel-left-open" class="w-6 h-6"></i>
         </button>
 
         <!-- Controls Section -->
-        <!-- Mobile: order-2 (Bottom), relative. Desktop: Absolute Left, Centered Vertically, Z-20 -->
-        <!-- Added ID='sidebar' and transitions for collapsing -->
         <div id="sidebar" class="w-full lg:w-80 flex-none order-2 lg:absolute lg:left-8 lg:top-1/2 lg:-translate-y-1/2 lg:z-20 bg-white rounded-2xl shadow-xl p-6 border border-slate-100 flex flex-col gap-6 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] h-fit max-h-[85vh] overflow-y-auto">
             
-            <!-- COLLAPSE BUTTON (Desktop Only) -->
             <button onclick="toggleSidebar()" class="hidden lg:flex absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" title="Collapse Panel">
                 <i data-lucide="panel-left-close" class="w-5 h-5"></i>
             </button>
@@ -365,116 +204,90 @@
             <div>
                 <div class="flex justify-between items-end mb-1">
                     <label class="block text-sm font-semibold text-slate-700 uppercase tracking-wider mb-0">2. Guard Option</label>
-                    <!-- Rotate Button -->
                     <button onclick="toggleFlip()" class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 flex items-center gap-1 transition-colors" title="Flip Guard Vertically">
                         <i data-lucide="refresh-cw" class="w-3 h-3"></i>
                         <span class="font-medium">Rotate</span>
                     </button>
                 </div>
 
-                <!-- Current Selection Text Moved Here -->
-                <span id="colorNameDisplay" class="block text-sm font-medium text-slate-600 mb-3">Current: Fuschia</span>
+                <span id="colorNameDisplay" class="block text-sm font-medium text-slate-600 mb-3">Current: Loading...</span>
                 
-                <!-- Options: Eclipse & Fuschia -->
-                <div class="flex items-center gap-3 mb-4">
-                    <!-- Fuschia: 50% solid pink top, 50% solid purple bottom (MOVED FIRST) -->
-                    <button id="btn-fuschia"
-                            onclick="setGuardOption('#d946ef', 'Fuschia', 'https://mew.cards/gg/img/GG_PSA_Fuschia.png', 'btn-fuschia')" 
-                            class="w-10 h-10 rounded-xl shadow-sm hover:scale-105 transition ring-offset-2 focus:outline-none ring-2 ring-fuchsia-400" 
-                            style="background: linear-gradient(to bottom, #dd8ab4 50%, #6c4572 50%); background-size: 100% 100%; background-repeat: no-repeat;" 
-                            title="Fuschia"></button>
-                    
-                    <!-- Eclipse: 50% solid #e4e4e4 top, 50% solid black bottom (MOVED SECOND) -->
-                    <button id="btn-eclipse"
-                            onclick="setGuardOption('#111827', 'Eclipse', 'https://mew.cards/gg/img/GG_PSA_Eclipse.png', 'btn-eclipse')" 
-                            class="w-10 h-10 rounded-xl shadow-sm hover:scale-105 transition ring-offset-2 focus:outline-none" 
-                            style="background: linear-gradient(to bottom, #e4e4e4 50%, #000000 50%); background-size: 100% 100%; background-repeat: no-repeat;" 
-                            title="Eclipse"></button>
-                    
+                <div id="guardOptionsContainer" class="flex flex-wrap items-center gap-3 mb-4 min-h-[40px]">
+                    <span class="text-xs text-slate-400 italic">Loading options...</span>
                 </div>
-                <!-- Hidden input to maintain state for JS logic (Default to Fuschia Hex) -->
                 <input type="hidden" id="customColorInput" value="#d946ef">
             </div>
 
-            <!-- 3. Actions (Replaces previous Upload Box) -->
+            <!-- 3. Actions -->
             <div>
-                <!-- 3 Columns Layout -->
                 <div class="grid grid-cols-3 gap-2">
-                    <!-- Find Cert Button (Updated Text) -->
                     <button type="button" onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
                         by Cert
                     </button>
                     
-                    <!-- Remove Button -->
                     <button type="button" onclick="clearImage()" class="py-2.5 px-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Remove Image">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                         Clear
                     </button>
                     
-                    <!-- Save Button -->
-                    <!-- Updated to text-slate-900 (Darkest Grey) for maximum visibility in light mode -->
                     <button id="saveBtn" type="button" onclick="downloadPreview()" class="py-2.5 px-2 rounded-lg border border-slate-200 dark:border-slate-500 text-slate-900 dark:text-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Save Image">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         Save
                     </button>
                 </div>
             </div>
-
         </div>
 
         <!-- Preview Section -->
-        <!-- Mobile: order-1 (Top). Desktop: Full Width/Height, Absolute/Inset-0 or simply Flex fill to center behind sidebar -->
         <div class="flex-1 w-full h-full flex flex-col items-center justify-center order-1 lg:absolute lg:inset-0 lg:z-10 pointer-events-none">
-            <!-- Added pointer-events-auto to wrapper to ensure interaction works even if container overlays sidebar (though z-index handles that) -->
-            
-            <!-- MAIN COMPOSITE VIEW -->
-            <!-- Updated padding: p-4 for mobile, md:p-16 for desktop -->
             <div id="previewWrapper" class="relative p-4 md:p-16 rounded-xl pointer-events-auto">
                 
                 <!-- LAYER 1: The GUARD Container -->
                 <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
                     
-                    <!-- NEW LAYER: Graded Guard Image (Z-50 Topmost) -->
-                    <!-- Defaulted to Fuschia -->
+                    <!-- Guard Image -->
                     <img id="guardImageOverlay" src="https://mew.cards/gg/img/GG_PSA_Fuschia.png" 
                          onerror="handleImageError(this)"
                          class="absolute z-50 pointer-events-none hidden" 
                          style="width: 106.33%; max-width: none; left: 50%; top: 50%; transform: translate(-50%, -50%); transition: transform 0.3s ease;">
 
-                    <!-- Inner Content Container (The Slab) -->
-                    <!-- Added rounded-xl to clip the glare to the slab shape -->
+                    <!-- Slab Container -->
                     <div id="slabContainer" class="company-psa w-full relative overflow-hidden bg-white/10 rounded-[18px]">
 
-                        <!-- NEW: Glare Overlay (Inside Slab Container to clip to rounded corners) -->
+                        <!-- Glare Overlay -->
                         <div id="glareOverlay" class="glare-overlay"></div>
 
                         <!-- LAYER 2: The SLAB BASE IMG -->
                         <img id="slabImageOverlay" src="https://mew.cards/gg/img/base_PSA.png" 
                              onerror="handleImageError(this)"
-                             class="w-full h-auto relative z-10 pointer-events-none hidden">
+                             class="w-full h-auto relative z-10 pointer-events-none">
 
                         <!-- LAYER 3: The CARD & UPLOAD ZONE -->
-                        <!-- Added 'cursor-pointer' and 'group' to enable upload interaction -->
                         <div id="cardLayer" 
                              onclick="document.getElementById('fileInput').click()"
                              class="absolute z-20 flex items-center justify-center transition-all duration-300 cursor-pointer group">
                              
-                             <!-- Hidden File Input inside the click target -->
                              <input type="file" id="fileInput" accept="image/*" class="hidden">
 
                              <img id="userCardImage" src="" class="hidden object-contain shadow-sm pointer-events-none" alt="User Card">
                              
-                             <!-- Placeholder / Drag Target -->
-                             <div id="cardPlaceholder" class="w-full h-full flex items-center justify-center">
-                                <!-- Updated classes: 100% opacity, 50% saturation (grayscale-[50%]) default, full color on hover. -->
+                             <!-- Placeholder -->
+                             <div id="cardPlaceholder" class="w-full h-full flex items-center justify-center relative">
                                 <img src="https://mew.cards/gg/img/upload.png" 
                                      alt="Upload Here" 
+                                     onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden'); if(typeof lucide!=='undefined') lucide.createIcons();"
                                      class="w-full h-full object-contain opacity-100 grayscale-[50%] group-hover:grayscale-0 transition-all duration-300" />
+                                     
+                                <!-- Fallback Icon -->
+                                <div class="hidden absolute inset-0 flex flex-col items-center justify-center text-gray-400/50 group-hover:text-gray-400 transition-colors">
+                                    <i data-lucide="upload-cloud" class="w-12 h-12 mb-1"></i>
+                                    <span class="text-[10px] font-bold uppercase tracking-widest">Upload</span>
+                                </div>
                              </div>
                         </div>
 
-                        <!-- LAYER 4: The PLASTIC GLOSS -->
+                        <!-- LAYER 4: PLASTIC GLOSS -->
                         <div class="absolute inset-0 z-30 pointer-events-none opacity-20 bg-gradient-to-tr from-transparent via-white to-transparent mix-blend-overlay"></div>
                         <div class="slab-shine z-30"></div>
 
@@ -501,106 +314,84 @@
 
                     </div>
                 </div>
-                
-                <!-- Shadow below the whole object -->
-                <div class="absolute -bottom-8 left-10 right-10 h-4 bg-black/20 blur-xl rounded-[100%]"></div>
             </div>
         </div>
 
     </main>
 
-    <!-- CROPPER MODAL (Unchanged) -->
-    <div id="cropModal" class="fixed inset-0 z-50 bg-black/80 hidden items-center justify-center backdrop-blur-sm p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-                    <i data-lucide="crop" class="w-5 h-5"></i> Crop Your Card
-                </h3>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
-                    <i data-lucide="x" class="w-6 h-6"></i>
-                </button>
-            </div>
-            <div class="flex-1 bg-gray-900 p-2 overflow-hidden relative flex items-center justify-center h-[50vh] md:h-[60vh]">
-                <img id="imageToCrop" src="" alt="To Crop" class="max-w-full max-h-full block">
-            </div>
-            <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center gap-4">
-                <p class="text-xs text-slate-500 hidden md:block">
-                    Drag corners to select card. Ratio is locked.
-                </p>
-                <div class="flex gap-3 ml-auto">
-                    <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-slate-600 font-semibold hover:bg-gray-200 transition text-sm">Cancel</button>
-                    <button onclick="applyCrop()" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-sm text-sm flex items-center gap-2">
-                        <i data-lucide="check" class="w-4 h-4"></i> Crop & Apply
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Initialize Icons
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            
+            fetchGuardOptions();
+            
+            IMAGES_TO_PRELOAD.forEach(url => {
+                const img = new Image();
+                img.onload = updateLoader;
+                img.onerror = () => { console.warn("Failed to preload:", url); updateLoader(); };
+                img.src = url;
+            });
+            
+            const ringObserver = new MutationObserver((mutations) => {
+                 mutations.forEach((mutation) => {
+                     if (mutation.attributeName === 'class') {
+                         const isDark = document.body.classList.contains('dark-mode');
+                         const offsetColor = isDark ? '#27272a' : '#ffffff';
+                         const activeBtns = document.querySelectorAll('.guard-option-btn.ring-2');
+                         activeBtns.forEach(btn => {
+                            btn.style.setProperty('--tw-ring-offset-color', offsetColor);
+                         });
+                     }
+                 });
+            });
+            ringObserver.observe(document.body, { attributes: true });
+        });
 
         // DOM Elements
         const guardContainer = document.getElementById('guardContainer');
         const slabContainer = document.getElementById('slabContainer');
         const previewWrapper = document.getElementById('previewWrapper');
         const glareOverlay = document.getElementById('glareOverlay');
+        const guardOptionsContainer = document.getElementById('guardOptionsContainer');
         
-        // Layers
-        // RENAME: changed cardLayer to cardLayerEl to fix Identifier 'cardLayer' has already been declared
         const cardLayerEl = document.getElementById('cardLayer');
         const slabImageOverlay = document.getElementById('slabImageOverlay');
         const slabCssOverlay = document.getElementById('slabCssOverlay');
         const guardImageOverlay = document.getElementById('guardImageOverlay');
         
-        // CSS Mode Elements
-        const labelBorder = document.getElementById('labelBorder');
-        const companyLabelText = document.getElementById('companyLabelText');
-        const colorNameDisplay = document.getElementById('colorNameDisplay');
-        const customColorInput = document.getElementById('customColorInput');
-        const userCardImage = document.getElementById('userCardImage');
-        
-        // Buttons
         const btnPsa = document.getElementById('btn-psa');
         const btnBgs = document.getElementById('btn-bgs');
         const btnCgc = document.getElementById('btn-cgc');
         
-        // Dark Mode Toggle
         const darkModeToggle = document.getElementById('darkModeToggle');
         
-        // Loader Elements
         const loadingScreen = document.getElementById('loading-screen');
         const loadingLogoFg = document.getElementById('loading-logo-fg');
         
-        // Sidebar Toggle Logic
         const sidebar = document.getElementById('sidebar');
         const sidebarOpenBtn = document.getElementById('sidebar-open-btn');
 
         function toggleSidebar() {
             if (sidebar.classList.contains('translate-x-[-120%]')) {
-                // OPEN
                 sidebar.classList.remove('translate-x-[-120%]', 'opacity-0', 'pointer-events-none');
                 sidebarOpenBtn.classList.add('hidden');
                 sidebarOpenBtn.classList.remove('flex');
             } else {
-                // CLOSE
                 sidebar.classList.add('translate-x-[-120%]', 'opacity-0', 'pointer-events-none');
                 sidebarOpenBtn.classList.remove('hidden');
                 sidebarOpenBtn.classList.add('flex');
             }
         }
 
-
-        // CONSTANTS FOR PSA POSITIONING
+        // CONSTANTS
         const PSA_REF_WIDTH = 1200; 
         const PSA_REF_HEIGHT = 2102; 
         const PSA_CARD_WIDTH_PX = 940;
         const PSA_CARD_BOTTOM_PX = 166;
 
-        // PRELOAD LOGIC (Ensure new Fuschia default is in here)
+        // PRELOAD LOGIC
         const IMAGES_TO_PRELOAD = [
             'https://mew.cards/gg/img/logo.png',
             'https://mew.cards/gg/img/base_PSA.png',
@@ -613,75 +404,189 @@
         
         function updateLoader() {
             loadedCount++;
-            const percentage = Math.round((loadedCount / IMAGES_TO_PRELOAD.length) * 100);
-            
-            // Animate Clip Path from top (inset 100%) to bottom (inset 0%)
+            const percentage = Math.round((loadedCount / (IMAGES_TO_PRELOAD.length + 1)) * 100);
             loadingLogoFg.style.clipPath = `inset(${100 - percentage}% 0 0 0)`;
 
-            if (loadedCount >= IMAGES_TO_PRELOAD.length) {
+            if (loadedCount >= IMAGES_TO_PRELOAD.length + 1) {
                 setTimeout(() => {
                     loadingScreen.classList.add('hidden-loader');
-                    document.body.classList.remove('overflow-hidden'); // Restore scrolling here
-                }, 500); // Slight delay for smoothness
+                    document.body.classList.remove('overflow-hidden'); 
+                }, 500); 
             }
         }
 
-        // Start Loading
-        IMAGES_TO_PRELOAD.forEach(url => {
-            const img = new Image();
-            img.onload = updateLoader;
-            img.onerror = () => {
-                console.warn("Failed to preload:", url);
-                updateLoader(); // Proceed anyway
+        // DATA FETCHING
+        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ5OLGw_I77Cxa-6Lq15tV3-pPFgBqcVzQmhYH8SiuyDK8vdvGn4rRH8DAFxdh00IWXXY6savQ5yiPx/pub?output=csv';
+        let allGuardOptions = [];
+        let currentCompany = 'PSA'; 
+
+        // FALLBACK DATA
+        const FALLBACK_OPTIONS = [
+             { Grader: 'PSA', Name: 'Fuschia', 'Color 1': '#be81a1', 'Color 2': '#5c4065', 'Color 3': '', Highlight: '#f0abfc', Image: 'GG_PSA_Fuschia.png' },
+             { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png' }
+        ];
+
+        function parseCSV(csv) {
+            const lines = csv.split(/\r?\n/).filter(line => line.trim() !== '');
+            const clean = (val) => {
+                val = val ? val.trim() : '';
+                if (val.charCodeAt(0) === 0xFEFF) val = val.slice(1);
+                if (val.startsWith('"') && val.endsWith('"')) return val.slice(1, -1).trim();
+                return val;
             };
-            img.src = url;
-        });
+            // Normalize headers to ensure consistent access (trim spaces)
+            const headers = lines[0].split(',').map(h => clean(h).trim()); 
+            
+            return lines.slice(1).map(line => {
+                const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                const entry = {};
+                headers.forEach((h, i) => {
+                    // Map headers to values, handling potential index mismatches safely
+                    if(values[i] !== undefined) {
+                        entry[h] = clean(values[i]);
+                    }
+                });
+                return entry;
+            });
+        }
+        
+        function normalizeHex(hex) {
+            if (!hex) return '#000000';
+            hex = hex.trim();
 
+            // DATA CORRECTION: Fix known bad data from the sheet
+            if (hex.toLowerCase().includes('fuschia') || hex.toLowerCase().includes('fuchsia')) {
+                return '#be81a1'; // Hardcoded fix for Fuschia
+            }
+            if (hex.toLowerCase() === 'eclipse') return '#ffffff';
 
-        // FLIP STATE
+            const hexPattern = /^#?[0-9A-Fa-f]{3,8}$/;
+            // If it looks like a hex code but missing #, add it
+            if (hexPattern.test(hex) && !hex.startsWith('#')) {
+                return '#' + hex;
+            }
+            
+            // If it's a valid hex, return it. If it's a valid CSS name (e.g. 'red'), return it.
+            return hex;
+        }
+
+        async function fetchGuardOptions() {
+            try {
+                // CACHE BUSTING: Add timestamp to force fresh data from Google Sheets
+                const response = await fetch(`${SHEET_URL}&t=${Date.now()}`);
+                if(!response.ok) throw new Error("Bad response");
+                const text = await response.text();
+                const parsed = parseCSV(text);
+                
+                // Validate parsed data has at least some valid rows
+                if(parsed.length > 0) {
+                    allGuardOptions = parsed;
+                    console.log("Loaded options:", allGuardOptions.length);
+                } else {
+                    console.warn("Parsed CSV empty, using fallback");
+                    allGuardOptions = FALLBACK_OPTIONS;
+                }
+            } catch (error) {
+                console.error('Error fetching options, using fallback:', error);
+                allGuardOptions = FALLBACK_OPTIONS;
+            }
+            
+            setCompany('psa'); 
+            updateLoader(); 
+        }
+
+        function renderGuardOptions(grader) {
+            guardOptionsContainer.innerHTML = '';
+            const options = allGuardOptions.filter(opt => opt.Grader && opt.Grader.toUpperCase() === grader.toUpperCase());
+
+            if (options.length === 0) {
+                guardOptionsContainer.innerHTML = '<span class="text-xs text-slate-400 italic">No options available.</span>';
+                return;
+            }
+
+            options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                const safeName = opt.Name ? opt.Name.replace(/\s+/g, '-').toLowerCase() : `opt-${index}`;
+                btn.id = `btn-${safeName}`;
+                btn.title = opt.Name || 'Unknown';
+                
+                // Styles - ADDED border border-black/10 to define shape for white buttons
+                btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 transition-transform duration-200 ring-offset-2 ring-offset-[#f3f4f6] dark:ring-offset-[#18181b] focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700 border border-black/10 dark:border-white/10`;
+                
+                const c1 = normalizeHex(opt['Color 1']);
+                const c2 = opt['Color 2'] ? normalizeHex(opt['Color 2']) : null;
+                const c3 = opt['Color 3'] ? normalizeHex(opt['Color 3']) : null;
+
+                let bgStyle = '';
+                if (c3) {
+                     bgStyle = `linear-gradient(135deg, ${c1} 0%, ${c1} 33.3%, ${c2} 33.3%, ${c2} 66.6%, ${c3} 66.6%, ${c3} 100%)`;
+                } else if (c2) {
+                     bgStyle = `linear-gradient(135deg, ${c1} 50%, ${c2} 50%)`; 
+                } else {
+                     bgStyle = c1;
+                }
+
+                btn.style.background = bgStyle;
+                // FIX: Force gradient to fill 100% of the circle and prevent tiling artifacts
+                btn.style.backgroundSize = '100% 100%';
+                btn.style.backgroundRepeat = 'no-repeat';
+                btn.style.backgroundPosition = 'center';
+                
+                // Force backgroundColor in case gradient fails
+                btn.style.backgroundColor = c1; 
+
+                // Sheen Overlay
+                const sheen = document.createElement('div');
+                sheen.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
+                btn.appendChild(sheen);
+                
+                // HIGHLIGHT FIX: 
+                // If highlight is missing or white, default to a visible slate color so the ring shows up
+                let highlight = opt.Highlight ? normalizeHex(opt.Highlight) : c1;
+                if (!highlight || highlight.toLowerCase() === '#ffffff' || highlight.toLowerCase() === '#fff') {
+                    highlight = '#94a3b8'; // Visible Slate Blue
+                }
+                
+                const imgUrl = opt.Image ? `https://mew.cards/gg/img/${opt.Image}` : '';
+                
+                btn.dataset.hex = c1; 
+                btn.dataset.name = opt.Name;
+                btn.dataset.image = imgUrl;
+                btn.dataset.highlight = highlight; 
+
+                btn.onclick = () => {
+                    setGuardOption(c1, opt.Name, imgUrl, btn.id, highlight);
+                };
+
+                guardOptionsContainer.appendChild(btn);
+                if (index === 0) setTimeout(() => btn.click(), 0);
+            });
+        }
+
+        // ... Rest of the script logic stays the same ...
         let isFlipped = false;
 
-        // Dark Mode Logic
         darkModeToggle.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                document.body.classList.add('dark-mode');
-            } else {
-                document.body.classList.remove('dark-mode');
-            }
+            if (e.target.checked) document.body.classList.add('dark-mode');
+            else document.body.classList.remove('dark-mode');
         });
 
-        // --- 3D TILT PHYSICS (REFINED) ---
+        // 3D Tilt
         previewWrapper.addEventListener('mousemove', (e) => {
             const rect = previewWrapper.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
-            // Normalized coordinates (0 to 1)
             const px = x / rect.width;
             const py = y / rect.height;
-            
-            // 1. FEATHERING LOGIC
             const featherX = Math.sin(px * Math.PI);
             const featherY = Math.sin(py * Math.PI);
-            const interactionStrength = Math.pow(featherX * featherY, 0.5);
-
-            const maxTilt = 3; 
-            
-            // Calculate rotation with dampening
-            const rotateX = (0.5 - py) * maxTilt * 2 * interactionStrength; 
-            const rotateY = (px - 0.5) * maxTilt * 2 * interactionStrength; 
-            
-            // Apply Transform
-            // REMOVED scale3d factor as requested
+            const strength = Math.pow(featherX * featherY, 0.5);
+            const rotateX = (0.5 - py) * 6 * strength; 
+            const rotateY = (px - 0.5) * 6 * strength; 
             previewWrapper.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1, 1, 1)`;
-            
-            // Glare Logic
             const glareX = 50 + (rotateY * 15); 
             const glareY = 50 - (rotateX * 15);
-            
-            const tiltMag = Math.min(1, Math.hypot(rotateX, rotateY) / maxTilt);
-            const alpha = (0.35 * tiltMag).toFixed(2); 
-            
+            const alpha = (0.35 * Math.min(1, Math.hypot(rotateX, rotateY) / 3)).toFixed(2); 
             glareOverlay.style.opacity = alpha;
             glareOverlay.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.6), transparent 60%)`;
         });
@@ -690,73 +595,52 @@
             previewWrapper.style.transition = 'transform 0.5s ease';
             previewWrapper.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
             glareOverlay.style.opacity = '0';
-            setTimeout(() => {
-                previewWrapper.style.transition = '';
-            }, 500);
+            setTimeout(() => previewWrapper.style.transition = '', 500);
         });
 
-
-        // Error Handling for Images
         function handleImageError(img) {
-            console.warn('Image failed to load, switching to CSS fallback:', img.id);
+            console.warn('Image failed to load:', img.id, img.src);
             img.style.display = 'none';
-
-            // Fallback logic
             if (img.id === 'slabImageOverlay') {
                 const slabCss = document.getElementById('slabCssOverlay');
                 slabCss.classList.remove('hidden');
                 slabCss.classList.add('flex');
-                
-                const labelBorder = document.getElementById('labelBorder');
-                labelBorder.className = "absolute inset-0 border-4 border-red-600 opacity-100 pointer-events-none";
-                document.getElementById('companyLabelText').innerText = "PSA";
-                
                 document.getElementById('slabContainer').classList.add('h-full');
                 document.getElementById('slabContainer').style.aspectRatio = "3.2 / 5.35"; 
             }
-            if (img.id === 'guardImageOverlay') {
-                const guard = document.getElementById('guardContainer');
-                guard.classList.add('guard-bumper', 'guard-psa');
-                const color = document.getElementById('customColorInput').value;
-                guard.style.backgroundColor = color;
+            if (img.src && img.src.includes('upload.png')) {
+                const fallback = img.nextElementSibling;
+                if(fallback) {
+                    fallback.classList.remove('hidden'); 
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                }
             }
         }
 
-        // Logic
         function toggleFlip() {
             isFlipped = !isFlipped;
             const guard = document.getElementById('guardImageOverlay');
-            if (isFlipped) {
-                guard.style.transform = "translate(-50%, -50%) scaleY(-1)";
-            } else {
-                guard.style.transform = "translate(-50%, -50%)";
-            }
+            if (isFlipped) guard.style.transform = "translate(-50%, -50%) scaleY(-1)";
+            else guard.style.transform = "translate(-50%, -50%)";
         }
 
         function setCompany(company) {
+            currentCompany = company.toUpperCase();
+            
             guardContainer.className = `w-[320px] md:w-[360px] flex items-center justify-center relative z-0`;
             guardContainer.style.backgroundColor = ''; 
-            document.getElementById('slabContainer').style.aspectRatio = ""; 
-            slabContainer.className = `w-full relative overflow-hidden`;
             
             [btnPsa, btnBgs, btnCgc].forEach(btn => {
                 btn.className = `company-btn py-2 px-3 rounded-lg text-sm font-bold transition-all text-center text-slate-500 hover:text-slate-700`;
             });
 
             if (company === 'psa') {
-                if(slabImageOverlay.style.display !== 'none') slabImageOverlay.classList.remove('hidden');
-                if(guardImageOverlay.style.display !== 'none') guardImageOverlay.classList.remove('hidden');
-                
-                if (slabImageOverlay.style.display === 'none') {
-                     handleImageError(slabImageOverlay);
-                } else {
-                     slabCssOverlay.classList.add('hidden');
-                     slabCssOverlay.classList.remove('flex');
-                }
-
-                if (guardImageOverlay.style.display === 'none') {
-                     handleImageError(guardImageOverlay);
-                }
+                slabImageOverlay.style.display = 'block'; 
+                slabImageOverlay.classList.remove('hidden');
+                guardImageOverlay.style.display = 'block';
+                guardImageOverlay.classList.remove('hidden');
+                slabCssOverlay.classList.add('hidden');
+                slabCssOverlay.classList.remove('flex');
 
                 const widthPercent = (PSA_CARD_WIDTH_PX / PSA_REF_WIDTH) * 100;
                 const bottomPercent = (PSA_CARD_BOTTOM_PX / PSA_REF_HEIGHT) * 100;
@@ -773,175 +657,112 @@
                 userCardImage.style.height = '100%';
 
                 btnPsa.className = `company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center bg-white text-slate-900 shadow-sm ring-1 ring-slate-200`;
-            } 
-            else if (company === 'bgs') {
-                // ... BGS Logic ...
-                guardContainer.classList.add('guard-bumper', 'guard-bgs', 'bg-gray-900');
-                slabContainer.classList.add('company-bgs', 'h-full');
+                
+                renderGuardOptions('PSA');
+            } else {
+                guardContainer.classList.add('guard-bumper', `guard-${company}`, 'bg-gray-900');
+                slabContainer.classList.add(`company-${company}`, 'h-full');
                 slabImageOverlay.classList.add('hidden');
                 guardImageOverlay.classList.add('hidden');
                 slabCssOverlay.classList.remove('hidden');
                 slabCssOverlay.classList.add('flex');
-                labelBorder.className = "absolute inset-0 border-t-4 border-b-0 border-x-0 border-yellow-600 opacity-100 pointer-events-none"; 
-                companyLabelText.innerText = "BECKETT";
-                cardLayerEl.style.top = '22%';
-                cardLayerEl.style.height = '78%';
-                cardLayerEl.style.width = '100%';
-                cardLayerEl.style.left = '0';
-                cardLayerEl.style.bottom = 'auto';
-                cardLayerEl.style.aspectRatio = 'auto'; 
-                userCardImage.style.width = '90%';
-                userCardImage.style.height = '90%';
-                btnBgs.className = `company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center bg-white text-slate-900 shadow-sm ring-1 ring-slate-200`;
-                guardContainer.style.backgroundColor = '#111827';
-            } 
-            else if (company === 'cgc') {
-                // ... CGC Logic ...
-                guardContainer.classList.add('guard-bumper', 'guard-cgc', 'bg-gray-900');
-                slabContainer.classList.add('company-cgc', 'h-full');
-                slabImageOverlay.classList.add('hidden');
-                guardImageOverlay.classList.add('hidden');
-                slabCssOverlay.classList.remove('hidden');
-                slabCssOverlay.classList.add('flex');
-                labelBorder.className = "absolute inset-0 border-x-4 border-blue-600 opacity-0 pointer-events-none"; 
-                companyLabelText.innerText = "CGC";
-                cardLayerEl.style.top = '22%';
-                cardLayerEl.style.height = '78%';
-                cardLayerEl.style.width = '100%';
-                cardLayerEl.style.left = '0';
-                cardLayerEl.style.bottom = 'auto';
-                cardLayerEl.style.aspectRatio = 'auto';
-                userCardImage.style.width = '90%';
-                userCardImage.style.height = '90%';
-                btnCgc.className = `company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center bg-white text-slate-900 shadow-sm ring-1 ring-slate-200`;
-                guardContainer.style.backgroundColor = '#111827';
             }
         }
 
-        function setGuardOption(hex, name, imageUrl, btnId) {
+        function setGuardOption(hex, name, imageUrl, btnId, highlightColor) {
             document.getElementById('customColorInput').value = hex;
             document.getElementById('colorNameDisplay').innerText = `Current: ${name}`;
             
-            // 1. Update Image
             const guardImg = document.getElementById('guardImageOverlay');
+            guardImg.style.display = ''; 
+            
             if (imageUrl && guardImg.src !== imageUrl) {
                 guardImg.src = imageUrl;
-                guardImg.style.display = ''; 
                 if (document.getElementById('btn-psa').classList.contains('active-company')) {
                     guardImg.classList.remove('hidden');
                 }
             }
-
-            // 2. Update Fallback CSS (for BGS/CGC)
+            
             const guardContainer = document.getElementById('guardContainer');
             if (guardContainer.classList.contains('guard-bumper')) {
                 guardContainer.style.backgroundColor = hex;
             }
 
-            // 3. Handle Button Highlighting
-            // Remove ring classes from all guard buttons
-            const buttons = ['btn-fuschia', 'btn-eclipse'];
-            buttons.forEach(id => {
-                const btn = document.getElementById(id);
-                if (btn) {
-                    // Remove generic active rings
-                    btn.classList.remove('ring-2', 'ring-fuchsia-400', 'ring-gray-400');
-                }
+            const buttons = document.querySelectorAll('.guard-option-btn');
+            buttons.forEach(btn => {
+                btn.classList.remove('ring-2'); 
+                btn.style.boxShadow = ''; 
+                btn.style.removeProperty('--tw-ring-color');
             });
 
-            // Add ring to active button
-            if (btnId) {
-                const activeBtn = document.getElementById(btnId);
-                if (activeBtn) {
-                    activeBtn.classList.add('ring-2');
-                    // Add specific color ring based on ID
-                    if (btnId === 'btn-fuschia') activeBtn.classList.add('ring-fuchsia-400');
-                    if (btnId === 'btn-eclipse') activeBtn.classList.add('ring-gray-400');
-                }
-            }
-        }
-
-        // New Cert Functionality
-        // Attached to window to ensure global accessibility
-        window.findByCert = function() {
-            const cert = prompt("Enter PSA Certificate Number:");
-            if (cert && cert.trim().length > 0) {
-                // Open in new tab
-                window.open(`https://www.psacard.com/cert/${cert.trim()}/psa`, '_blank');
+            const activeBtn = document.getElementById(btnId);
+            if (activeBtn) {
+                 activeBtn.classList.add('ring-2'); 
+                 activeBtn.style.setProperty('--tw-ring-color', highlightColor);
+                 const isDark = document.body.classList.contains('dark-mode');
+                 const offsetColor = isDark ? '#18181b' : '#f3f4f6'; 
+                 activeBtn.style.setProperty('--tw-ring-offset-color', offsetColor);
             }
         }
 
         const fileInput = document.getElementById('fileInput');
-        const cardPlaceholder = document.getElementById('cardPlaceholder');
-        
         const cropModal = document.getElementById('cropModal');
         const imageToCrop = document.getElementById('imageToCrop');
         let cropper = null;
 
-        fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
-        
-        // Re-targeting DnD to the card layer (using the renamed var to be safe)
-        const dndLayer = document.getElementById('cardLayer'); 
-        dndLayer.addEventListener('dragover', (e) => { 
-            e.preventDefault(); 
-            document.body.classList.add('drop-active'); 
-        });
-        dndLayer.addEventListener('dragleave', (e) => { 
-            e.preventDefault(); 
-            document.body.classList.remove('drop-active'); 
-        });
-        dndLayer.addEventListener('drop', (e) => { 
-            e.preventDefault(); 
-            document.body.classList.remove('drop-active'); 
-            if (e.dataTransfer.files.length) { handleFile(e.dataTransfer.files[0]); } 
-        });
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        const dnd = document.getElementById('cardLayer');
+        dnd.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('drop-active'); });
+        dnd.addEventListener('dragleave', (e) => { e.preventDefault(); document.body.classList.remove('drop-active'); });
+        dnd.addEventListener('drop', (e) => { e.preventDefault(); document.body.classList.remove('drop-active'); if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
 
         function handleFile(file) {
             if (file && file.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
+                    const imgEl = document.getElementById('imageToCrop');
+                    const modalEl = document.getElementById('cropModal');
                     if(cropper) { cropper.destroy(); cropper = null; }
-                    imageToCrop.src = e.target.result;
-                    cropModal.classList.remove('hidden'); cropModal.classList.add('flex');
-                    setTimeout(() => { cropper = new Cropper(imageToCrop, { viewMode: 1, background: false, autoCropArea: 0.9, zoomable: true, aspectRatio: 63.5 / 88.9, ready() {} }); }, 100);
+                    if (imgEl) {
+                        imgEl.src = e.target.result;
+                        modalEl.classList.remove('hidden');
+                        modalEl.classList.add('flex');
+                        setTimeout(() => { 
+                            cropper = new Cropper(imgEl, { viewMode: 1, background: false, autoCropArea: 0.9, zoomable: true, aspectRatio: 63.5 / 88.9, ready() {} }); 
+                        }, 100);
+                    }
                 };
                 reader.readAsDataURL(file);
             }
         }
 
-        function closeModal() { cropModal.classList.add('hidden'); cropModal.classList.remove('flex'); if (cropper) { cropper.destroy(); cropper = null; } fileInput.value = ''; }
-
-        function applyCrop() {
+        window.closeModal = function() { cropModal.classList.add('hidden'); cropModal.classList.remove('flex'); if (cropper) { cropper.destroy(); cropper = null; } fileInput.value = ''; }
+        window.applyCrop = function() {
             if (cropper) {
-                const sourceCanvas = cropper.getCroppedCanvas({ maxWidth: 1024, maxHeight: 1024, fillColor: '#fff', imageSmoothingEnabled: true, imageSmoothingQuality: 'high', });
-                const roundedCanvas = document.createElement('canvas'); roundedCanvas.width = sourceCanvas.width; roundedCanvas.height = sourceCanvas.height; const ctx = roundedCanvas.getContext('2d'); const radius = (sourceCanvas.width / 63.5) * 3;
-                ctx.beginPath(); ctx.moveTo(radius, 0); ctx.lineTo(roundedCanvas.width - radius, 0); ctx.quadraticCurveTo(roundedCanvas.width, 0, roundedCanvas.width, radius); ctx.lineTo(roundedCanvas.width, roundedCanvas.height - radius); ctx.quadraticCurveTo(roundedCanvas.width, roundedCanvas.height, roundedCanvas.width - radius, roundedCanvas.height); ctx.lineTo(radius, roundedCanvas.height); ctx.quadraticCurveTo(0, roundedCanvas.height, 0, roundedCanvas.height - radius); ctx.lineTo(0, radius); ctx.quadraticCurveTo(0, 0, radius, 0); ctx.closePath(); ctx.clip(); ctx.drawImage(sourceCanvas, 0, 0);
-                userCardImage.src = roundedCanvas.toDataURL('image/png'); userCardImage.classList.remove('hidden'); cardPlaceholder.classList.add('hidden'); closeModal();
+                const cvs = cropper.getCroppedCanvas({ maxWidth: 1024, maxHeight: 1024, fillColor: '#fff' });
+                const rounded = document.createElement('canvas'); rounded.width = cvs.width; rounded.height = cvs.height; 
+                const ctx = rounded.getContext('2d'); 
+                const r = (cvs.width / 63.5) * 3;
+                ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(rounded.width-r, 0); ctx.quadraticCurveTo(rounded.width, 0, rounded.width, r); ctx.lineTo(rounded.width, rounded.height-r); ctx.quadraticCurveTo(rounded.width, rounded.height, rounded.width-r, rounded.height); ctx.lineTo(r, rounded.height); ctx.quadraticCurveTo(0, rounded.height, 0, rounded.height-r); ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.closePath(); ctx.clip(); ctx.drawImage(cvs, 0, 0);
+                
+                const userImg = document.getElementById('userCardImage');
+                userImg.src = rounded.toDataURL('image/png'); 
+                userImg.classList.remove('hidden'); 
+                document.getElementById('cardPlaceholder').classList.add('hidden'); 
+                closeModal();
             }
         }
-
-        function clearImage() { userCardImage.src = ''; userCardImage.classList.add('hidden'); cardPlaceholder.classList.remove('hidden'); fileInput.value = ''; }
-
-        // Reverting downloadPreview to simple version
-        function downloadPreview() {
-            html2canvas(previewWrapper, {
-                useCORS: true,
-                backgroundColor: null,
-                scale: 2 // Higher resolution
-            }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = 'graded-guard-preview.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            }).catch(err => {
-                console.error("Save failed:", err);
-                alert("Could not save image. This is likely due to browser security restrictions on the slab images.");
-            });
+        window.clearImage = function() { 
+            document.getElementById('userCardImage').src = ''; 
+            document.getElementById('userCardImage').classList.add('hidden'); 
+            document.getElementById('cardPlaceholder').classList.remove('hidden'); 
+            fileInput.value = ''; 
         }
-
-        // Init
-        setCompany('psa');
-
+        window.downloadPreview = function() {
+            html2canvas(previewWrapper, { useCORS: true, backgroundColor: null, scale: 2 }).then(canvas => {
+                const link = document.createElement('a'); link.download = 'graded-guard-preview.png'; link.href = canvas.toDataURL('image/png'); link.click();
+            }).catch(err => alert("Save failed. Check console"));
+        }
     </script>
 </body>
 </html>
