@@ -319,6 +319,25 @@
 
     </main>
 
+    <!-- Crop Modal (Was missing in previous version) -->
+    <div id="cropModal" class="fixed inset-0 z-50 bg-black/80 hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <h3 class="font-bold text-lg dark:text-white">Adjust Image</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 p-1 rounded-full">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-hidden bg-black relative h-80">
+                 <img id="imageToCrop" src="" class="max-w-full block" style="display: block; max-height: 100%;">
+            </div>
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2 bg-gray-50 dark:bg-slate-800">
+                <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-slate-700 transition-colors">Cancel</button>
+                <button onclick="applyCrop()" class="px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-md">Apply</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof lucide !== 'undefined') {
@@ -704,6 +723,14 @@
                  activeBtn.style.setProperty('--tw-ring-offset-color', offsetColor);
             }
         }
+        
+        // Added missing cert lookup function
+        window.findByCert = function() {
+            const cert = prompt("Enter PSA Certification Number (Demo Mode):");
+            if (cert) {
+                alert(`Note: In this demo version, we cannot fetch real-time data from PSA for cert #${cert} due to browser security restrictions (CORS). \n\nPlease use the 'Upload' feature to test with your own card images!`);
+            }
+        }
 
         const fileInput = document.getElementById('fileInput');
         const cropModal = document.getElementById('cropModal');
@@ -727,6 +754,10 @@
                         imgEl.src = e.target.result;
                         modalEl.classList.remove('hidden');
                         modalEl.classList.add('flex');
+                        
+                        // Ensure icons are rendered if using lucide inside modal (X button)
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                        
                         setTimeout(() => { 
                             cropper = new Cropper(imgEl, { viewMode: 1, background: false, autoCropArea: 0.9, zoomable: true, aspectRatio: 63.5 / 88.9, ready() {} }); 
                         }, 100);
