@@ -141,8 +141,8 @@
         }
     </style>
 </head>
-<!-- UPDATED: Changed h-screen to h-dvh (dynamic viewport height) for better mobile browser support -->
-<body class="h-dvh flex flex-col py-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
+<!-- UPDATED: min-h-screen allows full page scrolling, removed overflow-hidden to let Header scroll away -->
+<body class="min-h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300">
 
     <!-- Loading Screen -->
     <div id="loading-screen">
@@ -169,8 +169,8 @@
     </header>
 
     <!-- Main Container -->
-    <!-- UPDATED: Changed overflow-hidden to overflow-y-auto to allow scrolling on mobile -->
-    <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 overflow-y-auto overflow-x-hidden">
+    <!-- UPDATED: gap-12 adds spacing between Visual and Sidebar. Removed overflow-y-auto to allow body scroll. -->
+    <main class="w-full flex-1 relative flex flex-col gap-12 px-4 lg:px-0 pb-6 lg:overflow-hidden">
         
         <!-- SIDEBAR REOPEN BUTTON -->
         <button id="sidebar-open-btn" onclick="toggleSidebar()" class="hidden absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-white dark:bg-slate-800 p-3 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all hover:scale-110 group" title="Open Controls">
@@ -240,7 +240,7 @@
         </div>
 
         <!-- Preview Section -->
-        <div class="flex-1 w-full h-full flex flex-col items-center justify-center order-1 lg:absolute lg:inset-0 lg:z-10 pointer-events-none">
+        <div class="flex-1 w-full flex flex-col items-center justify-center order-1 lg:absolute lg:inset-0 lg:z-10 pointer-events-none min-h-[50vh] lg:min-h-0">
             <div id="previewWrapper" class="relative p-4 md:p-16 rounded-xl pointer-events-auto">
                 
                 <!-- LAYER 1: The GUARD Container -->
@@ -726,9 +726,9 @@
         
         // Added missing cert lookup function
         window.findByCert = function() {
-            const cert = prompt("Enter PSA Certification Number (Demo Mode):");
+            const cert = prompt("Enter PSA Certification Number:");
             if (cert) {
-                alert(`Note: In this demo version, we cannot fetch real-time data from PSA for cert #${cert} due to browser security restrictions (CORS). \n\nPlease use the 'Upload' feature to test with your own card images!`);
+                window.open(`https://www.psacard.com/cert/${cert.trim()}/psa`, '_blank');
             }
         }
 
