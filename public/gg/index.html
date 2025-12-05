@@ -141,8 +141,7 @@
         }
     </style>
 </head>
-<!-- UPDATED: min-h-screen allows full page scrolling, removed overflow-hidden to let Header scroll away -->
-<body class="min-h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300">
+<body class="h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
 
     <!-- Loading Screen -->
     <div id="loading-screen">
@@ -169,8 +168,7 @@
     </header>
 
     <!-- Main Container -->
-    <!-- UPDATED: gap-12 adds spacing between Visual and Sidebar. Removed overflow-y-auto to allow body scroll. -->
-    <main class="w-full flex-1 relative flex flex-col gap-12 px-4 lg:px-0 pb-6 lg:overflow-hidden">
+    <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 overflow-hidden">
         
         <!-- SIDEBAR REOPEN BUTTON -->
         <button id="sidebar-open-btn" onclick="toggleSidebar()" class="hidden absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-white dark:bg-slate-800 p-3 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all hover:scale-110 group" title="Open Controls">
@@ -210,7 +208,7 @@
                     </button>
                 </div>
 
-                <span id="colorNameDisplay" class="block text-sm font-medium text-slate-600 mb-3">Current: Loading...</span>
+                <span id="colorNameDisplay" class="block text-sm font-medium text-slate-600 mb-3">Current: None</span>
                 
                 <div id="guardOptionsContainer" class="flex flex-wrap items-center gap-3 mb-4 min-h-[40px]">
                     <span class="text-xs text-slate-400 italic">Loading options...</span>
@@ -240,14 +238,14 @@
         </div>
 
         <!-- Preview Section -->
-        <div class="flex-1 w-full flex flex-col items-center justify-center order-1 lg:absolute lg:inset-0 lg:z-10 pointer-events-none min-h-[50vh] lg:min-h-0">
+        <div class="flex-1 w-full h-full flex flex-col items-center justify-center order-1 lg:absolute lg:inset-0 lg:z-10 pointer-events-none">
             <div id="previewWrapper" class="relative p-4 md:p-16 rounded-xl pointer-events-auto">
                 
                 <!-- LAYER 1: The GUARD Container -->
                 <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
                     
                     <!-- Guard Image -->
-                    <img id="guardImageOverlay" src="https://mew.cards/gg/img/GG_PSA_Fuschia.png" 
+                    <img id="guardImageOverlay" src="" 
                          onerror="handleImageError(this)"
                          class="absolute z-50 pointer-events-none hidden" 
                          style="width: 106.33%; max-width: none; left: 50%; top: 50%; transform: translate(-50%, -50%); transition: transform 0.3s ease;">
@@ -319,25 +317,6 @@
 
     </main>
 
-    <!-- Crop Modal (Was missing in previous version) -->
-    <div id="cropModal" class="fixed inset-0 z-50 bg-black/80 hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                <h3 class="font-bold text-lg dark:text-white">Adjust Image</h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 p-1 rounded-full">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <div class="flex-1 overflow-hidden bg-black relative h-80">
-                 <img id="imageToCrop" src="" class="max-w-full block" style="display: block; max-height: 100%;">
-            </div>
-            <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2 bg-gray-50 dark:bg-slate-800">
-                <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-slate-700 transition-colors">Cancel</button>
-                <button onclick="applyCrop()" class="px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-md">Apply</button>
-            </div>
-        </div>
-    </div>
-
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof lucide !== 'undefined') {
@@ -362,6 +341,13 @@
                          activeBtns.forEach(btn => {
                             btn.style.setProperty('--tw-ring-offset-color', offsetColor);
                          });
+                         // Update non-selected buttons to match background as well for hover effect
+                         const allBtns = document.querySelectorAll('.guard-option-btn');
+                         allBtns.forEach(btn => {
+                            if(!btn.classList.contains('ring-2')) {
+                                btn.style.setProperty('--tw-ring-offset-color', offsetColor);
+                            }
+                         });
                      }
                  });
             });
@@ -374,6 +360,7 @@
         const previewWrapper = document.getElementById('previewWrapper');
         const glareOverlay = document.getElementById('glareOverlay');
         const guardOptionsContainer = document.getElementById('guardOptionsContainer');
+        const colorNameDisplay = document.getElementById('colorNameDisplay');
         
         const cardLayerEl = document.getElementById('cardLayer');
         const slabImageOverlay = document.getElementById('slabImageOverlay');
@@ -420,6 +407,7 @@
         ];
 
         let loadedCount = 0;
+        let currentSelectionName = 'None';
         
         function updateLoader() {
             loadedCount++;
@@ -453,14 +441,12 @@
                 if (val.startsWith('"') && val.endsWith('"')) return val.slice(1, -1).trim();
                 return val;
             };
-            // Normalize headers to ensure consistent access (trim spaces)
             const headers = lines[0].split(',').map(h => clean(h).trim()); 
             
             return lines.slice(1).map(line => {
                 const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                 const entry = {};
                 headers.forEach((h, i) => {
-                    // Map headers to values, handling potential index mismatches safely
                     if(values[i] !== undefined) {
                         entry[h] = clean(values[i]);
                     }
@@ -473,36 +459,28 @@
             if (!hex) return '#000000';
             hex = hex.trim();
 
-            // DATA CORRECTION: Fix known bad data from the sheet
             if (hex.toLowerCase().includes('fuschia') || hex.toLowerCase().includes('fuchsia')) {
-                return '#be81a1'; // Hardcoded fix for Fuschia
+                return '#be81a1'; 
             }
             if (hex.toLowerCase() === 'eclipse') return '#ffffff';
 
             const hexPattern = /^#?[0-9A-Fa-f]{3,8}$/;
-            // If it looks like a hex code but missing #, add it
             if (hexPattern.test(hex) && !hex.startsWith('#')) {
                 return '#' + hex;
             }
-            
-            // If it's a valid hex, return it. If it's a valid CSS name (e.g. 'red'), return it.
             return hex;
         }
 
         async function fetchGuardOptions() {
             try {
-                // CACHE BUSTING: Add timestamp to force fresh data from Google Sheets
                 const response = await fetch(`${SHEET_URL}&t=${Date.now()}`);
                 if(!response.ok) throw new Error("Bad response");
                 const text = await response.text();
                 const parsed = parseCSV(text);
                 
-                // Validate parsed data has at least some valid rows
                 if(parsed.length > 0) {
                     allGuardOptions = parsed;
-                    console.log("Loaded options:", allGuardOptions.length);
                 } else {
-                    console.warn("Parsed CSV empty, using fallback");
                     allGuardOptions = FALLBACK_OPTIONS;
                 }
             } catch (error) {
@@ -523,49 +501,55 @@
                 return;
             }
 
+            const isDark = document.body.classList.contains('dark-mode');
+            const offsetColor = isDark ? '#27272a' : '#ffffff';
+
             options.forEach((opt, index) => {
                 const btn = document.createElement('button');
                 const safeName = opt.Name ? opt.Name.replace(/\s+/g, '-').toLowerCase() : `opt-${index}`;
                 btn.id = `btn-${safeName}`;
                 btn.title = opt.Name || 'Unknown';
                 
-                // Styles - ADDED border border-black/10 to define shape for white buttons
-                btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 transition-transform duration-200 ring-offset-2 ring-offset-[#f3f4f6] dark:ring-offset-[#18181b] focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700 border border-black/10 dark:border-white/10`;
+                // REMOVED border class from main button to fix background clipping issue
+                // The border is now applied via the child overlay div
+                btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 hover:ring-2 transition-all duration-200 ring-offset-2 focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700`;
                 
                 const c1 = normalizeHex(opt['Color 1']);
                 const c2 = opt['Color 2'] ? normalizeHex(opt['Color 2']) : null;
                 const c3 = opt['Color 3'] ? normalizeHex(opt['Color 3']) : null;
+                const c4 = opt['Color 4'] ? normalizeHex(opt['Color 4']) : null; 
 
                 let bgStyle = '';
-                if (c3) {
-                     bgStyle = `linear-gradient(135deg, ${c1} 0%, ${c1} 33.3%, ${c2} 33.3%, ${c2} 66.6%, ${c3} 66.6%, ${c3} 100%)`;
+                if (c4) {
+                     bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 25%, ${c2} 25%, ${c2} 50%, ${c3} 50%, ${c3} 75%, ${c4} 75%, ${c4} 110%)`;
+                } else if (c3) {
+                     bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 33.33%, ${c2} 33.33%, ${c2} 66.66%, ${c3} 66.66%, ${c3} 110%)`;
                 } else if (c2) {
-                     bgStyle = `linear-gradient(135deg, ${c1} 50%, ${c2} 50%)`; 
+                     bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 50%, ${c2} 50%, ${c2} 110%)`; 
                 } else {
                      bgStyle = c1;
                 }
 
                 btn.style.background = bgStyle;
-                // FIX: Fill 105% to ensure full coverage and hide anti-aliasing seams at edges
-                btn.style.backgroundSize = '105% 105%';
-                btn.style.backgroundRepeat = 'no-repeat';
-                btn.style.backgroundPosition = 'center';
-                
-                // Force backgroundColor in case gradient fails
                 btn.style.backgroundColor = c1; 
 
-                // Sheen Overlay
                 const sheen = document.createElement('div');
                 sheen.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
                 btn.appendChild(sheen);
                 
-                // HIGHLIGHT FIX: 
-                // If highlight is missing or white, default to a visible slate color so the ring shows up
+                // NEW: Border Overlay div - sits on top of everything to provide border without clipping background
+                const borderOverlay = document.createElement('div');
+                borderOverlay.className = 'absolute inset-0 rounded-full border border-black/10 dark:border-white/10 pointer-events-none';
+                btn.appendChild(borderOverlay);
+                
                 let highlight = opt.Highlight ? normalizeHex(opt.Highlight) : c1;
                 if (!highlight || highlight.toLowerCase() === '#ffffff' || highlight.toLowerCase() === '#fff') {
-                    highlight = '#94a3b8'; // Visible Slate Blue
+                    highlight = '#94a3b8'; 
                 }
                 
+                btn.style.setProperty('--tw-ring-color', highlight);
+                btn.style.setProperty('--tw-ring-offset-color', offsetColor);
+
                 const imgUrl = opt.Image ? `https://mew.cards/gg/img/${opt.Image}` : '';
                 
                 btn.dataset.hex = c1; 
@@ -573,12 +557,19 @@
                 btn.dataset.image = imgUrl;
                 btn.dataset.highlight = highlight; 
 
+                btn.onmouseenter = () => {
+                    colorNameDisplay.innerText = `${opt.Name}`;
+                };
+                
+                btn.onmouseleave = () => {
+                    colorNameDisplay.innerText = `Current: ${currentSelectionName}`;
+                };
+
                 btn.onclick = () => {
                     setGuardOption(c1, opt.Name, imgUrl, btn.id, highlight);
                 };
 
                 guardOptionsContainer.appendChild(btn);
-                if (index === 0) setTimeout(() => btn.click(), 0);
             });
         }
 
@@ -588,6 +579,13 @@
         darkModeToggle.addEventListener('change', (e) => {
             if (e.target.checked) document.body.classList.add('dark-mode');
             else document.body.classList.remove('dark-mode');
+            
+            // Update Ring Offset for hover effects when mode changes
+            const offsetColor = e.target.checked ? '#27272a' : '#ffffff';
+            const allBtns = document.querySelectorAll('.guard-option-btn');
+            allBtns.forEach(btn => {
+                btn.style.setProperty('--tw-ring-offset-color', offsetColor);
+            });
         });
 
         // 3D Tilt
@@ -618,8 +616,12 @@
         });
 
         function handleImageError(img) {
-            console.warn('Image failed to load:', img.id, img.src);
-            img.style.display = 'none';
+            // Only hide if it's supposed to be visible (prevents hiding the placeholder on load)
+            if(img.src && img.src !== window.location.href) {
+                 console.warn('Image failed to load:', img.id, img.src);
+                 img.style.display = 'none';
+            }
+            
             if (img.id === 'slabImageOverlay') {
                 const slabCss = document.getElementById('slabCssOverlay');
                 slabCss.classList.remove('hidden');
@@ -656,8 +658,15 @@
             if (company === 'psa') {
                 slabImageOverlay.style.display = 'block'; 
                 slabImageOverlay.classList.remove('hidden');
-                guardImageOverlay.style.display = 'block';
-                guardImageOverlay.classList.remove('hidden');
+                
+                // Only show guard if an option is actually selected
+                if(currentSelectionName !== 'None') {
+                    guardImageOverlay.style.display = 'block';
+                    guardImageOverlay.classList.remove('hidden');
+                } else {
+                    guardImageOverlay.classList.add('hidden');
+                }
+                
                 slabCssOverlay.classList.add('hidden');
                 slabCssOverlay.classList.remove('flex');
 
@@ -690,12 +699,13 @@
 
         function setGuardOption(hex, name, imageUrl, btnId, highlightColor) {
             document.getElementById('customColorInput').value = hex;
+            currentSelectionName = name; // Update selection state
             document.getElementById('colorNameDisplay').innerText = `Current: ${name}`;
             
             const guardImg = document.getElementById('guardImageOverlay');
             guardImg.style.display = ''; 
             
-            if (imageUrl && guardImg.src !== imageUrl) {
+            if (imageUrl) {
                 guardImg.src = imageUrl;
                 if (document.getElementById('btn-psa').classList.contains('active-company')) {
                     guardImg.classList.remove('hidden');
@@ -711,24 +721,16 @@
             buttons.forEach(btn => {
                 btn.classList.remove('ring-2'); 
                 btn.style.boxShadow = ''; 
-                btn.style.removeProperty('--tw-ring-color');
+                // Don't remove prop --tw-ring-color as it's needed for hover
             });
 
             const activeBtn = document.getElementById(btnId);
             if (activeBtn) {
                  activeBtn.classList.add('ring-2'); 
-                 activeBtn.style.setProperty('--tw-ring-color', highlightColor);
+                 // Color prop is already set on creation
                  const isDark = document.body.classList.contains('dark-mode');
                  const offsetColor = isDark ? '#18181b' : '#f3f4f6'; 
                  activeBtn.style.setProperty('--tw-ring-offset-color', offsetColor);
-            }
-        }
-        
-        // Added missing cert lookup function
-        window.findByCert = function() {
-            const cert = prompt("Enter PSA Certification Number:");
-            if (cert) {
-                window.open(`https://www.psacard.com/cert/${cert.trim()}/psa`, '_blank');
             }
         }
 
@@ -754,10 +756,6 @@
                         imgEl.src = e.target.result;
                         modalEl.classList.remove('hidden');
                         modalEl.classList.add('flex');
-                        
-                        // Ensure icons are rendered if using lucide inside modal (X button)
-                        if (typeof lucide !== 'undefined') lucide.createIcons();
-                        
                         setTimeout(() => { 
                             cropper = new Cropper(imgEl, { viewMode: 1, background: false, autoCropArea: 0.9, zoomable: true, aspectRatio: 63.5 / 88.9, ready() {} }); 
                         }, 100);
