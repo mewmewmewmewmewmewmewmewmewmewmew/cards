@@ -26,10 +26,64 @@
     <!-- html2canvas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
+    <!-- CRITICAL SCRIPT: Must be in HEAD to catch image load errors immediately -->
+    <script>
+        function handleImageError(img) {
+            // Prevent infinite loops if fallback fails
+            if(img.src && img.src === window.location.href) return;
+
+            // Only log warning if it's not an empty src (which happens on init)
+            if(img.src) {
+                 console.warn('Image failed to load:', img.id, img.src);
+            }
+            
+            // Hide the broken image
+            img.style.display = 'none';
+            
+            // Specific logic for the Slab Base
+            if (img.id === 'slabImageOverlay') {
+                // We need to wait for DOM to be ready to find the CSS overlay fallback
+                // or check if it exists now
+                setTimeout(() => {
+                    const slabCss = document.getElementById('slabCssOverlay');
+                    const slabContainer = document.getElementById('slabContainer');
+                    if (slabCss && slabContainer) {
+                        slabCss.classList.remove('hidden');
+                        slabCss.classList.add('flex');
+                        slabContainer.classList.add('h-full');
+                        slabContainer.style.aspectRatio = "3.2 / 5.35"; 
+                    }
+                }, 0);
+            }
+            
+            // Specific logic for the Upload Placeholder
+            if (img.src && img.src.includes('upload.png')) {
+                // The sibling fallback icon might not be parsed yet, so we use setTimeout
+                setTimeout(() => {
+                    const fallback = img.nextElementSibling;
+                    if(fallback) {
+                        fallback.classList.remove('hidden'); 
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                    }
+                }, 0);
+            }
+        }
+    </script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
+        /* --- UNIVERS 55 SETUP --- */
+        /* Expects 'Univers-55-roman.woff' in the same folder as this index.html */
+        @font-face {
+            font-family: 'Univers 55';
+            src: url('Univers-55-roman.woff') format('woff');
+            font-weight: 400;
+            font-style: normal;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
+            /* Prioritize Univers 55, then standard Univers, then fallback to Inter */
+            font-family: 'Univers 55', 'Univers', 'Inter', sans-serif;
             background-color: #f3f4f6;
             background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
             background-size: 20px 20px;
@@ -307,7 +361,13 @@
                          style="width: 106.33%; max-width: none; left: 50%; top: 50%; transform: translate(-50%, -50%); transition: transform 0.3s ease;">
 
                     <!-- Slab Container -->
-                    <div id="slabContainer" class="company-psa w-full relative overflow-hidden bg-white/10 rounded-[18px]">
+                    <div id="slabContainer" class="company-psa w-full relative overflow-hidden bg-white/10 rounded-[18px]" style="container-type: inline-size;">
+
+                        <!-- Guard Label Overlay -->
+                        <!-- UPDATED: Added opacity: 0.9 -->
+                        <div id="guardLabelText" class="absolute z-20 text-[#242424] uppercase tracking-wide" 
+                             style="top: 6.9%; left: 12.1%; font-size: 3.5cqw; font-family: 'Univers 55', sans-serif; -webkit-text-stroke: 0.01em #242424; opacity: 0.9;">
+                        </div>
 
                         <!-- Glare Overlay -->
                         <div id="glareOverlay" class="glare-overlay"></div>
@@ -446,6 +506,7 @@
         const colorNameDisplay = document.getElementById('colorNameDisplay');
         const loadingLogoFg = document.getElementById('loading-logo-fg');
         const loadingScreen = document.getElementById('loading-screen');
+        const guardLabelText = document.getElementById('guardLabelText');
         
         const cardLayerEl = document.getElementById('cardLayer');
         const slabImageOverlay = document.getElementById('slabImageOverlay');
@@ -757,28 +818,6 @@
             setTimeout(() => previewWrapper.style.transition = '', 500);
         });
 
-        function handleImageError(img) {
-            if(img.src && img.src !== window.location.href) {
-                 console.warn('Image failed to load:', img.id, img.src);
-                 img.style.display = 'none';
-            }
-            
-            if (img.id === 'slabImageOverlay') {
-                const slabCss = document.getElementById('slabCssOverlay');
-                slabCss.classList.remove('hidden');
-                slabCss.classList.add('flex');
-                document.getElementById('slabContainer').classList.add('h-full');
-                document.getElementById('slabContainer').style.aspectRatio = "3.2 / 5.35"; 
-            }
-            if (img.src && img.src.includes('upload.png')) {
-                const fallback = img.nextElementSibling;
-                if(fallback) {
-                    fallback.classList.remove('hidden'); 
-                    if (typeof lucide !== 'undefined') lucide.createIcons();
-                }
-            }
-        }
-
         function toggleFlip() {
             isFlipped = !isFlipped;
             const guard = document.getElementById('guardImageOverlay');
@@ -844,6 +883,12 @@
             
             const guardImg = document.getElementById('guardImageOverlay');
             guardImg.style.display = ''; 
+            
+            // Set text on slab label
+            if (guardLabelText) {
+                // UPDATED: Added "GG: " prefix
+                guardLabelText.innerText = `GG: ${name}`;
+            }
             
             if (imageUrl) {
                 guardImg.src = imageUrl;
