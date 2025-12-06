@@ -972,7 +972,21 @@
         
         window.downloadPreview = function() {
             const originalImg = document.getElementById('userCardImage');
+            const originalLabel = document.getElementById('guardLabelText');
             const currentFilter = originalImg.style.filter; 
+
+            // CAPTURE EXACT STYLES: Measure what the user sees on screen right now
+            let fixedStyles = {};
+            if (originalLabel) {
+                const computed = window.getComputedStyle(originalLabel);
+                fixedStyles = {
+                    fontSize: computed.fontSize,
+                    top: computed.top,
+                    left: computed.left,
+                    letterSpacing: computed.letterSpacing,
+                    lineHeight: computed.lineHeight
+                };
+            }
 
             html2canvas(previewWrapper, { 
                 useCORS: true, 
@@ -980,8 +994,20 @@
                 scale: 2,
                 onclone: (clonedDoc) => {
                     const clonedImg = clonedDoc.getElementById('userCardImage');
+                    const clonedLabel = clonedDoc.getElementById('guardLabelText');
                     
-                    // 1. Image Filter Fix
+                    // 1. Text Position Fix: Apply the frozen pixel values to the clone
+                    if (clonedLabel && fixedStyles.fontSize) {
+                        clonedLabel.style.fontSize = fixedStyles.fontSize;
+                        clonedLabel.style.top = fixedStyles.top;
+                        clonedLabel.style.left = fixedStyles.left;
+                        clonedLabel.style.letterSpacing = fixedStyles.letterSpacing;
+                        clonedLabel.style.lineHeight = fixedStyles.lineHeight;
+                        // Disable container query logic on the clone to prevent re-calculation errors
+                        clonedLabel.style.transform = "none"; 
+                    }
+
+                    // 2. Image Filter Fix
                     if (currentFilter && currentFilter !== 'none' && !originalImg.classList.contains('hidden') && originalImg.naturalWidth > 0) {
                         try {
                             const canvas = clonedDoc.createElement('canvas');
@@ -995,17 +1021,6 @@
                         } catch (e) {
                             console.warn("Filter baking failed inside onclone:", e);
                         }
-                    }
-
-                    // 2. TEXT SIZE FIX: Manually convert 'cqw' to 'px' for the exporter
-                    // html2canvas doesn't understand container queries (cqw), so we calculate it manually.
-                    const sourceSlab = document.getElementById('slabContainer');
-                    const clonedLabel = clonedDoc.getElementById('guardLabelText');
-                    
-                    if (sourceSlab && clonedLabel) {
-                        // Calculate 3.5% of the container's current width
-                        const pixelSize = sourceSlab.getBoundingClientRect().width * 0.035;
-                        clonedLabel.style.fontSize = `${pixelSize}px`;
                     }
                 }
             }).then(canvas => {
