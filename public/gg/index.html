@@ -999,10 +999,22 @@
                     // 1. Text Position Fix: Apply the frozen pixel values to the clone
                     if (clonedLabel && fixedStyles.fontSize) {
                         clonedLabel.style.fontSize = fixedStyles.fontSize;
-                        clonedLabel.style.top = fixedStyles.top;
+                        
+                        // FIX: Manually adjust top position upwards to compensate for html2canvas rendering offset
+                        const topVal = parseFloat(fixedStyles.top);
+                        if (!isNaN(topVal)) {
+                             // Subtract pixels to shift up. Amount is empirical.
+                            clonedLabel.style.top = `${topVal - 3}px`; 
+                        } else {
+                            clonedLabel.style.top = fixedStyles.top;
+                        }
+                        
                         clonedLabel.style.left = fixedStyles.left;
                         clonedLabel.style.letterSpacing = fixedStyles.letterSpacing;
-                        clonedLabel.style.lineHeight = fixedStyles.lineHeight;
+                        
+                        // FIX: Force line-height to 1 to reduce baseline shift issues
+                        clonedLabel.style.lineHeight = '1';
+                        
                         // Disable container query logic on the clone to prevent re-calculation errors
                         clonedLabel.style.transform = "none"; 
                     }
