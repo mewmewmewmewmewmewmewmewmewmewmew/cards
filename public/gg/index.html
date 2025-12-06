@@ -981,6 +981,7 @@
                 onclone: (clonedDoc) => {
                     const clonedImg = clonedDoc.getElementById('userCardImage');
                     
+                    // 1. Image Filter Fix
                     if (currentFilter && currentFilter !== 'none' && !originalImg.classList.contains('hidden') && originalImg.naturalWidth > 0) {
                         try {
                             const canvas = clonedDoc.createElement('canvas');
@@ -994,6 +995,17 @@
                         } catch (e) {
                             console.warn("Filter baking failed inside onclone:", e);
                         }
+                    }
+
+                    // 2. TEXT SIZE FIX: Manually convert 'cqw' to 'px' for the exporter
+                    // html2canvas doesn't understand container queries (cqw), so we calculate it manually.
+                    const sourceSlab = document.getElementById('slabContainer');
+                    const clonedLabel = clonedDoc.getElementById('guardLabelText');
+                    
+                    if (sourceSlab && clonedLabel) {
+                        // Calculate 3.5% of the container's current width
+                        const pixelSize = sourceSlab.getBoundingClientRect().width * 0.035;
+                        clonedLabel.style.fontSize = `${pixelSize}px`;
                     }
                 }
             }).then(canvas => {
