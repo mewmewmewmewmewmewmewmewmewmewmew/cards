@@ -236,7 +236,8 @@
 
                 <span id="colorNameDisplay" class="block text-sm font-medium text-slate-600 mb-3">Current: None</span>
                 
-                <div id="guardOptionsContainer" class="flex flex-wrap items-center gap-3 mb-4 min-h-[40px]">
+                <!-- UPDATED CONTAINER: Flex column to stack categories -->
+                <div id="guardOptionsContainer" class="flex flex-col gap-4 mb-4 min-h-[40px]">
                     <span class="text-xs text-slate-400 italic">Loading options...</span>
                 </div>
                 <input type="hidden" id="customColorInput" value="#d946ef">
@@ -519,10 +520,10 @@
         let currentCompany = 'PSA'; 
         let currentSelectionName = 'None';
 
-        // FALLBACK DATA
+        // FALLBACK DATA (Added Set property for testing)
         const FALLBACK_OPTIONS = [
-             { Grader: 'PSA', Name: 'Fuschia', 'Color 1': '#be81a1', 'Color 2': '#5c4065', 'Color 3': '', Highlight: '#f0abfc', Image: 'GG_PSA_Fuschia.png' },
-             { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png' }
+             { Grader: 'PSA', Name: 'Fuschia', 'Color 1': '#be81a1', 'Color 2': '#5c4065', 'Color 3': '', Highlight: '#f0abfc', Image: 'GG_PSA_Fuschia.png', Set: 'Limited' },
+             { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png', Set: 'Standard' }
         ];
 
         function parseCSV(csv) {
@@ -615,74 +616,104 @@
                 return;
             }
 
+            // GROUPING LOGIC
+            const setsMap = new Map(); 
+            options.forEach(opt => {
+                const setName = opt.Set || 'Standard'; 
+                if (!setsMap.has(setName)) {
+                    setsMap.set(setName, []);
+                }
+                setsMap.get(setName).push(opt);
+            });
+
             const isDark = document.body.classList.contains('dark-mode');
             const offsetColor = isDark ? '#27272a' : '#ffffff';
 
-            options.forEach((opt, index) => {
-                const btn = document.createElement('button');
-                const safeName = opt.Name ? opt.Name.replace(/\s+/g, '-').toLowerCase() : `opt-${index}`;
-                btn.id = `btn-${safeName}`;
-                btn.title = opt.Name || 'Unknown';
+            setsMap.forEach((groupOptions, setName) => {
+                // Create Group Container
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'w-full mb-2';
                 
-                // Button Base Style
-                btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 hover:ring-2 transition-all duration-200 ring-offset-2 focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700`;
+                // Create Header
+                const header = document.createElement('h3');
+                header.className = 'text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-700 pb-1';
+                header.textContent = setName;
+                groupDiv.appendChild(header);
                 
-                const c1 = normalizeHex(opt['Color 1']);
-                const c2 = opt['Color 2'] ? normalizeHex(opt['Color 2']) : null;
-                const c3 = opt['Color 3'] ? normalizeHex(opt['Color 3']) : null;
-                const c4 = opt['Color 4'] ? normalizeHex(opt['Color 4']) : null; 
-
-                let bgStyle = '';
-                if (c4) {
-                     bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 25%, ${c2} 25%, ${c2} 50%, ${c3} 50%, ${c3} 75%, ${c4} 75%, ${c4} 110%)`;
-                } else if (c3) {
-                     bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 33.33%, ${c2} 33.33%, ${c2} 66.66%, ${c3} 66.66%, ${c3} 110%)`;
-                } else if (c2) {
-                     bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 50%, ${c2} 50%, ${c2} 110%)`; 
-                } else {
-                     bgStyle = c1;
-                }
-
-                btn.style.background = bgStyle;
-                btn.style.backgroundColor = c1; 
-
-                const sheen = document.createElement('div');
-                sheen.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
-                btn.appendChild(sheen);
+                // Create Button Grid
+                const grid = document.createElement('div');
+                grid.className = 'flex flex-wrap gap-3';
                 
-                // Border Overlay
-                const borderOverlay = document.createElement('div');
-                borderOverlay.className = 'absolute inset-0 rounded-full border border-black/10 dark:border-white/10 pointer-events-none';
-                btn.appendChild(borderOverlay);
-                
-                let highlight = opt.Highlight ? normalizeHex(opt.Highlight) : c1;
-                if (!highlight || highlight.toLowerCase() === '#ffffff' || highlight.toLowerCase() === '#fff') {
-                    highlight = '#94a3b8'; 
-                }
-                
-                btn.style.setProperty('--tw-ring-color', highlight);
-                btn.style.setProperty('--tw-ring-offset-color', offsetColor);
+                groupOptions.forEach((opt, index) => {
+                    const btn = document.createElement('button');
+                    // Use a unique ID based on set and name to avoid conflicts
+                    const safeName = opt.Name ? opt.Name.replace(/\s+/g, '-').toLowerCase() : `opt-${index}`;
+                    btn.id = `btn-${safeName}`;
+                    btn.title = opt.Name || 'Unknown';
+                    
+                    // Button Base Style
+                    btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 hover:ring-2 transition-all duration-200 ring-offset-2 focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700`;
+                    
+                    const c1 = normalizeHex(opt['Color 1']);
+                    const c2 = opt['Color 2'] ? normalizeHex(opt['Color 2']) : null;
+                    const c3 = opt['Color 3'] ? normalizeHex(opt['Color 3']) : null;
+                    const c4 = opt['Color 4'] ? normalizeHex(opt['Color 4']) : null; 
 
-                const imgUrl = opt.Image ? `https://mew.cards/gg/img/${opt.Image}` : '';
+                    let bgStyle = '';
+                    if (c4) {
+                         bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 25%, ${c2} 25%, ${c2} 50%, ${c3} 50%, ${c3} 75%, ${c4} 75%, ${c4} 110%)`;
+                    } else if (c3) {
+                         bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 33.33%, ${c2} 33.33%, ${c2} 66.66%, ${c3} 66.66%, ${c3} 110%)`;
+                    } else if (c2) {
+                         bgStyle = `linear-gradient(135deg, ${c1} -10%, ${c1} 50%, ${c2} 50%, ${c2} 110%)`; 
+                    } else {
+                         bgStyle = c1;
+                    }
+
+                    btn.style.background = bgStyle;
+                    btn.style.backgroundColor = c1; 
+
+                    const sheen = document.createElement('div');
+                    sheen.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
+                    btn.appendChild(sheen);
+                    
+                    // Border Overlay
+                    const borderOverlay = document.createElement('div');
+                    borderOverlay.className = 'absolute inset-0 rounded-full border border-black/10 dark:border-white/10 pointer-events-none';
+                    btn.appendChild(borderOverlay);
+                    
+                    let highlight = opt.Highlight ? normalizeHex(opt.Highlight) : c1;
+                    if (!highlight || highlight.toLowerCase() === '#ffffff' || highlight.toLowerCase() === '#fff') {
+                        highlight = '#94a3b8'; 
+                    }
+                    
+                    btn.style.setProperty('--tw-ring-color', highlight);
+                    btn.style.setProperty('--tw-ring-offset-color', offsetColor);
+
+                    const imgUrl = opt.Image ? `https://mew.cards/gg/img/${opt.Image}` : '';
+                    
+                    btn.dataset.hex = c1; 
+                    btn.dataset.name = opt.Name;
+                    btn.dataset.image = imgUrl;
+                    btn.dataset.highlight = highlight; 
+
+                    btn.onmouseenter = () => {
+                        colorNameDisplay.innerText = `${opt.Name}`;
+                    };
+                    
+                    btn.onmouseleave = () => {
+                        colorNameDisplay.innerText = `Current: ${currentSelectionName}`;
+                    };
+
+                    btn.onclick = () => {
+                        setGuardOption(c1, opt.Name, imgUrl, btn.id, highlight);
+                    };
+
+                    grid.appendChild(btn);
+                });
                 
-                btn.dataset.hex = c1; 
-                btn.dataset.name = opt.Name;
-                btn.dataset.image = imgUrl;
-                btn.dataset.highlight = highlight; 
-
-                btn.onmouseenter = () => {
-                    colorNameDisplay.innerText = `${opt.Name}`;
-                };
-                
-                btn.onmouseleave = () => {
-                    colorNameDisplay.innerText = `Current: ${currentSelectionName}`;
-                };
-
-                btn.onclick = () => {
-                    setGuardOption(c1, opt.Name, imgUrl, btn.id, highlight);
-                };
-
-                guardOptionsContainer.appendChild(btn);
+                groupDiv.appendChild(grid);
+                guardOptionsContainer.appendChild(groupDiv);
             });
         }
 
