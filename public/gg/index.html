@@ -43,7 +43,6 @@
             // Specific logic for the Slab Base
             if (img.id === 'slabImageOverlay') {
                 // We need to wait for DOM to be ready to find the CSS overlay fallback
-                // or check if it exists now
                 setTimeout(() => {
                     const slabCss = document.getElementById('slabCssOverlay');
                     const slabContainer = document.getElementById('slabContainer');
@@ -58,7 +57,6 @@
             
             // Specific logic for the Upload Placeholder
             if (img.src && img.src.includes('upload.png')) {
-                // The sibling fallback icon might not be parsed yet, so we use setTimeout
                 setTimeout(() => {
                     const fallback = img.nextElementSibling;
                     if(fallback) {
@@ -82,7 +80,6 @@
         }
 
         body {
-            /* Prioritize Univers 55, then standard Univers, then fallback to Inter */
             font-family: 'Univers 55', 'Univers', 'Inter', sans-serif;
             background-color: #f3f4f6;
             background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
@@ -354,6 +351,7 @@
                 <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
                     
                     <!-- Guard Image -->
+                    <!-- UPDATED: REMOVED crossorigin="anonymous" to fix broken images -->
                     <img id="guardImageOverlay" src="" 
                          onerror="handleImageError(this)"
                          class="absolute z-50 pointer-events-none hidden" 
@@ -372,6 +370,7 @@
                         <div id="glareOverlay" class="glare-overlay"></div>
 
                         <!-- LAYER 2: The SLAB BASE IMG -->
+                        <!-- UPDATED: REMOVED crossorigin="anonymous" -->
                         <img id="slabImageOverlay" src="https://mew.cards/gg/img/base_PSA.png" 
                              onerror="handleImageError(this)"
                              class="w-full h-auto relative z-10 pointer-events-none">
@@ -384,10 +383,13 @@
                              <input type="file" id="fileInput" accept="image/*" class="hidden">
 
                              <!-- USER IMAGE: Filters applied here -->
-                             <img id="userCardImage" src="" class="hidden object-contain shadow-sm pointer-events-none" alt="User Card">
+                             <!-- UPDATED: REMOVED crossorigin="anonymous" -->
+                             <img id="userCardImage" src="" 
+                                  class="hidden object-contain shadow-sm pointer-events-none" alt="User Card">
                              
                              <!-- Placeholder -->
                              <div id="cardPlaceholder" class="w-full h-full flex items-center justify-center relative">
+                                <!-- UPDATED: REMOVED crossorigin="anonymous" -->
                                 <img src="https://mew.cards/gg/img/upload.png" 
                                      alt="Upload Here" 
                                      onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden'); if(typeof lucide!=='undefined') lucide.createIcons();"
@@ -435,7 +437,6 @@
 
     <!-- Crop Modal -->
     <div id="cropModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
-        <!-- UPDATED: Increased width to 90vw and height to 85vh for a much larger workspace -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl w-[90vw] h-[85vh] max-w-7xl shadow-2xl overflow-hidden flex flex-col">
             <div class="flex-none p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                 <h3 class="font-bold text-slate-900 dark:text-white">Adjust Image</h3>
@@ -443,7 +444,6 @@
             </div>
             
             <div class="flex-1 bg-black/5 dark:bg-black/50 p-4 relative flex items-center justify-center overflow-hidden">
-                <!-- UPDATED: Removed fixed height, uses h-full to fill the modal -->
                 <div class="h-full w-full">
                     <img id="imageToCrop" src="" alt="Crop Preview" class="max-w-full max-h-full block">
                 </div>
@@ -1001,21 +1001,17 @@
                         clonedLabel.style.fontSize = fixedStyles.fontSize;
                         
                         // FIX: Manually adjust top position upwards to compensate for html2canvas rendering offset
+                        // Increased offset from -3px to -15px to account for the "lower than expected" issue
                         const topVal = parseFloat(fixedStyles.top);
                         if (!isNaN(topVal)) {
-                             // Subtract pixels to shift up. Amount is empirical.
-                            clonedLabel.style.top = `${topVal - 3}px`; 
+                            clonedLabel.style.top = `${topVal - 15}px`; 
                         } else {
                             clonedLabel.style.top = fixedStyles.top;
                         }
                         
                         clonedLabel.style.left = fixedStyles.left;
                         clonedLabel.style.letterSpacing = fixedStyles.letterSpacing;
-                        
-                        // FIX: Force line-height to 1 to reduce baseline shift issues
                         clonedLabel.style.lineHeight = '1';
-                        
-                        // Disable container query logic on the clone to prevent re-calculation errors
                         clonedLabel.style.transform = "none"; 
                     }
 
