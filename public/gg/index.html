@@ -1000,14 +1000,9 @@
                     if (clonedLabel && fixedStyles.fontSize) {
                         clonedLabel.style.fontSize = fixedStyles.fontSize;
                         
-                        // FIX: Manually adjust top position upwards to compensate for html2canvas rendering offset
-                        // Increased offset from -3px to -15px to account for the "lower than expected" issue
-                        const topVal = parseFloat(fixedStyles.top);
-                        if (!isNaN(topVal)) {
-                            clonedLabel.style.top = `${topVal - 15}px`; 
-                        } else {
-                            clonedLabel.style.top = fixedStyles.top;
-                        }
+                        // UPDATED: Removed manual pixel subtraction. 
+                        // Now using exact computed style from screen to fix "too high" issue.
+                        clonedLabel.style.top = fixedStyles.top;
                         
                         clonedLabel.style.left = fixedStyles.left;
                         clonedLabel.style.letterSpacing = fixedStyles.letterSpacing;
