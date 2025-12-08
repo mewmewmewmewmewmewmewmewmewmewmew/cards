@@ -1169,61 +1169,55 @@
         }
         
         window.downloadPreview = async function() {
-            // Target output height (1000px)
-            const TARGET_HEIGHT = 1000;
-            // Calculate scale based on full PSA_REF_HEIGHT (2025)
-            // scale = 1000 / 2025 = ~0.4938
-            const scale = TARGET_HEIGHT / PSA_REF_HEIGHT;
+            // UPDATED: Fixed Output Dimensions
+            const OUTPUT_WIDTH = 604;
+            const OUTPUT_HEIGHT = 1000;
             
-            const width = PSA_REF_WIDTH * scale;
-            const height = TARGET_HEIGHT;
+            // Calculate scale based on Slab Height matching the Canvas Height
+            // Slab is 1200x2102. We want it to be 1000px tall.
+            const scale = OUTPUT_HEIGHT / PSA_REF_HEIGHT;
+            
+            // Calculate Scaled Slab Dimensions
+            const slabW = PSA_REF_WIDTH * scale;
+            const slabH = OUTPUT_HEIGHT;
+            
+            // Center the slab horizontally in the 604px canvas
+            const slabX = (OUTPUT_WIDTH - slabW) / 2;
+            const slabY = 0;
             
             try {
-                // Create off-screen canvas with target dimensions (1000px height)
                 const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
+                canvas.width = OUTPUT_WIDTH;
+                canvas.height = OUTPUT_HEIGHT;
                 const ctx = canvas.getContext('2d');
                 
-                // Use a high-quality scaling logic if possible (browser default usually fine for downscaling)
-
                 // --- 1. DRAW SLAB BACKGROUND ---
                 const slabImg = document.getElementById('slabImageOverlay');
                 if (slabImg && slabImg.naturalWidth > 0) {
-                    // Check if filters applied (Slab Mode)
                     const slabFilter = slabImg.style.filter;
                     if(slabFilter && slabFilter !== 'none') {
                         ctx.save();
                         ctx.filter = slabFilter;
-                        ctx.drawImage(slabImg, 0, 0, width, height);
+                        ctx.drawImage(slabImg, slabX, slabY, slabW, slabH);
                         ctx.restore();
                     } else {
-                        ctx.drawImage(slabImg, 0, 0, width, height);
+                        ctx.drawImage(slabImg, slabX, slabY, slabW, slabH);
                     }
                 }
 
-                // --- 2. DRAW USER CARD (With Filters & Masking) ---
-                // Only relevant if NOT in slab mode (userCardImage visible)
+                // --- 2. DRAW USER CARD ---
                 const cardImg = document.getElementById('userCardImage');
                 if (cardImg && !cardImg.classList.contains('hidden') && cardImg.naturalWidth > 0) {
-                    // Determine card position relative to full resolution, then SCALE
-                    // Original logic:
-                    // cardW_full = 940;
-                    // cardX_full = (1200 - 940) / 2 = 130;
-                    // ratio = height/width of actual image
-                    // cardH_full = 940 * ratio;
-                    // cardY_full = 2025 - 166 - cardH_full;
-                    
                     const cardW = PSA_CARD_WIDTH_PX * scale;
                     const ratio = cardImg.naturalHeight / cardImg.naturalWidth;
                     const cardH = cardW * ratio;
                     
-                    const cardX = ((PSA_REF_WIDTH - PSA_CARD_WIDTH_PX) / 2) * scale;
-                    // Bottom offset 166px -> scaled
-                    const cardY = height - (PSA_CARD_BOTTOM_PX * scale) - cardH;
+                    // Card is centered relative to the SLAB, so we add slabX
+                    const cardRelX = (PSA_REF_WIDTH - PSA_CARD_WIDTH_PX) / 2 * scale;
+                    const cardX = slabX + cardRelX;
+                    const cardY = slabH - (PSA_CARD_BOTTOM_PX * scale) - cardH;
 
                     ctx.save();
-                    // Apply filters manually since drawImage ignores CSS filters
                     const b = brightRange.value;
                     const c = contrastRange.value;
                     const s = satRange.value;
@@ -1236,31 +1230,24 @@
                 // --- 3. DRAW GUARD OVERLAY ---
                 const guardImg = document.getElementById('guardImageOverlay');
                 if (guardImg && !guardImg.classList.contains('hidden') && guardImg.naturalWidth > 0) {
-                    // Guard geometry from CSS: width: 106.33% of container
-                    const guardW = width * 1.0633;
+                    // Guard is 106.33% of the SLAB width
+                    const guardW = slabW * 1.0633;
                     const guardH = guardW * (guardImg.naturalHeight / guardImg.naturalWidth);
                     
-                    // Centered
-                    const guardX = (width - guardW) / 2;
-                    const guardY = (height - guardH) / 2;
+                    // Center guard relative to CANVAS
+                    const guardX = (OUTPUT_WIDTH - guardW) / 2;
+                    const guardY = (OUTPUT_HEIGHT - guardH) / 2;
                     
                     ctx.drawImage(guardImg, guardX, guardY, guardW, guardH);
                 }
 
                 // --- 4. DRAW TEXT ---
-                // If there's text, draw it. 
-                // Only if NOT in slab mode (or if you want text on slab mode? usually label is hidden)
-                // Current logic hides guardLabelText in slab mode.
                 if (currentSelectionName !== 'None' && (!guardLabelText || guardLabelText.style.display !== 'none')) {
-                    // Convert to Uppercase as requested
                     const text = currentSelectionName.toUpperCase();
                     
-                    // Font Setup
-                    // CSS uses 3.5cqw -> 3.5% of container width.
-                    // So font size = width * 0.035
-                    const fontSize = width * 0.035; 
+                    // Font size is relative to SLAB width (3.5%)
+                    const fontSize = slabW * 0.035; 
                     
-                    // Wait for font before drawing text to ensure correct measurement
                     await document.fonts.ready;
                     
                     ctx.font = `${fontSize}px "Univers 55", "Inter", sans-serif`;
@@ -1268,15 +1255,18 @@
                     ctx.textBaseline = "top";
                     ctx.textAlign = "left";
                     
-                    // We add a tiny stroke to simulate the 0.01em thickness from CSS
                     ctx.lineWidth = fontSize * 0.01; 
                     ctx.strokeStyle = "#242424";
                     
-                    // Position calculations
-                    // CSS: top: 6.9%, left: 12.1%
-                    const textX = width * 0.121;
-                    // Updated: Moving slightly lower than 6.9% as requested (e.g., 7.4%)
-                    const textY = height * 0.074;
+                    // Position relative to SLAB origin (slabX)
+                    // CSS Left: 12.1% of slab
+                    // CSS Top: 6.9% of slab (plus our manual nudge adjustment from before? 
+                    // Let's stick to the 7.4% logic or match CSS 6.9% exactly now that we have precision)
+                    const textRelX = slabW * 0.121;
+                    const textRelY = slabH * 0.069;
+                    
+                    const textX = slabX + textRelX;
+                    const textY = textRelY; // slabY is 0
                     
                     ctx.fillText(text, textX, textY);
                     ctx.strokeText(text, textX, textY);
@@ -1293,11 +1283,7 @@
 
             } catch (err) {
                 console.error("Save failed:", err);
-                if (err.name === 'SecurityError') {
-                    alert("Security Error: The browser blocked the download because the images are being loaded from a different domain (CORS issue). Please ensure all images are hosted on the same domain or have 'Access-Control-Allow-Origin' headers.");
-                } else {
-                    alert("Save failed. Check console for details.");
-                }
+                alert("Save failed. Check console for details.");
             }
         }
         
