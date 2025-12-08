@@ -1147,10 +1147,11 @@
             // Reset Inner Card
             userCardImage.src = ''; 
             userCardImage.classList.add('hidden'); 
+            userCardImage.style.filter = 'none'; // Reset filter
             
             // Reset Slab to Base
             slabImageOverlay.src = PSA_BASE_IMG_URL;
-            slabImageOverlay.style.filter = 'none'; // Reset filter on slab
+            slabImageOverlay.style.filter = 'none'; // Reset filter
             
             // Show Placeholder
             cardPlaceholder.classList.remove('hidden'); 
@@ -1164,6 +1165,11 @@
             isImageLoaded = false;
             // Enable cursor pointer
             cardLayerEl.classList.add('cursor-pointer');
+            
+            // Reset sliders to default
+            brightRange.value = 100;
+            contrastRange.value = 100;
+            satRange.value = 100;
             
             fileInput.value = ''; 
         }
@@ -1260,10 +1266,9 @@
                     
                     // Position relative to SLAB origin (slabX)
                     // CSS Left: 12.1% of slab
-                    // CSS Top: 6.9% of slab (plus our manual nudge adjustment from before? 
-                    // Let's stick to the 7.4% logic or match CSS 6.9% exactly now that we have precision)
+                    // CSS Top: 6.9% of slab. Increased to 7.5% to move it down slightly in the save file.
                     const textRelX = slabW * 0.121;
-                    const textRelY = slabH * 0.069;
+                    const textRelY = slabH * 0.075;
                     
                     const textX = slabX + textRelX;
                     const textY = textRelY; // slabY is 0
@@ -1299,10 +1304,19 @@
             const b = brightRange.value;
             const c = contrastRange.value;
             const s = satRange.value;
-            // Only apply filters to the inner card. 
-            // If user wants to filter the whole slab in slab mode, logic would need to target slabImageOverlay
-            // but requirement was "Adjust Card"
-            userCardImage.style.filter = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+            const filterVal = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+            
+            if (uploadMode === 'card') {
+                 // Card Mode: Filter inner card
+                 if(userCardImage) userCardImage.style.filter = filterVal;
+                 // Ensure slab doesn't have residual filters
+                 if(slabImageOverlay) slabImageOverlay.style.filter = 'none';
+            } else {
+                // Slab Mode: Filter the slab image itself
+                if(slabImageOverlay) slabImageOverlay.style.filter = filterVal;
+                // Ensure card doesn't have residual filters
+                if(userCardImage) userCardImage.style.filter = 'none';
+            }
         }
 
         [brightRange, contrastRange, satRange].forEach(el => el.addEventListener('input', updateFilters));
