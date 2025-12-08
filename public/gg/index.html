@@ -289,7 +289,6 @@
     </header>
 
     <!-- Main Container -->
-    <!-- UPDATED: Added lg:overflow-hidden to allow scrolling on mobile -->
     <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 lg:overflow-hidden">
         
         <!-- SIDEBAR REOPEN BUTTON -->
@@ -332,7 +331,7 @@
 
                 <span id="colorNameDisplay" class="block text-sm font-medium text-sky-500 dark:text-sky-300 mb-3">Current: None</span>
                 
-                <!-- UPDATED CONTAINER: Flex column to stack categories -->
+                <!-- CONTAINER: Flex column to stack categories -->
                 <div id="guardOptionsContainer" class="flex flex-col gap-4 mb-4 min-h-[40px]">
                     <span class="text-xs text-slate-400 italic">Loading options...</span>
                 </div>
@@ -369,7 +368,6 @@
 
             <!-- Actions (No Label) -->
             <div>
-                <!-- Removed '5. Actions' Label -->
                 <div class="grid grid-cols-3 gap-2">
                     <button type="button" onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
@@ -1002,7 +1000,7 @@
             
             if (imageUrl) {
                 guardImg.src = imageUrl;
-                if (document.getElementById('btn-psa').classList.contains('active-company')) {
+                if (btnPsa && btnPsa.classList.contains('active-company')) {
                     guardImg.classList.remove('hidden');
                 }
             }
@@ -1254,7 +1252,8 @@
                 // Only if NOT in slab mode (or if you want text on slab mode? usually label is hidden)
                 // Current logic hides guardLabelText in slab mode.
                 if (currentSelectionName !== 'None' && (!guardLabelText || guardLabelText.style.display !== 'none')) {
-                    const text = currentSelectionName;
+                    // Convert to Uppercase as requested
+                    const text = currentSelectionName.toUpperCase();
                     
                     // Font Setup
                     // CSS uses 3.5cqw -> 3.5% of container width.
@@ -1276,7 +1275,8 @@
                     // Position calculations
                     // CSS: top: 6.9%, left: 12.1%
                     const textX = width * 0.121;
-                    const textY = height * 0.069;
+                    // Updated: Moving slightly lower than 6.9% as requested (e.g., 7.4%)
+                    const textY = height * 0.074;
                     
                     ctx.fillText(text, textX, textY);
                     ctx.strokeText(text, textX, textY);
@@ -1293,7 +1293,11 @@
 
             } catch (err) {
                 console.error("Save failed:", err);
-                alert("Save failed. Check console for details.");
+                if (err.name === 'SecurityError') {
+                    alert("Security Error: The browser blocked the download because the images are being loaded from a different domain (CORS issue). Please ensure all images are hosted on the same domain or have 'Access-Control-Allow-Origin' headers.");
+                } else {
+                    alert("Save failed. Check console for details.");
+                }
             }
         }
         
@@ -1309,16 +1313,10 @@
             const b = brightRange.value;
             const c = contrastRange.value;
             const s = satRange.value;
-            const filterVal = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
-            
-            if (uploadMode === 'card') {
-                 // Card Mode: Filter inner card, reset slab
-                if(userCardImage) userCardImage.style.filter = filterVal;
-                if(slabImageOverlay) slabImageOverlay.style.filter = 'none';
-            } else {
-                // Slab Mode: Filter slab background
-                if(slabImageOverlay) slabImageOverlay.style.filter = filterVal;
-            }
+            // Only apply filters to the inner card. 
+            // If user wants to filter the whole slab in slab mode, logic would need to target slabImageOverlay
+            // but requirement was "Adjust Card"
+            userCardImage.style.filter = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
         }
 
         [brightRange, contrastRange, satRange].forEach(el => el.addEventListener('input', updateFilters));
