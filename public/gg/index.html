@@ -80,6 +80,7 @@
         }
 
         body {
+            /* Prioritize Univers 55, then standard Univers, then fallback to Inter */
             font-family: 'Univers 55', 'Univers', 'Inter', sans-serif;
             background-color: #f3f4f6;
             background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
@@ -216,6 +217,49 @@
         .dark-mode input[type=range]::-webkit-slider-runnable-track {
             background: #475569;
         }
+        
+        /* Segmented Control */
+        .segmented-control {
+            display: flex;
+            background-color: #f1f5f9;
+            border-radius: 0.5rem;
+            padding: 0.25rem;
+            margin-bottom: 1rem;
+        }
+        .dark-mode .segmented-control {
+            background-color: #3f3f46;
+        }
+        .segmented-btn {
+            flex: 1;
+            text-align: center;
+            padding: 0.35rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .segmented-btn.active {
+            background-color: white;
+            color: #0f172a;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .dark-mode .segmented-btn.active {
+            background-color: #52525b;
+            color: white;
+        }
+        .segmented-btn:not(.active) {
+            color: #64748b;
+        }
+        .dark-mode .segmented-btn:not(.active) {
+            color: #a1a1aa;
+        }
+        
+        /* Cropper CSS Override */
+        .cropper-container {
+            width: 100%;
+            height: 100%;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
@@ -294,7 +338,7 @@
                 <input type="hidden" id="customColorInput" value="#d946ef">
             </div>
 
-            <!-- 3. Adjust Card -->
+            <!-- 3. Adjust Card (Renumbered) -->
             <div>
                 <div class="flex justify-between items-center mb-2">
                     <label class="block text-sm font-semibold text-slate-700 uppercase tracking-wider mb-0">3. Adjust Card</label>
@@ -324,6 +368,7 @@
 
             <!-- Actions (No Label) -->
             <div>
+                <!-- Removed '5. Actions' Label -->
                 <div class="grid grid-cols-3 gap-2">
                     <button type="button" onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
@@ -351,7 +396,6 @@
                 <div id="guardContainer" class="guard-bumper guard-psa bg-gray-900 w-[320px] md:w-[360px] flex items-center justify-center relative z-0">
                     
                     <!-- Guard Image -->
-                    <!-- UPDATED: REMOVED crossorigin="anonymous" to fix broken images -->
                     <img id="guardImageOverlay" src="" 
                          onerror="handleImageError(this)"
                          class="absolute z-50 pointer-events-none hidden" 
@@ -361,7 +405,6 @@
                     <div id="slabContainer" class="company-psa w-full relative overflow-hidden bg-white/10 rounded-[18px]" style="container-type: inline-size;">
 
                         <!-- Guard Label Overlay -->
-                        <!-- UPDATED: Added opacity: 0.9 -->
                         <div id="guardLabelText" class="absolute z-20 text-[#242424] uppercase tracking-wide" 
                              style="top: 6.9%; left: 12.1%; font-size: 3.5cqw; font-family: 'Univers 55', sans-serif; -webkit-text-stroke: 0.01em #242424; opacity: 0.9;">
                         </div>
@@ -370,26 +413,22 @@
                         <div id="glareOverlay" class="glare-overlay"></div>
 
                         <!-- LAYER 2: The SLAB BASE IMG -->
-                        <!-- UPDATED: REMOVED crossorigin="anonymous" -->
                         <img id="slabImageOverlay" src="https://mew.cards/gg/img/base_PSA.png" 
                              onerror="handleImageError(this)"
                              class="w-full h-auto relative z-10 pointer-events-none">
 
                         <!-- LAYER 3: The CARD & UPLOAD ZONE -->
+                        <!-- UPDATED: Removed cursor-pointer if image loaded -->
                         <div id="cardLayer" 
-                             onclick="document.getElementById('fileInput').click()"
                              class="absolute z-20 flex items-center justify-center transition-all duration-300 cursor-pointer group">
                              
                              <input type="file" id="fileInput" accept="image/*" class="hidden">
 
                              <!-- USER IMAGE: Filters applied here -->
-                             <!-- UPDATED: REMOVED crossorigin="anonymous" -->
-                             <img id="userCardImage" src="" 
-                                  class="hidden object-contain shadow-sm pointer-events-none" alt="User Card">
+                             <img id="userCardImage" src="" class="hidden object-contain shadow-sm pointer-events-none" alt="User Card">
                              
                              <!-- Placeholder -->
                              <div id="cardPlaceholder" class="w-full h-full flex items-center justify-center relative">
-                                <!-- UPDATED: REMOVED crossorigin="anonymous" -->
                                 <img src="https://mew.cards/gg/img/upload.png" 
                                      alt="Upload Here" 
                                      onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden'); if(typeof lucide!=='undefined') lucide.createIcons();"
@@ -437,19 +476,31 @@
 
     <!-- Crop Modal -->
     <div id="cropModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-900 rounded-2xl w-[90vw] h-[85vh] max-w-7xl shadow-2xl overflow-hidden flex flex-col">
-            <div class="flex-none p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                <h3 class="font-bold text-slate-900 dark:text-white">Adjust Image</h3>
+        <!-- UPDATED: Increased width to 90vw and height to 85vh for a much larger workspace -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl w-[90vw] h-[85vh] max-w-7xl shadow-2xl overflow-hidden flex flex-col relative">
+            
+            <!-- HEADER with Title and Close -->
+            <div class="flex-none p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center relative z-20 bg-white dark:bg-slate-900 rounded-t-2xl">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                     <h3 class="font-bold text-slate-900 dark:text-white">Adjust Image</h3>
+                     
+                     <!-- TOGGLE CONTROLS MOVED HERE (Header) to prevent cutoff/overlap -->
+                     <div class="segmented-control bg-slate-100 dark:bg-slate-800 mb-0">
+                         <!-- Simplified Labels -->
+                         <div id="modalModeCardBtn" class="segmented-btn active px-3 py-1 text-xs" onclick="setUploadModeInModal('card')">Card</div>
+                         <div id="modalModeSlabBtn" class="segmented-btn px-3 py-1 text-xs" onclick="setUploadModeInModal('slab')">Slab</div>
+                     </div>
+                </div>
                 <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             
-            <div class="flex-1 bg-black/5 dark:bg-black/50 p-4 relative flex items-center justify-center overflow-hidden">
-                <div class="h-full w-full">
-                    <img id="imageToCrop" src="" alt="Crop Preview" class="max-w-full max-h-full block">
+            <div class="flex-1 w-full min-h-0 bg-black/5 dark:bg-black/50 relative overflow-hidden flex items-center justify-center">
+                <div class="w-full h-full p-4">
+                    <img id="imageToCrop" src="" alt="Crop Preview" class="max-w-full max-h-full block opacity-0">
                 </div>
             </div>
 
-            <div class="flex-none p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-white dark:bg-slate-900">
+            <div class="flex-none p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-white dark:bg-slate-900 rounded-b-2xl relative z-20">
                 <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
                 <button onclick="applyCrop()" class="px-6 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-lg transition-all">Apply Card</button>
             </div>
@@ -462,10 +513,8 @@
                 lucide.createIcons();
             }
             
-            // Just trigger the fetch, which triggers the preload
             fetchGuardOptions();
             
-            // Failsafe for loader: Hide after 8 seconds no matter what
             setTimeout(() => {
                 const loader = document.getElementById('loading-screen');
                 if (loader && !loader.classList.contains('hidden-loader')) {
@@ -483,7 +532,6 @@
                          activeBtns.forEach(btn => {
                             btn.style.setProperty('--tw-ring-offset-color', offsetColor);
                          });
-                         // Update non-selected buttons to match background as well for hover effect
                          const allBtns = document.querySelectorAll('.guard-option-btn');
                          allBtns.forEach(btn => {
                             if(!btn.classList.contains('ring-2')) {
@@ -512,6 +560,7 @@
         const slabCssOverlay = document.getElementById('slabCssOverlay');
         const guardImageOverlay = document.getElementById('guardImageOverlay');
         const userCardImage = document.getElementById('userCardImage');
+        const cardPlaceholder = document.getElementById('cardPlaceholder');
         
         const btnPsa = document.getElementById('btn-psa');
         const btnBgs = document.getElementById('btn-bgs');
@@ -526,6 +575,10 @@
         const brightRange = document.getElementById('brightRange');
         const contrastRange = document.getElementById('contrastRange');
         const satRange = document.getElementById('satRange');
+
+        // Toggle Buttons
+        const modalModeCardBtn = document.getElementById('modalModeCardBtn');
+        const modalModeSlabBtn = document.getElementById('modalModeSlabBtn');
 
         function toggleSidebar() {
             if (sidebar.classList.contains('translate-x-[-120%]')) {
@@ -544,12 +597,12 @@
         const PSA_REF_HEIGHT = 2102; 
         const PSA_CARD_WIDTH_PX = 940;
         const PSA_CARD_BOTTOM_PX = 166;
+        const PSA_BASE_IMG_URL = 'https://mew.cards/gg/img/base_PSA.png';
 
         // PRELOAD LOGIC
-        // Base assets that are always needed
         const BASE_ASSETS = [
             'https://mew.cards/gg/img/logo.png',
-            'https://mew.cards/gg/img/base_PSA.png',
+            PSA_BASE_IMG_URL,
             'https://mew.cards/gg/img/upload.png'
         ];
 
@@ -568,7 +621,7 @@
 
             if (loadedCount >= total) {
                 setTimeout(() => {
-                    loadingScreen.classList.add('hidden-loader');
+                    if (loadingScreen) loadingScreen.classList.add('hidden-loader');
                     document.body.classList.remove('overflow-hidden'); 
                 }, 500); 
             }
@@ -579,6 +632,8 @@
         let allGuardOptions = [];
         let currentCompany = 'PSA'; 
         let currentSelectionName = 'None';
+        let uploadMode = 'card'; // 'card' or 'slab'
+        let isImageLoaded = false;
 
         // FALLBACK DATA (Added Set property for testing)
         const FALLBACK_OPTIONS = [
@@ -875,6 +930,48 @@
             }
         }
 
+        // MODE SWITCHING LOGIC (IN MODAL)
+        window.setUploadModeInModal = function(mode) {
+            uploadMode = mode;
+            modalModeCardBtn.classList.toggle('active', mode === 'card');
+            modalModeSlabBtn.classList.toggle('active', mode === 'slab');
+            
+            // Re-initialize cropper with new aspect ratio logic
+            const imgEl = document.getElementById('imageToCrop');
+            if (imgEl && imgEl.src) {
+                if(cropper) cropper.destroy();
+                let aspectRatio = (63.5 / 88.9);
+                if (uploadMode === 'slab') {
+                    // Use updated slab ratio 1200/2025
+                    aspectRatio = (1200 / 2025); 
+                }
+                cropper = new Cropper(imgEl, { 
+                    viewMode: 1, 
+                    background: false, 
+                    autoCropArea: 1, 
+                    zoomable: true, 
+                    aspectRatio: aspectRatio, 
+                    ready() {} 
+                });
+            }
+        }
+        
+        // Ensure global access if needed
+        window.setUploadMode = function(mode) {
+             setUploadModeInModal(mode);
+             
+             // Update visibility of label text immediately if image is already loaded
+             if (isImageLoaded) {
+                 if (uploadMode === 'slab') {
+                     if(guardLabelText) guardLabelText.style.display = 'none';
+                 } else {
+                     if (currentSelectionName !== 'None' && guardLabelText) {
+                         guardLabelText.style.display = 'block';
+                     }
+                 }
+             }
+        }
+
         function setGuardOption(hex, name, imageUrl, btnId, highlightColor) {
             document.getElementById('customColorInput').value = hex;
             currentSelectionName = name; 
@@ -887,6 +984,12 @@
             if (guardLabelText) {
                 // UPDATED: Removed "GG: " prefix, just using the name
                 guardLabelText.innerText = name;
+                // Only show text in Card Mode. In Slab Mode, text is hidden.
+                if (uploadMode === 'slab') {
+                    guardLabelText.style.display = 'none';
+                } else {
+                    guardLabelText.style.display = 'block';
+                }
             }
             
             if (imageUrl) {
@@ -921,6 +1024,13 @@
         const imageToCrop = document.getElementById('imageToCrop');
         let cropper = null;
 
+        // UPDATED: Restrict clicking if image is loaded
+        cardLayerEl.addEventListener('click', () => {
+             if (!isImageLoaded) {
+                 fileInput.click();
+             }
+        });
+        
         fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
         const dnd = document.getElementById('cardLayer');
         dnd.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('drop-active'); });
@@ -933,14 +1043,31 @@
                 reader.onload = (e) => {
                     const imgEl = document.getElementById('imageToCrop');
                     const modalEl = document.getElementById('cropModal');
+                    
                     if(cropper) { cropper.destroy(); cropper = null; }
+                    
                     if (imgEl) {
+                        // Reset image src first to avoid potential issues
+                        imgEl.src = '';
                         imgEl.src = e.target.result;
                         modalEl.classList.remove('hidden');
                         modalEl.classList.add('flex');
-                        setTimeout(() => { 
-                            cropper = new Cropper(imgEl, { viewMode: 1, background: false, autoCropArea: 0.9, zoomable: true, aspectRatio: 63.5 / 88.9, ready() {} }); 
-                        }, 100);
+                        
+                        // Default back to Card mode on new upload
+                        setUploadModeInModal('card');
+                        
+                        // Use img.onload to ensure image dimensions are ready before initializing cropper
+                        imgEl.onload = () => {
+                            // Initial cropper (Card Mode default)
+                            cropper = new Cropper(imgEl, { 
+                                viewMode: 1, 
+                                background: false, 
+                                autoCropArea: 1, 
+                                zoomable: true, 
+                                aspectRatio: 63.5 / 88.9, 
+                                ready() {} 
+                            }); 
+                        };
                     }
                 };
                 reader.readAsDataURL(file);
@@ -948,32 +1075,102 @@
         }
 
         window.closeModal = function() { cropModal.classList.add('hidden'); cropModal.classList.remove('flex'); if (cropper) { cropper.destroy(); cropper = null; } fileInput.value = ''; }
+        
+        // UPDATED: Restored the full logic to handle Card vs Slab modes
         window.applyCrop = function() {
             if (cropper) {
-                const cvs = cropper.getCroppedCanvas({ maxWidth: 1024, maxHeight: 1024, fillColor: '#fff' });
-                const rounded = document.createElement('canvas'); rounded.width = cvs.width; rounded.height = cvs.height; 
-                const ctx = rounded.getContext('2d'); 
-                const r = (cvs.width / 63.5) * 3;
-                ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(rounded.width-r, 0); ctx.quadraticCurveTo(rounded.width, 0, rounded.width, r); ctx.lineTo(rounded.width, rounded.height-r); ctx.quadraticCurveTo(rounded.width, rounded.height, rounded.width-r, rounded.height); ctx.lineTo(r, rounded.height); ctx.quadraticCurveTo(0, rounded.height, 0, rounded.height-r); ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.closePath(); ctx.clip(); ctx.drawImage(cvs, 0, 0);
+                // If Card Mode: Limit size to save resources. If Slab Mode: Need high res for background.
+                const maxWidth = uploadMode === 'slab' ? 1200 : 1024;
+                const maxHeight = uploadMode === 'slab' ? 2025 : 1024;
                 
-                const userImg = document.getElementById('userCardImage');
-                userImg.src = rounded.toDataURL('image/png'); 
-                userImg.classList.remove('hidden'); 
-                document.getElementById('cardPlaceholder').classList.add('hidden'); 
+                const cvs = cropper.getCroppedCanvas({ maxWidth: maxWidth, maxHeight: maxHeight, fillColor: '#fff' });
+                
+                // Get elements to update
+                const userCardImage = document.getElementById('userCardImage');
+                const slabImageOverlay = document.getElementById('slabImageOverlay');
+                const cardPlaceholder = document.getElementById('cardPlaceholder');
+                const guardLabelText = document.getElementById('guardLabelText');
+                const cardLayerEl = document.getElementById('cardLayer');
+
+                if (uploadMode === 'card') {
+                    // --- CARD MODE LOGIC (Round Corners) ---
+                    const rounded = document.createElement('canvas'); 
+                    rounded.width = cvs.width; 
+                    rounded.height = cvs.height; 
+                    const ctx = rounded.getContext('2d'); 
+                    const r = (cvs.width / 63.5) * 3;
+                    
+                    ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(rounded.width-r, 0); ctx.quadraticCurveTo(rounded.width, 0, rounded.width, r); ctx.lineTo(rounded.width, rounded.height-r); ctx.quadraticCurveTo(rounded.width, rounded.height, rounded.width-r, rounded.height); ctx.lineTo(r, rounded.height); ctx.quadraticCurveTo(0, rounded.height, 0, rounded.height-r); ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.closePath(); ctx.clip(); ctx.drawImage(cvs, 0, 0);
+                    
+                    userCardImage.src = rounded.toDataURL('image/png'); 
+                    userCardImage.classList.remove('hidden'); 
+                    
+                    // Restore Base Slab (in case we were previously in slab mode)
+                    slabImageOverlay.src = PSA_BASE_IMG_URL;
+                    
+                    // Show Text if option selected
+                    if (currentSelectionName !== 'None' && guardLabelText) {
+                        guardLabelText.style.display = 'block';
+                    }
+
+                } else {
+                    // --- SLAB MODE LOGIC (Full Replacement) ---
+                    // Replace base image with cropped slab
+                    slabImageOverlay.src = cvs.toDataURL('image/png');
+                    // Hide inner card
+                    userCardImage.classList.add('hidden');
+                    // Hide label text as requested for Slab mode
+                    if (guardLabelText) guardLabelText.style.display = 'none';
+                }
+                
+                // Hide placeholder
+                cardPlaceholder.classList.add('hidden'); 
+                
+                // Disable clicking on the layer
+                cardLayerEl.classList.remove('cursor-pointer');
+                
+                // Mark image as loaded
+                isImageLoaded = true;
+                
+                // Update filters to apply to the correct element
+                updateFilters();
+
                 closeModal();
             }
         }
+        
         window.clearImage = function() { 
-            document.getElementById('userCardImage').src = ''; 
-            document.getElementById('userCardImage').classList.add('hidden'); 
-            document.getElementById('cardPlaceholder').classList.remove('hidden'); 
+            // Reset Inner Card
+            userCardImage.src = ''; 
+            userCardImage.classList.add('hidden'); 
+            
+            // Reset Slab to Base
+            slabImageOverlay.src = PSA_BASE_IMG_URL;
+            slabImageOverlay.style.filter = 'none'; // Reset filter on slab
+            
+            // Show Placeholder
+            cardPlaceholder.classList.remove('hidden'); 
+            
+            // Show Text again (if option is selected)
+            if (currentSelectionName !== 'None') {
+                guardLabelText.style.display = 'block';
+            }
+            
+            // Reset state
+            isImageLoaded = false;
+            // Enable cursor pointer
+            cardLayerEl.classList.add('cursor-pointer');
+            
             fileInput.value = ''; 
         }
         
         window.downloadPreview = function() {
             const originalImg = document.getElementById('userCardImage');
             const originalLabel = document.getElementById('guardLabelText');
-            const currentFilter = originalImg.style.filter; 
+            const slabImg = document.getElementById('slabImageOverlay');
+            
+            // Capture filters based on mode
+            const currentFilter = uploadMode === 'card' ? originalImg.style.filter : slabImg.style.filter;
 
             // CAPTURE EXACT STYLES: Measure what the user sees on screen right now
             let fixedStyles = {};
@@ -994,6 +1191,7 @@
                 scale: 2,
                 onclone: (clonedDoc) => {
                     const clonedImg = clonedDoc.getElementById('userCardImage');
+                    const clonedSlab = clonedDoc.getElementById('slabImageOverlay');
                     const clonedLabel = clonedDoc.getElementById('guardLabelText');
                     
                     // 1. Text Position Fix: Apply the frozen pixel values to the clone
@@ -1015,19 +1213,28 @@
                     }
 
                     // 2. Image Filter Fix
-                    if (currentFilter && currentFilter !== 'none' && !originalImg.classList.contains('hidden') && originalImg.naturalWidth > 0) {
-                        try {
-                            const canvas = clonedDoc.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            canvas.width = originalImg.naturalWidth;
-                            canvas.height = originalImg.naturalHeight;
-                            ctx.filter = currentFilter;
-                            ctx.drawImage(originalImg, 0, 0, canvas.width, canvas.height);
-                            clonedImg.src = canvas.toDataURL('image/png');
-                            clonedImg.style.filter = 'none'; 
-                        } catch (e) {
-                            console.warn("Filter baking failed inside onclone:", e);
+                    // Function to bake filter into an image
+                    const bakeFilter = (imgEl, filter) => {
+                        if (filter && filter !== 'none' && !imgEl.classList.contains('hidden') && imgEl.naturalWidth > 0) {
+                             try {
+                                const canvas = clonedDoc.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                canvas.width = imgEl.naturalWidth;
+                                canvas.height = imgEl.naturalHeight;
+                                ctx.filter = filter;
+                                ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+                                imgEl.src = canvas.toDataURL('image/png');
+                                imgEl.style.filter = 'none'; 
+                            } catch (e) {
+                                console.warn("Filter baking failed inside onclone:", e);
+                            }
                         }
+                    };
+
+                    if (uploadMode === 'card') {
+                        bakeFilter(clonedImg, currentFilter);
+                    } else if (uploadMode === 'slab') {
+                        bakeFilter(clonedSlab, currentFilter);
                     }
                 }
             }).then(canvas => {
@@ -1056,7 +1263,16 @@
             const b = brightRange.value;
             const c = contrastRange.value;
             const s = satRange.value;
-            userCardImage.style.filter = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+            const filterVal = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+            
+            if (uploadMode === 'card') {
+                 // Card Mode: Filter inner card, reset slab
+                if(userCardImage) userCardImage.style.filter = filterVal;
+                if(slabImageOverlay) slabImageOverlay.style.filter = 'none';
+            } else {
+                // Slab Mode: Filter slab background
+                if(slabImageOverlay) slabImageOverlay.style.filter = filterVal;
+            }
         }
 
         [brightRange, contrastRange, satRange].forEach(el => el.addEventListener('input', updateFilters));
