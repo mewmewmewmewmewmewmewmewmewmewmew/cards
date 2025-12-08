@@ -331,7 +331,7 @@
 
                 <span id="colorNameDisplay" class="block text-sm font-medium text-sky-500 dark:text-sky-300 mb-3">Current: None</span>
                 
-                <!-- CONTAINER: Flex column to stack categories -->
+                <!-- UPDATED CONTAINER: Flex column to stack categories -->
                 <div id="guardOptionsContainer" class="flex flex-col gap-4 mb-4 min-h-[40px]">
                     <span class="text-xs text-slate-400 italic">Loading options...</span>
                 </div>
@@ -418,6 +418,7 @@
 
                         <!-- LAYER 3: The CARD & UPLOAD ZONE -->
                         <div id="cardLayer" 
+                             onclick="document.getElementById('fileInput').click()"
                              class="absolute z-20 flex items-center justify-center transition-all duration-300 cursor-pointer group">
                              
                              <input type="file" id="fileInput" accept="image/*" class="hidden">
@@ -582,7 +583,7 @@
         const contrastRange = document.getElementById('contrastRange');
         const satRange = document.getElementById('satRange');
 
-        // Modal Toggle Buttons
+        // Toggle Buttons
         const modalModeCardBtn = document.getElementById('modalModeCardBtn');
         const modalModeSlabBtn = document.getElementById('modalModeSlabBtn');
 
@@ -1266,9 +1267,9 @@
                     
                     // Position relative to SLAB origin (slabX)
                     // CSS Left: 12.1% of slab
-                    // CSS Top: 6.9% of slab. Increased to 7.5% to move it down slightly in the save file.
+                    // CSS Top: 6.9% of slab. Increased to 7.2% to match sweet spot.
                     const textRelX = slabW * 0.121;
-                    const textRelY = slabH * 0.075;
+                    const textRelY = slabH * 0.072;
                     
                     const textX = slabX + textRelX;
                     const textY = textRelY; // slabY is 0
@@ -1307,12 +1308,11 @@
             const filterVal = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
             
             if (uploadMode === 'card') {
-                 // Card Mode: Filter inner card
-                 if(userCardImage) userCardImage.style.filter = filterVal;
-                 // Ensure slab doesn't have residual filters
-                 if(slabImageOverlay) slabImageOverlay.style.filter = 'none';
+                 // Card Mode: Filter inner card, reset slab
+                if(userCardImage) userCardImage.style.filter = filterVal;
+                if(slabImageOverlay) slabImageOverlay.style.filter = 'none';
             } else {
-                // Slab Mode: Filter the slab image itself
+                // Slab Mode: Filter slab background
                 if(slabImageOverlay) slabImageOverlay.style.filter = filterVal;
                 // Ensure card doesn't have residual filters
                 if(userCardImage) userCardImage.style.filter = 'none';
