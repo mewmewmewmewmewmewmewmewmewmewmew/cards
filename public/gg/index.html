@@ -417,8 +417,8 @@
                              class="w-full h-auto relative z-10 pointer-events-none">
 
                         <!-- LAYER 3: The CARD & UPLOAD ZONE -->
+                        <!-- UPDATED: Removed onclick, using JS listener to prevent double prompt -->
                         <div id="cardLayer" 
-                             onclick="document.getElementById('fileInput').click()"
                              class="absolute z-20 flex items-center justify-center transition-all duration-300 cursor-pointer group">
                              
                              <input type="file" id="fileInput" accept="image/*" class="hidden">
@@ -538,7 +538,6 @@
                          activeBtns.forEach(btn => {
                             btn.style.setProperty('--tw-ring-offset-color', offsetColor);
                          });
-                         // Update non-selected buttons to match background as well for hover effect
                          const allBtns = document.querySelectorAll('.guard-option-btn');
                          allBtns.forEach(btn => {
                             if(!btn.classList.contains('ring-2')) {
@@ -642,7 +641,7 @@
         let uploadMode = 'card'; // 'card' or 'slab'
         let isImageLoaded = false;
 
-        // FALLBACK DATA (Added Set property for testing)
+        // FALLBACK DATA
         const FALLBACK_OPTIONS = [
              { Grader: 'PSA', Name: 'Fuschia', 'Color 1': '#be81a1', 'Color 2': '#5c4065', 'Color 3': '', Highlight: '#f0abfc', Image: 'GG_PSA_Fuschia.png', Set: 'Limited' },
              { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png', Set: 'Standard' }
@@ -1267,9 +1266,9 @@
                     
                     // Position relative to SLAB origin (slabX)
                     // CSS Left: 12.1% of slab
-                    // CSS Top: 6.9% of slab. Increased to 7.2% to match sweet spot.
+                    // CSS Top: 7% of slab.
                     const textRelX = slabW * 0.121;
-                    const textRelY = slabH * 0.072;
+                    const textRelY = slabH * 0.07;
                     
                     const textX = slabX + textRelX;
                     const textY = textRelY; // slabY is 0
