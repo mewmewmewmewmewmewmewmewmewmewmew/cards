@@ -224,7 +224,7 @@
             background-color: #f1f5f9;
             border-radius: 0.5rem;
             padding: 0.25rem;
-            margin-bottom: 1rem;
+            /* margin-bottom: 1rem; */
         }
         .dark-mode .segmented-control {
             background-color: #3f3f46;
@@ -240,13 +240,13 @@
             cursor: pointer;
         }
         .segmented-btn.active {
-            background-color: white;
-            color: #0f172a;
+            background-color: #7dd3fc; /* Baby Blue Accent */
+            color: #0f172a; /* Dark text on baby blue */
             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         }
         .dark-mode .segmented-btn.active {
-            background-color: #52525b;
-            color: white;
+            background-color: #7dd3fc; /* Baby Blue Accent */
+            color: #0f172a; /* Dark text on baby blue */
         }
         .segmented-btn:not(.active) {
             color: #64748b;
@@ -262,7 +262,6 @@
         }
     </style>
 </head>
-<!-- UPDATED: Replaced h-screen with min-h-screen and removed global overflow-hidden -->
 <body class="min-h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300 lg:h-screen lg:overflow-hidden overflow-y-auto">
 
     <!-- Loading Screen -->
@@ -370,6 +369,7 @@
 
             <!-- Actions (No Label) -->
             <div>
+                <!-- Removed '5. Actions' Label -->
                 <div class="grid grid-cols-3 gap-2">
                     <button type="button" onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
@@ -475,33 +475,39 @@
     </main>
 
     <!-- Crop Modal -->
-    <div id="cropModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+    <!-- UPDATED: Close Button outside (fixed position). Header removed. Footer reorganized. -->
+    <div id="cropModal" class="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+        
+        <!-- External Close Button -->
+        <button onclick="closeModal()" class="fixed top-6 right-6 z-[110] text-white hover:text-gray-300 transition-colors">
+            <i data-lucide="x" class="w-8 h-8"></i>
+        </button>
+
         <div class="bg-white dark:bg-slate-900 rounded-2xl w-[90vw] h-[85vh] max-w-7xl shadow-2xl overflow-hidden flex flex-col relative">
             
-            <!-- HEADER with Title and Close -->
-            <div class="flex-none p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center relative z-20 bg-white dark:bg-slate-900 rounded-t-2xl">
-                <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                     <h3 class="font-bold text-slate-900 dark:text-white">Adjust Image</h3>
-                     
-                     <!-- TOGGLE CONTROLS MOVED HERE (Header) to prevent cutoff/overlap -->
-                     <div class="segmented-control bg-slate-100 dark:bg-slate-800 mb-0">
-                         <!-- Simplified Labels -->
-                         <div id="modalModeCardBtn" class="segmented-btn active px-3 py-1 text-xs" onclick="setUploadModeInModal('card')">Card</div>
-                         <div id="modalModeSlabBtn" class="segmented-btn px-3 py-1 text-xs" onclick="setUploadModeInModal('slab')">Slab</div>
-                     </div>
-                </div>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            
-            <div class="flex-1 w-full min-h-0 bg-black/5 dark:bg-black/50 relative overflow-hidden flex items-center justify-center">
-                <div class="w-full h-full p-4">
+            <!-- Image Area (Full Height now minus footer) -->
+            <!-- UPDATED: Added p-6 padding to ensure image container symmetry -->
+            <div class="flex-1 w-full min-h-0 bg-black/5 dark:bg-black/50 relative overflow-hidden flex items-center justify-center p-6">
+                 <!-- Image wrapper -->
+                 <div class="w-full h-full flex items-center justify-center">
                     <img id="imageToCrop" src="" alt="Crop Preview" class="max-w-full max-h-full block opacity-0">
-                </div>
+                 </div>
             </div>
 
-            <div class="flex-none p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-white dark:bg-slate-900 rounded-b-2xl relative z-20">
-                <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-                <button onclick="applyCrop()" class="px-6 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-lg transition-all">Apply Card</button>
+            <!-- Footer: Toggle Left, Buttons Right -->
+            <div class="flex-none p-4 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-900 relative z-20">
+                
+                <!-- Toggle (Moved to footer) -->
+                <div class="segmented-control bg-slate-100 dark:bg-slate-800 mb-0">
+                     <div id="modalModeCardBtn" class="segmented-btn active px-4 py-1.5 text-xs" onclick="setUploadModeInModal('card')">Card</div>
+                     <div id="modalModeSlabBtn" class="segmented-btn px-4 py-1.5 text-xs" onclick="setUploadModeInModal('slab')">Slab</div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                    <!-- UPDATED: Removed bold, using font-medium. Baby Blue bg. -->
+                    <button onclick="applyCrop()" class="px-6 py-2 rounded-lg text-sm font-medium bg-[#7dd3fc] text-slate-900 hover:bg-[#7dd3fc]/80 shadow-lg transition-all">Apply Card</button>
+                </div>
             </div>
         </div>
     </div>
@@ -512,8 +518,10 @@
                 lucide.createIcons();
             }
             
+            // Just trigger the fetch, which triggers the preload
             fetchGuardOptions();
             
+            // Failsafe for loader: Hide after 8 seconds no matter what
             setTimeout(() => {
                 const loader = document.getElementById('loading-screen');
                 if (loader && !loader.classList.contains('hidden-loader')) {
@@ -531,6 +539,7 @@
                          activeBtns.forEach(btn => {
                             btn.style.setProperty('--tw-ring-offset-color', offsetColor);
                          });
+                         // Update non-selected buttons to match background as well for hover effect
                          const allBtns = document.querySelectorAll('.guard-option-btn');
                          allBtns.forEach(btn => {
                             if(!btn.classList.contains('ring-2')) {
@@ -575,7 +584,7 @@
         const contrastRange = document.getElementById('contrastRange');
         const satRange = document.getElementById('satRange');
 
-        // Toggle Buttons
+        // Modal Toggle Buttons
         const modalModeCardBtn = document.getElementById('modalModeCardBtn');
         const modalModeSlabBtn = document.getElementById('modalModeSlabBtn');
 
@@ -610,6 +619,7 @@
         
         function updateLoader() {
             loadedCount++;
+            // Prevent divide by zero if resourcesToLoad is empty
             const total = resourcesToLoad.length || 1; 
             const percentage = Math.round((loadedCount / total) * 100);
             
@@ -633,7 +643,7 @@
         let uploadMode = 'card'; // 'card' or 'slab'
         let isImageLoaded = false;
 
-        // FALLBACK DATA
+        // FALLBACK DATA (Added Set property for testing)
         const FALLBACK_OPTIONS = [
              { Grader: 'PSA', Name: 'Fuschia', 'Color 1': '#be81a1', 'Color 2': '#5c4065', 'Color 3': '', Highlight: '#f0abfc', Image: 'GG_PSA_Fuschia.png', Set: 'Limited' },
              { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png', Set: 'Standard' }
@@ -695,12 +705,16 @@
                 allGuardOptions = FALLBACK_OPTIONS;
             }
             
+            // START PRELOADING HERE
+            // 1. Collect all image URLs from the data options
             const dynamicImages = allGuardOptions
                 .map(opt => opt.Image ? `https://mew.cards/gg/img/${opt.Image}` : null)
                 .filter(url => url !== null);
 
+            // 2. Combine with base assets and deduplicate
             resourcesToLoad = [...new Set([...BASE_ASSETS, ...dynamicImages])];
             
+            // 3. Start loading them
             if (resourcesToLoad.length > 0) {
                 resourcesToLoad.forEach(url => {
                     const img = new Image();
@@ -709,9 +723,10 @@
                     img.src = url;
                 });
             } else {
-                updateLoader();
+                updateLoader(); // Force load if empty
             }
 
+            // Initialize App UI
             setCompany('psa'); 
         }
 
@@ -724,6 +739,7 @@
                 return;
             }
 
+            // GROUPING LOGIC
             const setsMap = new Map(); 
             options.forEach(opt => {
                 const setName = opt.Set || 'Standard'; 
@@ -737,23 +753,28 @@
             const offsetColor = isDark ? '#27272a' : '#ffffff';
 
             setsMap.forEach((groupOptions, setName) => {
+                // Create Group Container
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'w-full mb-2';
                 
+                // Create Header
                 const header = document.createElement('h3');
                 header.className = 'text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-700 pb-1';
                 header.textContent = setName;
                 groupDiv.appendChild(header);
                 
+                // Create Button Grid
                 const grid = document.createElement('div');
                 grid.className = 'flex flex-wrap gap-3';
                 
                 groupOptions.forEach((opt, index) => {
                     const btn = document.createElement('button');
+                    // Use a unique ID based on set and name to avoid conflicts
                     const safeName = opt.Name ? opt.Name.replace(/\s+/g, '-').toLowerCase() : `opt-${index}`;
                     btn.id = `btn-${safeName}`;
                     btn.title = opt.Name || 'Unknown';
                     
+                    // Button Base Style
                     btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 hover:ring-2 transition-all duration-200 ring-offset-2 focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700`;
                     
                     const c1 = normalizeHex(opt['Color 1']);
@@ -779,6 +800,7 @@
                     sheen.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
                     btn.appendChild(sheen);
                     
+                    // Border Overlay
                     const borderOverlay = document.createElement('div');
                     borderOverlay.className = 'absolute inset-0 rounded-full border border-black/10 dark:border-white/10 pointer-events-none';
                     btn.appendChild(borderOverlay);
@@ -980,7 +1002,7 @@
             
             if (imageUrl) {
                 guardImg.src = imageUrl;
-                if (btnPsa && btnPsa.classList.contains('active-company')) {
+                if (document.getElementById('btn-psa').classList.contains('active-company')) {
                     guardImg.classList.remove('hidden');
                 }
             }
@@ -1148,91 +1170,131 @@
             fileInput.value = ''; 
         }
         
-        window.downloadPreview = function() {
-            const originalImg = document.getElementById('userCardImage');
-            const originalLabel = document.getElementById('guardLabelText');
-            const slabImg = document.getElementById('slabImageOverlay');
+        window.downloadPreview = async function() {
+            // Target output height (1000px)
+            const TARGET_HEIGHT = 1000;
+            // Calculate scale based on full PSA_REF_HEIGHT (2025)
+            // scale = 1000 / 2025 = ~0.4938
+            const scale = TARGET_HEIGHT / PSA_REF_HEIGHT;
             
-            // Capture filters based on mode
-            const currentFilter = uploadMode === 'card' ? originalImg.style.filter : slabImg.style.filter;
+            const width = PSA_REF_WIDTH * scale;
+            const height = TARGET_HEIGHT;
+            
+            try {
+                // Create off-screen canvas with target dimensions (1000px height)
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                
+                // Use a high-quality scaling logic if possible (browser default usually fine for downscaling)
 
-            // CAPTURE EXACT STYLES: Measure what the user sees on screen right now
-            let fixedStyles = {};
-            if (originalLabel) {
-                const computed = window.getComputedStyle(originalLabel);
-                fixedStyles = {
-                    fontSize: computed.fontSize,
-                    top: computed.top,
-                    left: computed.left,
-                    letterSpacing: computed.letterSpacing,
-                    lineHeight: computed.lineHeight
-                };
-            }
-
-            html2canvas(previewWrapper, { 
-                useCORS: true, 
-                backgroundColor: null, 
-                scale: 2,
-                onclone: (clonedDoc) => {
-                    const clonedImg = clonedDoc.getElementById('userCardImage');
-                    const clonedSlab = clonedDoc.getElementById('slabImageOverlay');
-                    const clonedLabel = clonedDoc.getElementById('guardLabelText');
-                    
-                    // 1. Text Position Fix: Apply the frozen pixel values to the clone
-                    if (clonedLabel && fixedStyles.fontSize) {
-                        clonedLabel.style.fontSize = fixedStyles.fontSize;
-                        
-                        // UPDATED: Re-added manual offset. -6px shifts the text UP slightly in the save file.
-                        const topVal = parseFloat(fixedStyles.top);
-                        if (!isNaN(topVal)) {
-                            clonedLabel.style.top = `${topVal - 6}px`; 
-                        } else {
-                            clonedLabel.style.top = fixedStyles.top;
-                        }
-                        
-                        clonedLabel.style.left = fixedStyles.left;
-                        clonedLabel.style.letterSpacing = fixedStyles.letterSpacing;
-                        clonedLabel.style.lineHeight = '1';
-                        clonedLabel.style.transform = "none"; 
-                    }
-
-                    // 2. Image Filter Fix
-                    // Function to bake filter into an image
-                    const bakeFilter = (imgEl, filter) => {
-                        if (filter && filter !== 'none' && !imgEl.classList.contains('hidden') && imgEl.naturalWidth > 0) {
-                             try {
-                                const canvas = clonedDoc.createElement('canvas');
-                                const ctx = canvas.getContext('2d');
-                                canvas.width = imgEl.naturalWidth;
-                                canvas.height = imgEl.naturalHeight;
-                                ctx.filter = filter;
-                                ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-                                imgEl.src = canvas.toDataURL('image/png');
-                                imgEl.style.filter = 'none'; 
-                            } catch (e) {
-                                console.warn("Filter baking failed inside onclone:", e);
-                            }
-                        }
-                    };
-
-                    if (uploadMode === 'card') {
-                        bakeFilter(clonedImg, currentFilter);
-                    } else if (uploadMode === 'slab') {
-                        bakeFilter(clonedSlab, currentFilter);
+                // --- 1. DRAW SLAB BACKGROUND ---
+                const slabImg = document.getElementById('slabImageOverlay');
+                if (slabImg && slabImg.naturalWidth > 0) {
+                    // Check if filters applied (Slab Mode)
+                    const slabFilter = slabImg.style.filter;
+                    if(slabFilter && slabFilter !== 'none') {
+                        ctx.save();
+                        ctx.filter = slabFilter;
+                        ctx.drawImage(slabImg, 0, 0, width, height);
+                        ctx.restore();
+                    } else {
+                        ctx.drawImage(slabImg, 0, 0, width, height);
                     }
                 }
-            }).then(canvas => {
+
+                // --- 2. DRAW USER CARD (With Filters & Masking) ---
+                // Only relevant if NOT in slab mode (userCardImage visible)
+                const cardImg = document.getElementById('userCardImage');
+                if (cardImg && !cardImg.classList.contains('hidden') && cardImg.naturalWidth > 0) {
+                    // Determine card position relative to full resolution, then SCALE
+                    // Original logic:
+                    // cardW_full = 940;
+                    // cardX_full = (1200 - 940) / 2 = 130;
+                    // ratio = height/width of actual image
+                    // cardH_full = 940 * ratio;
+                    // cardY_full = 2025 - 166 - cardH_full;
+                    
+                    const cardW = PSA_CARD_WIDTH_PX * scale;
+                    const ratio = cardImg.naturalHeight / cardImg.naturalWidth;
+                    const cardH = cardW * ratio;
+                    
+                    const cardX = ((PSA_REF_WIDTH - PSA_CARD_WIDTH_PX) / 2) * scale;
+                    // Bottom offset 166px -> scaled
+                    const cardY = height - (PSA_CARD_BOTTOM_PX * scale) - cardH;
+
+                    ctx.save();
+                    // Apply filters manually since drawImage ignores CSS filters
+                    const b = brightRange.value;
+                    const c = contrastRange.value;
+                    const s = satRange.value;
+                    ctx.filter = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
+                    
+                    ctx.drawImage(cardImg, cardX, cardY, cardW, cardH);
+                    ctx.restore();
+                }
+
+                // --- 3. DRAW GUARD OVERLAY ---
+                const guardImg = document.getElementById('guardImageOverlay');
+                if (guardImg && !guardImg.classList.contains('hidden') && guardImg.naturalWidth > 0) {
+                    // Guard geometry from CSS: width: 106.33% of container
+                    const guardW = width * 1.0633;
+                    const guardH = guardW * (guardImg.naturalHeight / guardImg.naturalWidth);
+                    
+                    // Centered
+                    const guardX = (width - guardW) / 2;
+                    const guardY = (height - guardH) / 2;
+                    
+                    ctx.drawImage(guardImg, guardX, guardY, guardW, guardH);
+                }
+
+                // --- 4. DRAW TEXT ---
+                // If there's text, draw it. 
+                // Only if NOT in slab mode (or if you want text on slab mode? usually label is hidden)
+                // Current logic hides guardLabelText in slab mode.
+                if (currentSelectionName !== 'None' && (!guardLabelText || guardLabelText.style.display !== 'none')) {
+                    const text = currentSelectionName;
+                    
+                    // Font Setup
+                    // CSS uses 3.5cqw -> 3.5% of container width.
+                    // So font size = width * 0.035
+                    const fontSize = width * 0.035; 
+                    
+                    // Wait for font before drawing text to ensure correct measurement
+                    await document.fonts.ready;
+                    
+                    ctx.font = `${fontSize}px "Univers 55", "Inter", sans-serif`;
+                    ctx.fillStyle = "#242424"; 
+                    ctx.textBaseline = "top";
+                    ctx.textAlign = "left";
+                    
+                    // We add a tiny stroke to simulate the 0.01em thickness from CSS
+                    ctx.lineWidth = fontSize * 0.01; 
+                    ctx.strokeStyle = "#242424";
+                    
+                    // Position calculations
+                    // CSS: top: 6.9%, left: 12.1%
+                    const textX = width * 0.121;
+                    const textY = height * 0.069;
+                    
+                    ctx.fillText(text, textX, textY);
+                    ctx.strokeText(text, textX, textY);
+                }
+
+                // --- 5. SAVE ---
                 const safeName = currentSelectionName.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-');
                 const filename = `${currentCompany}_${safeName}.png`;
-
-                const link = document.createElement('a'); 
-                link.download = filename; 
-                link.href = canvas.toDataURL('image/png'); 
+                
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = canvas.toDataURL('image/png');
                 link.click();
-            }).catch(err => {
-                console.error(err);
+
+            } catch (err) {
+                console.error("Save failed:", err);
                 alert("Save failed. Check console for details.");
-            });
+            }
         }
         
         window.findByCert = () => {
