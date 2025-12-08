@@ -1175,17 +1175,17 @@
             const OUTPUT_WIDTH = 604;
             const OUTPUT_HEIGHT = 1000;
             
-            // Calculate scale based on Slab Height matching the Canvas Height
-            // Slab is 1200x2102. We want it to be 1000px tall.
-            const scale = OUTPUT_HEIGHT / PSA_REF_HEIGHT;
+            // UPDATED: Specific Slab Dimensions from request
+            const SLAB_W = 568;
+            const SLAB_H = 958;
             
-            // Calculate Scaled Slab Dimensions
-            const slabW = PSA_REF_WIDTH * scale;
-            const slabH = OUTPUT_HEIGHT;
-            
-            // Center the slab horizontally in the 604px canvas
-            const slabX = (OUTPUT_WIDTH - slabW) / 2;
-            const slabY = 0;
+            // Calculate centering offsets for the slab within the canvas
+            const slabX = (OUTPUT_WIDTH - SLAB_W) / 2;
+            const slabY = (OUTPUT_HEIGHT - SLAB_H) / 2;
+
+            // Scale factors relative to original reference (1200x2102)
+            const scaleX = SLAB_W / PSA_REF_WIDTH;
+            const scaleY = SLAB_H / PSA_REF_HEIGHT;
             
             try {
                 const canvas = document.createElement('canvas');
@@ -1200,24 +1200,26 @@
                     if(slabFilter && slabFilter !== 'none') {
                         ctx.save();
                         ctx.filter = slabFilter;
-                        ctx.drawImage(slabImg, slabX, slabY, slabW, slabH);
+                        ctx.drawImage(slabImg, slabX, slabY, SLAB_W, SLAB_H);
                         ctx.restore();
                     } else {
-                        ctx.drawImage(slabImg, slabX, slabY, slabW, slabH);
+                        ctx.drawImage(slabImg, slabX, slabY, SLAB_W, SLAB_H);
                     }
                 }
 
                 // --- 2. DRAW USER CARD ---
                 const cardImg = document.getElementById('userCardImage');
                 if (cardImg && !cardImg.classList.contains('hidden') && cardImg.naturalWidth > 0) {
-                    const cardW = PSA_CARD_WIDTH_PX * scale;
+                    const cardW = PSA_CARD_WIDTH_PX * scaleX;
                     const ratio = cardImg.naturalHeight / cardImg.naturalWidth;
                     const cardH = cardW * ratio;
                     
-                    // Card is centered relative to the SLAB, so we add slabX
-                    const cardRelX = (PSA_REF_WIDTH - PSA_CARD_WIDTH_PX) / 2 * scale;
+                    // Card is centered relative to the SLAB (horizontally)
+                    const cardRelX = ((PSA_REF_WIDTH - PSA_CARD_WIDTH_PX) / 2) * scaleX;
                     const cardX = slabX + cardRelX;
-                    const cardY = slabH - (PSA_CARD_BOTTOM_PX * scale) - cardH;
+                    
+                    // Bottom offset scaled by Y height relative to slab bottom
+                    const cardY = slabY + SLAB_H - (PSA_CARD_BOTTOM_PX * scaleY) - cardH;
 
                     ctx.save();
                     const b = brightRange.value;
@@ -1233,7 +1235,7 @@
                 const guardImg = document.getElementById('guardImageOverlay');
                 if (guardImg && !guardImg.classList.contains('hidden') && guardImg.naturalWidth > 0) {
                     // Guard is 106.33% of the SLAB width
-                    const guardW = slabW * 1.0633;
+                    const guardW = SLAB_W * 1.0633; // ~604px
                     const guardH = guardW * (guardImg.naturalHeight / guardImg.naturalWidth);
                     
                     // Center guard relative to CANVAS
@@ -1248,7 +1250,7 @@
                     const text = currentSelectionName.toUpperCase();
                     
                     // Font size is relative to SLAB width (3.5%)
-                    const fontSize = slabW * 0.035; 
+                    const fontSize = SLAB_W * 0.035; 
                     
                     await document.fonts.ready;
                     
@@ -1260,14 +1262,14 @@
                     ctx.lineWidth = fontSize * 0.01; 
                     ctx.strokeStyle = "#242424";
                     
-                    // Position relative to SLAB origin (slabX)
+                    // Position relative to SLAB origin (slabX, slabY)
                     // CSS Left: 12.1% of slab
-                    // CSS Top: 6.9% of slab. Adjusted to 7.4% for perfect alignment.
-                    const textRelX = slabW * 0.121;
-                    const textRelY = slabH * 0.074;
+                    // CSS Top: 7.4% of slab
+                    const textRelX = SLAB_W * 0.121;
+                    const textRelY = SLAB_H * 0.074;
                     
                     const textX = slabX + textRelX;
-                    const textY = textRelY; // slabY is 0
+                    const textY = slabY + textRelY; 
                     
                     ctx.fillText(text, textX, textY);
                     ctx.strokeText(text, textX, textY);
