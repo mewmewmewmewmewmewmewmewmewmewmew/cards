@@ -417,8 +417,8 @@
                              class="w-full h-auto relative z-10 pointer-events-none">
 
                         <!-- LAYER 3: The CARD & UPLOAD ZONE -->
-                        <!-- UPDATED: Removed onclick, using JS listener to prevent double prompt -->
                         <div id="cardLayer" 
+                             onclick="document.getElementById('fileInput').click()"
                              class="absolute z-20 flex items-center justify-center transition-all duration-300 cursor-pointer group">
                              
                              <input type="file" id="fileInput" accept="image/*" class="hidden">
@@ -538,6 +538,7 @@
                          activeBtns.forEach(btn => {
                             btn.style.setProperty('--tw-ring-offset-color', offsetColor);
                          });
+                         // Update non-selected buttons to match background as well for hover effect
                          const allBtns = document.querySelectorAll('.guard-option-btn');
                          allBtns.forEach(btn => {
                             if(!btn.classList.contains('ring-2')) {
@@ -1166,11 +1167,6 @@
             // Enable cursor pointer
             cardLayerEl.classList.add('cursor-pointer');
             
-            // Reset sliders to default
-            brightRange.value = 100;
-            contrastRange.value = 100;
-            satRange.value = 100;
-            
             fileInput.value = ''; 
         }
         
@@ -1266,9 +1262,9 @@
                     
                     // Position relative to SLAB origin (slabX)
                     // CSS Left: 12.1% of slab
-                    // CSS Top: 6.9% of slab. Adjusted to 7.3% for perfect alignment.
+                    // CSS Top: 6.9% of slab. Adjusted to 7.4% for perfect alignment.
                     const textRelX = slabW * 0.121;
-                    const textRelY = slabH * 0.073;
+                    const textRelY = slabH * 0.074;
                     
                     const textX = slabX + textRelX;
                     const textY = textRelY; // slabY is 0
