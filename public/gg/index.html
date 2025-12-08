@@ -289,6 +289,7 @@
     </header>
 
     <!-- Main Container -->
+    <!-- UPDATED: Added lg:overflow-hidden to allow scrolling on mobile -->
     <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 lg:overflow-hidden">
         
         <!-- SIDEBAR REOPEN BUTTON -->
@@ -417,7 +418,7 @@
                              class="w-full h-auto relative z-10 pointer-events-none">
 
                         <!-- LAYER 3: The CARD & UPLOAD ZONE -->
-                        <!-- FIXED: Removed inline onclick to prevent double file prompt (handled by JS now) -->
+                        <!-- UPDATED: Removed cursor-pointer if image loaded -->
                         <div id="cardLayer" 
                              class="absolute z-20 flex items-center justify-center transition-all duration-300 cursor-pointer group">
                              
@@ -474,8 +475,8 @@
     </main>
 
     <!-- Crop Modal -->
-    <!-- UPDATED: Close Button outside (fixed position). Header removed. Footer reorganized. -->
-    <div id="cropModal" class="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+    <!-- UPDATED: Changed bg-black/50 to bg-black/70 for 70% opacity -->
+    <div id="cropModal" class="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
         
         <!-- External Close Button -->
         <button onclick="closeModal()" class="fixed top-6 right-6 z-[110] text-white hover:text-gray-300 transition-colors">
@@ -483,6 +484,21 @@
         </button>
 
         <div class="bg-white dark:bg-slate-900 rounded-2xl w-[90vw] h-[85vh] max-w-7xl shadow-2xl overflow-hidden flex flex-col relative">
+            
+            <!-- HEADER with Title and Toggle -->
+            <div class="flex-none p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center relative z-20 bg-white dark:bg-slate-900 rounded-t-2xl">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                     <h3 class="font-bold text-slate-900 dark:text-white">Adjust Image</h3>
+                     
+                     <!-- TOGGLE CONTROLS IN HEADER -->
+                     <div class="segmented-control bg-slate-100 dark:bg-slate-800 mb-0">
+                         <!-- Simplified Labels -->
+                         <div id="modalModeCardBtn" class="segmented-btn active px-3 py-1 text-xs" onclick="setUploadModeInModal('card')">Card</div>
+                         <div id="modalModeSlabBtn" class="segmented-btn px-3 py-1 text-xs" onclick="setUploadModeInModal('slab')">Slab</div>
+                     </div>
+                </div>
+                <!-- Optional close inside modal removed since we have the floating one -->
+            </div>
             
             <!-- Image Area (Full Height now minus footer) -->
             <!-- UPDATED: Added p-6 padding to ensure image container symmetry -->
@@ -493,20 +509,11 @@
                  </div>
             </div>
 
-            <!-- Footer: Toggle Left, Buttons Right -->
-            <div class="flex-none p-4 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-900 relative z-20">
-                
-                <!-- Toggle (Moved to footer) -->
-                <div class="segmented-control bg-slate-100 dark:bg-slate-800 mb-0">
-                     <div id="modalModeCardBtn" class="segmented-btn active px-4 py-1.5 text-xs" onclick="setUploadModeInModal('card')">Card</div>
-                     <div id="modalModeSlabBtn" class="segmented-btn px-4 py-1.5 text-xs" onclick="setUploadModeInModal('slab')">Slab</div>
-                </div>
-
-                <div class="flex gap-3">
-                    <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-                    <!-- UPDATED: Removed bold, using font-medium. Baby Blue bg. -->
-                    <button onclick="applyCrop()" class="px-6 py-2 rounded-lg text-sm font-medium bg-[#7dd3fc] text-slate-900 hover:bg-[#7dd3fc]/80 shadow-lg transition-all">Apply Card</button>
-                </div>
+            <!-- Footer: Buttons Right -->
+            <div class="flex-none p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-white dark:bg-slate-900 rounded-b-2xl relative z-20">
+                <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                <!-- UPDATED: Removed bold, using font-medium. Baby Blue bg. -->
+                <button onclick="applyCrop()" class="px-6 py-2 rounded-lg text-sm font-medium bg-[#7dd3fc] text-slate-900 hover:bg-[#7dd3fc]/80 shadow-lg transition-all">Apply Card</button>
             </div>
         </div>
     </div>
@@ -538,7 +545,6 @@
                          activeBtns.forEach(btn => {
                             btn.style.setProperty('--tw-ring-offset-color', offsetColor);
                          });
-                         // Update non-selected buttons to match background as well for hover effect
                          const allBtns = document.querySelectorAll('.guard-option-btn');
                          allBtns.forEach(btn => {
                             if(!btn.classList.contains('ring-2')) {
@@ -583,7 +589,7 @@
         const contrastRange = document.getElementById('contrastRange');
         const satRange = document.getElementById('satRange');
 
-        // Toggle Buttons
+        // Modal Toggle Buttons
         const modalModeCardBtn = document.getElementById('modalModeCardBtn');
         const modalModeSlabBtn = document.getElementById('modalModeSlabBtn');
 
@@ -642,7 +648,7 @@
         let uploadMode = 'card'; // 'card' or 'slab'
         let isImageLoaded = false;
 
-        // FALLBACK DATA
+        // FALLBACK DATA (Added Set property for testing)
         const FALLBACK_OPTIONS = [
              { Grader: 'PSA', Name: 'Fuschia', 'Color 1': '#be81a1', 'Color 2': '#5c4065', 'Color 3': '', Highlight: '#f0abfc', Image: 'GG_PSA_Fuschia.png', Set: 'Limited' },
              { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png', Set: 'Standard' }
@@ -1001,7 +1007,7 @@
             
             if (imageUrl) {
                 guardImg.src = imageUrl;
-                if (btnPsa && btnPsa.classList.contains('active-company')) {
+                if (document.getElementById('btn-psa').classList.contains('active-company')) {
                     guardImg.classList.remove('hidden');
                 }
             }
@@ -1302,18 +1308,10 @@
             const b = brightRange.value;
             const c = contrastRange.value;
             const s = satRange.value;
-            const filterVal = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
-            
-            if (uploadMode === 'card') {
-                 // Card Mode: Filter inner card, reset slab
-                if(userCardImage) userCardImage.style.filter = filterVal;
-                if(slabImageOverlay) slabImageOverlay.style.filter = 'none';
-            } else {
-                // Slab Mode: Filter slab background
-                if(slabImageOverlay) slabImageOverlay.style.filter = filterVal;
-                // Ensure card doesn't have residual filters
-                if(userCardImage) userCardImage.style.filter = 'none';
-            }
+            // Only apply filters to the inner card. 
+            // If user wants to filter the whole slab in slab mode, logic would need to target slabImageOverlay
+            // but requirement was "Adjust Card"
+            userCardImage.style.filter = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
         }
 
         [brightRange, contrastRange, satRange].forEach(el => el.addEventListener('input', updateFilters));
