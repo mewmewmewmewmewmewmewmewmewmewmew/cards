@@ -262,7 +262,8 @@
         }
     </style>
 </head>
-<body class="h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300 overflow-hidden">
+<!-- UPDATED: Replaced h-screen with min-h-screen and removed global overflow-hidden -->
+<body class="min-h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300 lg:h-screen lg:overflow-hidden overflow-y-auto">
 
     <!-- Loading Screen -->
     <div id="loading-screen">
@@ -289,7 +290,8 @@
     </header>
 
     <!-- Main Container -->
-    <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 overflow-hidden">
+    <!-- UPDATED: Added lg:overflow-hidden to allow scrolling on mobile -->
+    <main class="w-full flex-1 relative flex flex-col px-4 lg:px-0 pb-6 lg:overflow-hidden">
         
         <!-- SIDEBAR REOPEN BUTTON -->
         <button id="sidebar-open-btn" onclick="toggleSidebar()" class="hidden absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-white dark:bg-slate-800 p-3 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-400 dark:hover:text-sky-300 transition-all hover:scale-110 group" title="Open Controls">
@@ -338,7 +340,7 @@
                 <input type="hidden" id="customColorInput" value="#d946ef">
             </div>
 
-            <!-- 3. Adjust Card (Renumbered) -->
+            <!-- 3. Adjust Card -->
             <div>
                 <div class="flex justify-between items-center mb-2">
                     <label class="block text-sm font-semibold text-slate-700 uppercase tracking-wider mb-0">3. Adjust Card</label>
@@ -368,7 +370,6 @@
 
             <!-- Actions (No Label) -->
             <div>
-                <!-- Removed '5. Actions' Label -->
                 <div class="grid grid-cols-3 gap-2">
                     <button type="button" onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
@@ -418,7 +419,6 @@
                              class="w-full h-auto relative z-10 pointer-events-none">
 
                         <!-- LAYER 3: The CARD & UPLOAD ZONE -->
-                        <!-- UPDATED: Removed cursor-pointer if image loaded -->
                         <div id="cardLayer" 
                              class="absolute z-20 flex items-center justify-center transition-all duration-300 cursor-pointer group">
                              
@@ -476,7 +476,6 @@
 
     <!-- Crop Modal -->
     <div id="cropModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
-        <!-- UPDATED: Increased width to 90vw and height to 85vh for a much larger workspace -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl w-[90vw] h-[85vh] max-w-7xl shadow-2xl overflow-hidden flex flex-col relative">
             
             <!-- HEADER with Title and Close -->
@@ -611,7 +610,6 @@
         
         function updateLoader() {
             loadedCount++;
-            // Prevent divide by zero if resourcesToLoad is empty
             const total = resourcesToLoad.length || 1; 
             const percentage = Math.round((loadedCount / total) * 100);
             
@@ -635,7 +633,7 @@
         let uploadMode = 'card'; // 'card' or 'slab'
         let isImageLoaded = false;
 
-        // FALLBACK DATA (Added Set property for testing)
+        // FALLBACK DATA
         const FALLBACK_OPTIONS = [
              { Grader: 'PSA', Name: 'Fuschia', 'Color 1': '#be81a1', 'Color 2': '#5c4065', 'Color 3': '', Highlight: '#f0abfc', Image: 'GG_PSA_Fuschia.png', Set: 'Limited' },
              { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png', Set: 'Standard' }
@@ -697,16 +695,12 @@
                 allGuardOptions = FALLBACK_OPTIONS;
             }
             
-            // START PRELOADING HERE
-            // 1. Collect all image URLs from the data options
             const dynamicImages = allGuardOptions
                 .map(opt => opt.Image ? `https://mew.cards/gg/img/${opt.Image}` : null)
                 .filter(url => url !== null);
 
-            // 2. Combine with base assets and deduplicate
             resourcesToLoad = [...new Set([...BASE_ASSETS, ...dynamicImages])];
             
-            // 3. Start loading them
             if (resourcesToLoad.length > 0) {
                 resourcesToLoad.forEach(url => {
                     const img = new Image();
@@ -715,10 +709,9 @@
                     img.src = url;
                 });
             } else {
-                updateLoader(); // Force load if empty
+                updateLoader();
             }
 
-            // Initialize App UI
             setCompany('psa'); 
         }
 
@@ -731,7 +724,6 @@
                 return;
             }
 
-            // GROUPING LOGIC
             const setsMap = new Map(); 
             options.forEach(opt => {
                 const setName = opt.Set || 'Standard'; 
@@ -745,28 +737,23 @@
             const offsetColor = isDark ? '#27272a' : '#ffffff';
 
             setsMap.forEach((groupOptions, setName) => {
-                // Create Group Container
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'w-full mb-2';
                 
-                // Create Header
                 const header = document.createElement('h3');
                 header.className = 'text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 dark:border-slate-700 pb-1';
                 header.textContent = setName;
                 groupDiv.appendChild(header);
                 
-                // Create Button Grid
                 const grid = document.createElement('div');
                 grid.className = 'flex flex-wrap gap-3';
                 
                 groupOptions.forEach((opt, index) => {
                     const btn = document.createElement('button');
-                    // Use a unique ID based on set and name to avoid conflicts
                     const safeName = opt.Name ? opt.Name.replace(/\s+/g, '-').toLowerCase() : `opt-${index}`;
                     btn.id = `btn-${safeName}`;
                     btn.title = opt.Name || 'Unknown';
                     
-                    // Button Base Style
                     btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 hover:ring-2 transition-all duration-200 ring-offset-2 focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700`;
                     
                     const c1 = normalizeHex(opt['Color 1']);
@@ -792,7 +779,6 @@
                     sheen.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
                     btn.appendChild(sheen);
                     
-                    // Border Overlay
                     const borderOverlay = document.createElement('div');
                     borderOverlay.className = 'absolute inset-0 rounded-full border border-black/10 dark:border-white/10 pointer-events-none';
                     btn.appendChild(borderOverlay);
@@ -938,7 +924,7 @@
             
             // Re-initialize cropper with new aspect ratio logic
             const imgEl = document.getElementById('imageToCrop');
-            if (imgEl && imgEl.src) {
+            if (imgEl && imgEl.src && imgEl.naturalWidth > 0) {
                 if(cropper) cropper.destroy();
                 let aspectRatio = (63.5 / 88.9);
                 if (uploadMode === 'slab') {
@@ -994,7 +980,7 @@
             
             if (imageUrl) {
                 guardImg.src = imageUrl;
-                if (document.getElementById('btn-psa').classList.contains('active-company')) {
+                if (btnPsa && btnPsa.classList.contains('active-company')) {
                     guardImg.classList.remove('hidden');
                 }
             }
@@ -1058,6 +1044,7 @@
                         
                         // Use img.onload to ensure image dimensions are ready before initializing cropper
                         imgEl.onload = () => {
+                            if(cropper) cropper.destroy(); // Safety check
                             // Initial cropper (Card Mode default)
                             cropper = new Cropper(imgEl, { 
                                 viewMode: 1, 
@@ -1076,7 +1063,6 @@
 
         window.closeModal = function() { cropModal.classList.add('hidden'); cropModal.classList.remove('flex'); if (cropper) { cropper.destroy(); cropper = null; } fileInput.value = ''; }
         
-        // UPDATED: Restored the full logic to handle Card vs Slab modes
         window.applyCrop = function() {
             if (cropper) {
                 // If Card Mode: Limit size to save resources. If Slab Mode: Need high res for background.
@@ -1085,12 +1071,7 @@
                 
                 const cvs = cropper.getCroppedCanvas({ maxWidth: maxWidth, maxHeight: maxHeight, fillColor: '#fff' });
                 
-                // Get elements to update
-                const userCardImage = document.getElementById('userCardImage');
-                const slabImageOverlay = document.getElementById('slabImageOverlay');
-                const cardPlaceholder = document.getElementById('cardPlaceholder');
-                const guardLabelText = document.getElementById('guardLabelText');
-                const cardLayerEl = document.getElementById('cardLayer');
+                if(!cvs) return; // Prevent crash if canvas not generated
 
                 if (uploadMode === 'card') {
                     // --- CARD MODE LOGIC (Round Corners) ---
@@ -1100,7 +1081,10 @@
                     const ctx = rounded.getContext('2d'); 
                     const r = (cvs.width / 63.5) * 3;
                     
-                    ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(rounded.width-r, 0); ctx.quadraticCurveTo(rounded.width, 0, rounded.width, r); ctx.lineTo(rounded.width, rounded.height-r); ctx.quadraticCurveTo(rounded.width, rounded.height, rounded.width-r, rounded.height); ctx.lineTo(r, rounded.height); ctx.quadraticCurveTo(0, rounded.height, 0, rounded.height-r); ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.closePath(); ctx.clip(); ctx.drawImage(cvs, 0, 0);
+                    ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(rounded.width-r, 0); ctx.quadraticCurveTo(rounded.width, 0, rounded.width, r); ctx.lineTo(rounded.width, rounded.height-r); ctx.quadraticCurveTo(rounded.width, rounded.height, rounded.width-r, rounded.height); ctx.lineTo(r, rounded.height); ctx.quadraticCurveTo(0, rounded.height, 0, rounded.height-r); ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.closePath(); ctx.clip(); 
+                    
+                    // FIXED: Removed incorrect 4th argument (0) which made image invisible
+                    ctx.drawImage(cvs, 0, 0);
                     
                     userCardImage.src = rounded.toDataURL('image/png'); 
                     userCardImage.classList.remove('hidden'); 
