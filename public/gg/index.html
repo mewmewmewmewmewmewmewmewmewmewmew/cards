@@ -772,11 +772,16 @@
                 const grid = document.createElement('div');
                 grid.className = 'flex flex-wrap gap-3';
                 
+                // Sanitize set name for ID usage
+                const safeSetName = setName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+
                 groupOptions.forEach((opt, index) => {
                     const btn = document.createElement('button');
-                    // Use a unique ID based on set and name to avoid conflicts
-                    const safeName = opt.Name ? opt.Name.replace(/\s+/g, '-').toLowerCase() : `opt-${index}`;
-                    btn.id = `btn-${safeName}`;
+                    
+                    // FIXED: Generate Unique ID to prevent conflicts with duplicate names
+                    const safeName = opt.Name ? opt.Name.replace(/[^a-z0-9]/gi, '-').toLowerCase() : `opt`;
+                    btn.id = `btn-${safeSetName}-${safeName}-${index}`;
+                    
                     btn.title = opt.Name || 'Unknown';
                     
                     // Button Base Style
