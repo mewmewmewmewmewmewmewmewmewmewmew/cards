@@ -645,7 +645,8 @@
         // FALLBACK DATA (Added Set property for testing)
         const FALLBACK_OPTIONS = [
              { Grader: 'PSA', Name: 'Fuschia', 'Color 1': '#be81a1', 'Color 2': '#5c4065', 'Color 3': '', Highlight: '#f0abfc', Image: 'GG_PSA_Fuschia.png', Set: 'Limited' },
-             { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png', Set: 'Standard' }
+             { Grader: 'PSA', Name: 'Eclipse', 'Color 1': '#ffffff', 'Color 2': '#000000', 'Color 3': '', Highlight: '#94a3b8', Image: 'GG_PSA_Eclipse.png', Set: 'Standard' },
+             { Grader: 'PSA', Name: 'Glitter Test', 'Color 1': '#222', 'Color 2': '#000', 'Glitter': '#FFD700', Highlight: '#FFD700', Image: '', Set: 'Special' }
         ];
 
         function parseCSV(csv) {
@@ -814,6 +815,50 @@
                     
                     btn.style.setProperty('--tw-ring-color', highlight);
                     btn.style.setProperty('--tw-ring-offset-color', offsetColor);
+
+                    // --- GLITTER EFFECT ---
+                    if (opt.Glitter) {
+                        const glitterColor = normalizeHex(opt.Glitter);
+                        const glitterContainer = document.createElement('div');
+                        glitterContainer.className = 'absolute inset-0 pointer-events-none z-10';
+                        
+                        // Create randomized diamonds
+                        // "Double the number" and "Half as random": Using a 4x4 grid (16 particles) ensures even distribution
+                        const particleCount = 16; 
+                        
+                        for (let i = 0; i < particleCount; i++) {
+                            const diamond = document.createElement('div');
+                            // "Make them smaller": Random size between 1px and 2.5px
+                            const size = Math.random() * 1.5 + 1; 
+                            
+                            // Jittered Grid Logic:
+                            // Divide button into 4x4 grid. Place one diamond in each cell with random offset.
+                            const col = i % 4;
+                            const row = Math.floor(i / 4);
+                            
+                            // Each cell is 25% wide. We allow jitter within that cell.
+                            // Adding slight padding (2%) so they don't sit exactly on the grid lines
+                            const leftPos = (col * 25) + Math.random() * 20 + 2; 
+                            const topPos = (row * 25) + Math.random() * 20 + 2;
+
+                            Object.assign(diamond.style, {
+                                width: `${size}px`,
+                                height: `${size}px`,
+                                backgroundColor: glitterColor,
+                                position: 'absolute',
+                                left: `${leftPos}%`, 
+                                top: `${topPos}%`,
+                                transform: 'translate(-50%, -50%) rotate(45deg)', // Diamond shape
+                                opacity: Math.random() * 0.6 + 0.4, // Opacity between 0.4 and 1.0
+                                boxShadow: `0 0 1px ${glitterColor}` // Slight glow
+                            });
+                            
+                            glitterContainer.appendChild(diamond);
+                        }
+                        
+                        btn.appendChild(glitterContainer);
+                    }
+                    // ----------------------
 
                     const imgUrl = opt.Image ? `https://mew.cards/gg/img/${opt.Image}` : '';
                     
