@@ -1230,13 +1230,28 @@
         }
         
         window.downloadPreview = async function() {
-            // UPDATED: Fixed Output Dimensions to 1000x609
+            // UPDATED: Fixed Output Width to 609
             const OUTPUT_WIDTH = 609;
-            const OUTPUT_HEIGHT = 1000;
             
             // UPDATED: Specific Slab Dimensions from request
             const SLAB_W = 568;
             const SLAB_H = 958;
+            
+            // Check for guard to adjust height dynamically
+            const guardImg = document.getElementById('guardImageOverlay');
+            const hasGuard = guardImg && !guardImg.classList.contains('hidden') && guardImg.naturalWidth > 0;
+            
+            let OUTPUT_HEIGHT = 1000; // Default minimum height
+            
+            if (hasGuard) {
+                // Guard is 107.22% of the SLAB width
+                const guardW = SLAB_W * 1.0722; 
+                const guardH = guardW * (guardImg.naturalHeight / guardImg.naturalWidth);
+                // If guard is taller than default, expand canvas to fit
+                if (guardH > OUTPUT_HEIGHT) {
+                    OUTPUT_HEIGHT = Math.ceil(guardH);
+                }
+            }
             
             // Calculate centering offsets for the slab within the canvas
             const slabX = (OUTPUT_WIDTH - SLAB_W) / 2;
@@ -1291,10 +1306,9 @@
                 }
 
                 // --- 3. DRAW GUARD OVERLAY ---
-                const guardImg = document.getElementById('guardImageOverlay');
-                if (guardImg && !guardImg.classList.contains('hidden') && guardImg.naturalWidth > 0) {
-                    // Guard is 107.22% of the SLAB width (609/568)
-                    const guardW = SLAB_W * 1.0722; // ~609px
+                if (hasGuard) {
+                    // Recalculate dimensions for drawing (same logic as above)
+                    const guardW = SLAB_W * 1.0722; 
                     const guardH = guardW * (guardImg.naturalHeight / guardImg.naturalWidth);
                     
                     // Center guard relative to CANVAS
