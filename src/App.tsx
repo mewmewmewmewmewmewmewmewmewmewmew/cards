@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "13.5";
+const APP_VERSION = "13.6";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -603,6 +603,7 @@ export default function PokeCardGallery() {
     return (
       <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
         <div className="relative h-28 w-28">
+          <div className="loading-swirl absolute inset-0" aria-hidden="true" />
           <img
             src="https://mew.cards/img/logo.png"
             alt="Loading..."
@@ -618,6 +619,28 @@ export default function PokeCardGallery() {
           />
         </div>
         <div className="h-16" />
+        <style>{`
+          @keyframes swirl {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          .loading-swirl {
+            background: radial-gradient(circle at 30% 30%, rgba(255, 209, 221, 0.85), rgba(203, 151, 165, 0.35) 45%, rgba(16, 16, 16, 0) 70%);
+            background-size: 200% 200%;
+            opacity: 0.8;
+            filter: blur(6px);
+            animation: swirl 5s linear infinite;
+            mask-image: url("https://mew.cards/img/logo.png");
+            mask-size: contain;
+            mask-repeat: no-repeat;
+            mask-position: center;
+            -webkit-mask-image: url("https://mew.cards/img/logo.png");
+            -webkit-mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+          }
+        `}</style>
       </div>
     );
   }
