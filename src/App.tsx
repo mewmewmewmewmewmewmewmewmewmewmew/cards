@@ -388,8 +388,8 @@ export default function PokeCardGallery() {
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [statsTab, setStatsTab] = useState<"total" | "details">("total");
-  const [showPSA10, setShowPSA10] = useState(true);
-  const [showPSA19, setShowPSA19] = useState(true);
+  const [showPSA10, setShowPSA10] = useState(false);
+  const [showPSA19, setShowPSA19] = useState(false);
   const [showNeed, setShowNeed] = useState(true);
   const [mew, setMew] = useState(true);
   const [cameo, setCameo] = useState(false);
@@ -687,7 +687,7 @@ export default function PokeCardGallery() {
         type="button"
         onClick={() => setShowStats(true)}
         aria-label="Open owned card stats"
-        className="fixed bottom-4 left-4 z-40 p-1.5 focus:outline-none focus:ring-2 focus:ring-[#cb97a5]"
+        className="fixed bottom-4 left-4 z-40 p-1.5 focus:outline-none"
       >
         <img
           src="https://mew.cards/img/logo.png"
@@ -800,15 +800,8 @@ const StatsModal: React.FC<{
 }) => (
   <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
-      <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
       <div className="flex h-full flex-col px-5 pb-6 pt-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-100">Owned stats</h2>
-            <p className="mt-1 text-sm text-gray-400">PSA10 progress by category</p>
-          </div>
           <div className="flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
             <button
               type="button"
@@ -849,21 +842,8 @@ const StatsModal: React.FC<{
                   <div className="mt-2 text-[11px] text-gray-400">
                     Total cards: {section.total} · PSA10 progress: {progressText}
                   </div>
-                  {section.total === 0 ? (
+                  {section.total === 0 && (
                     <div className="mt-3 text-xs text-gray-500">No cards loaded yet.</div>
-                  ) : (
-                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-                      <div className="rounded-lg border border-[#2a2a2a] bg-[#101010] px-2 py-1">
-                        <div className="text-[10px] text-gray-500">RAW</div>
-                        <div className="text-sm font-semibold text-gray-200">{section.raw}</div>
-                      </div>
-                      {section.lower.map((item) => (
-                        <div key={`${section.key}-${item.grade}`} className="rounded-lg border border-[#2a2a2a] bg-[#101010] px-2 py-1">
-                          <div className="text-[10px] text-gray-500">{item.grade}</div>
-                          <div className="text-sm font-semibold text-gray-200">{item.count}</div>
-                        </div>
-                      ))}
-                    </div>
                   )}
                 </div>
               );
@@ -958,8 +938,9 @@ const StatsList: React.FC<{
                     <button
                       type="button"
                       onClick={() => onSelectCard(card)}
-                      className="flex w-full items-center gap-2 text-left text-[11px] text-gray-300 hover:text-gray-100"
+                      className="grid w-full grid-cols-[52px_44px_64px_1fr] items-center gap-2 text-left text-[11px] text-gray-300 hover:text-gray-100"
                     >
+                      <span className="text-[10px] font-semibold text-gray-500">{card.pc || ""}</span>
                       <span className="text-gray-500">{card.year || "—"}</span>
                       <span className="text-gray-500">{card.number || "—"}</span>
                       <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
