@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "17.4";
+const APP_VERSION = "17.5";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -854,7 +854,7 @@ const StatsModal: React.FC<{
           </div>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:flex-1 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] sm:overflow-hidden">
-          <div className="stats-scroll stats-scroll-edge rounded-2xl border border-[#2a2a2a] bg-[#141414] overflow-hidden pr-1 sm:min-h-0 sm:overflow-y-auto">
+          <div className="stats-scroll stats-scroll-edge rounded-l-2xl rounded-r-none border border-[#2a2a2a] bg-[#141414] overflow-hidden pr-1 sm:min-h-0 sm:overflow-y-auto">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
                 <StatsList
@@ -926,12 +926,11 @@ const StatsModal: React.FC<{
           background: rgba(203, 151, 165, 0.7);
         }
         .progress-hatch {
-          background-size: 14px 14px;
-          animation: hatchMove 2.2s linear infinite;
+          animation: hatchMove 3s linear infinite;
         }
         @keyframes hatchMove {
           from { background-position: 0 0; }
-          to { background-position: 14px 0; }
+          to { background-position: 12px 0; }
         }
       `}</style>
     </div>
