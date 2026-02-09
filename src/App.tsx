@@ -387,10 +387,6 @@ export default function PokeCardGallery() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
-  const [statsTab, setStatsTab] = useState<"total" | "details">("total");
-  const [showPSA10, setShowPSA10] = useState(false);
-  const [showPSA19, setShowPSA19] = useState(false);
-  const [showNeed, setShowNeed] = useState(true);
   const [mew, setMew] = useState(true);
   const [cameo, setCameo] = useState(false);
   const [intl, setIntl] = useState(false);
@@ -548,29 +544,10 @@ export default function PokeCardGallery() {
   const filtered = useMemo(() => applyFilters(sourceCards, { q, mew, cameo, intl, sortBy: releaseSortDesc ? "releaseDesc" : "releaseAsc" }), [q, mew, cameo, intl, sourceCards, releaseSortDesc]);
 
   const ownedStats = useMemo(() => {
-    const categories = [
-      { key: "mew", label: "Japanese", flag: "isMew" as const },
-      { key: "cameo", label: "Cameo", flag: "isCameo" as const },
-      { key: "intl", label: "Unique", flag: "isIntl" as const },
-    ];
-
-    const build = (cards: PokeCard[]) => {
-      const owned = cards.filter((card) => card.pc);
-      const total = cards.length;
-      const psa10Cards = cards.filter((card) => card.pc === "PSA10");
-      const psa10 = psa10Cards.length;
-      const raw = owned.filter((card) => card.pc === "RAW").length;
-      const lowerGrades = Array.from({ length: 9 }, (_, i) => `PSA${i + 1}`);
-      const psa19Cards = cards.filter((card) => lowerGrades.includes(card.pc || ""));
-      const lower = lowerGrades.map((grade) => ({ grade, count: owned.filter((card) => card.pc === grade).length }));
-      const needCards = cards.filter((card) => card.pc !== "PSA10");
-      return { total, psa10, raw, lower, psa10Cards, psa19Cards, needCards };
-    };
-
-    return categories.map((category) => {
-      const cards = sourceCards.filter((card) => card[category.flag]);
-      return { ...category, ...build(cards) };
-    });
+    const total = sourceCards.length;
+    const psa10Cards = sourceCards.filter((card) => card.pc === "PSA10");
+    const psa10 = psa10Cards.length;
+    return { total, psa10, psa10Cards, allCards: sourceCards };
   }, [sourceCards]);
 
   const handlePasswordSubmit = (submittedPassword: string) => {
@@ -703,14 +680,6 @@ export default function PokeCardGallery() {
             setSelected(card);
             setShowStats(false);
           }}
-          statsTab={statsTab}
-          setStatsTab={setStatsTab}
-          showPSA10={showPSA10}
-          setShowPSA10={setShowPSA10}
-          showPSA19={showPSA19}
-          setShowPSA19={setShowPSA19}
-          showNeed={showNeed}
-          setShowNeed={setShowNeed}
         />
       )}
       {selected && <DetailModal card={selected} onClose={() => setSelected(null)} language={language} setLanguage={setLanguage} />}
@@ -765,144 +734,45 @@ const EmptyState: React.FC = () => (
 
 const StatsModal: React.FC<{
   onClose: () => void;
-  stats: Array<{
-    key: string;
-    label: string;
+  stats: {
     total: number;
     psa10: number;
-    raw: number;
-    lower: Array<{ grade: string; count: number }>;
     psa10Cards: PokeCard[];
-    psa19Cards: PokeCard[];
-    needCards: PokeCard[];
-  }>;
+    allCards: PokeCard[];
+  };
   onSelectCard: (card: PokeCard) => void;
-  statsTab: "total" | "details";
-  setStatsTab: React.Dispatch<React.SetStateAction<"total" | "details">>;
-  showPSA10: boolean;
-  setShowPSA10: React.Dispatch<React.SetStateAction<boolean>>;
-  showPSA19: boolean;
-  setShowPSA19: React.Dispatch<React.SetStateAction<boolean>>;
-  showNeed: boolean;
-  setShowNeed: React.Dispatch<React.SetStateAction<boolean>>;
 }> = ({
   onClose,
   stats,
   onSelectCard,
-  statsTab,
-  setStatsTab,
-  showPSA10,
-  setShowPSA10,
-  showPSA19,
-  setShowPSA19,
-  showNeed,
-  setShowNeed,
 }) => (
   <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
       <div className="flex h-full flex-col px-5 pb-6 pt-6 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
-            <button
-              type="button"
-              onClick={() => setStatsTab("total")}
-              className={classNames(
-                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-                statsTab === "total" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
-              )}
-            >
-              Total
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatsTab("details")}
-              className={classNames(
-                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-                statsTab === "details" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
-              )}
-            >
-              Details
-            </button>
+        <div className="space-y-4 overflow-y-auto pr-1">
+          <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-gray-200">Total</div>
+              <div className="text-[11px] text-gray-400">PSA10 {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}</div>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#262626]">
+              <div
+                className="h-full bg-[#cb97a5] transition-all"
+                style={{ width: `${stats.total ? Math.round((stats.psa10 / stats.total) * 100) : 0}%` }}
+              />
+            </div>
+            <div className="mt-2 text-[11px] text-gray-400">
+              Total cards: {stats.total} · PSA10 progress: {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}
+            </div>
+            {stats.total === 0 && (
+              <div className="mt-3 text-xs text-gray-500">No cards loaded yet.</div>
+            )}
           </div>
+          <StatsList title="Details" sections={[{ key: "all", label: "All cards", cards: stats.allCards }]} onSelectCard={onSelectCard} />
         </div>
-        {statsTab === "total" ? (
-          <div className="mt-5 space-y-4 overflow-y-auto pr-1">
-            {stats.map((section) => {
-              const percent = section.total ? Math.round((section.psa10 / section.total) * 100) : 0;
-              const progressText = section.total ? `${section.psa10}/${section.total}` : "0/0";
-              return (
-                <div key={section.key} className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-gray-200">{section.label}</div>
-                    <div className="text-[11px] text-gray-400">PSA10 {progressText}</div>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#262626]">
-                    <div className="h-full bg-[#cb97a5] transition-all" style={{ width: `${percent}%` }} />
-                  </div>
-                  <div className="mt-2 text-[11px] text-gray-400">
-                    Total cards: {section.total} · PSA10 progress: {progressText}
-                  </div>
-                  {section.total === 0 && (
-                    <div className="mt-3 text-xs text-gray-500">No cards loaded yet.</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="mt-5 flex flex-1 flex-col overflow-hidden">
-            <div className="flex flex-wrap gap-2">
-              <TogglePill label="PSA10" active={showPSA10} onClick={() => setShowPSA10((v) => !v)} />
-              <TogglePill label="PSA1-9" active={showPSA19} onClick={() => setShowPSA19((v) => !v)} />
-              <TogglePill label="Need" active={showNeed} onClick={() => setShowNeed((v) => !v)} />
-            </div>
-            <div className="mt-4 flex-1 space-y-4 overflow-y-auto pr-1">
-              {showPSA10 && (
-                <StatsList title="PSA10" sections={stats.map((section) => ({
-                  key: section.key,
-                  label: section.label,
-                  cards: section.psa10Cards,
-                }))} onSelectCard={onSelectCard} />
-              )}
-              {showPSA19 && (
-                <StatsList title="PSA1-9" sections={stats.map((section) => ({
-                  key: section.key,
-                  label: section.label,
-                  cards: section.psa19Cards,
-                }))} onSelectCard={onSelectCard} />
-              )}
-              {showNeed && (
-                <StatsList title="Need" sections={stats.map((section) => ({
-                  key: section.key,
-                  label: section.label,
-                  cards: section.needCards,
-                }))} onSelectCard={onSelectCard} />
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   </div>
-);
-
-const TogglePill: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={classNames(
-      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-      active ? "border-[#cb97a5] bg-[#cb97a5]/15 text-[#cb97a5]" : "border-[#2a2a2a] text-gray-400 hover:text-gray-200"
-    )}
-    aria-pressed={active}
-  >
-    <span className={classNames("flex h-3 w-3 items-center justify-center rounded border", active ? "border-[#cb97a5]" : "border-[#3a3a3a]")}>
-      {active && (
-        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-      )}
-    </span>
-    {label}
-  </button>
 );
 
 const StatsList: React.FC<{
