@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "17.1";
+const APP_VERSION = "17.2";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -785,7 +785,7 @@ const StatsModal: React.FC<{
 }) => (
   <div className="fixed inset-0 z-[900] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl h-[100dvh] overflow-hidden rounded-none sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
-      <div className="flex h-full max-h-[100dvh] flex-col overflow-y-auto px-5 pb-6 pt-2 sm:h-full sm:max-h-none sm:overflow-hidden sm:px-6 sm:pt-6">
+      <div className="stats-scroll flex h-full max-h-[100dvh] flex-col overflow-y-auto px-5 pb-6 pt-2 sm:h-full sm:max-h-none sm:overflow-hidden sm:px-6 sm:pt-6">
         <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[11px] text-gray-100">PSA10 {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}</div>
@@ -854,7 +854,7 @@ const StatsModal: React.FC<{
           </div>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:flex-1 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] sm:overflow-hidden">
-          <div className="pr-1 sm:min-h-0 sm:overflow-y-auto">
+          <div className="stats-scroll pr-1 sm:min-h-0 sm:overflow-y-auto">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
                 <StatsList
@@ -898,6 +898,26 @@ const StatsModal: React.FC<{
           Back to list
         </button>
       </div>
+      <style>{`
+        .stats-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(203, 151, 165, 0.45) rgba(20, 20, 20, 0.9);
+        }
+        .stats-scroll::-webkit-scrollbar {
+          width: 8px;
+        }
+        .stats-scroll::-webkit-scrollbar-track {
+          background: rgba(20, 20, 20, 0.9);
+        }
+        .stats-scroll::-webkit-scrollbar-thumb {
+          background: rgba(203, 151, 165, 0.45);
+          border-radius: 999px;
+          border: 2px solid rgba(20, 20, 20, 0.9);
+        }
+        .stats-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(203, 151, 165, 0.7);
+        }
+      `}</style>
     </div>
   </div>
 );
@@ -967,7 +987,7 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
     {!card ? (
       <div className="text-[11px] text-gray-500">Select a card to preview.</div>
     ) : (
-      <div className="space-y-3">
+      <div className="stats-scroll h-full overflow-y-auto pr-2 space-y-3">
         <button
           type="button"
           onClick={() => onOpenCard(card)}
