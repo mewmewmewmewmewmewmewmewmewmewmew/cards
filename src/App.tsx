@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "15.4";
+const APP_VERSION = "15.5";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -408,6 +408,7 @@ export default function PokeCardGallery() {
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [password, setPassword] = useState("");
   const [swirlEpoch] = useState(() => Date.now());
+  const swirlDelay = useMemo(() => -((Date.now() - swirlEpoch) % 5000) / 1000, [swirlEpoch]);
 
   useEffect(() => { document.title = "Mews (JP)"; }, []);
 
@@ -589,7 +590,7 @@ export default function PokeCardGallery() {
     return (
       <LoadingScreen
         progress={loadingProgress}
-        swirlEpoch={swirlEpoch}
+        swirlDelay={swirlDelay}
         showPassword={passwordRequired && !isAuthenticated}
         onPasswordSubmit={handlePasswordSubmit}
         isAuthenticating={isAuthenticating}
@@ -933,13 +934,13 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
           <img
             src={card.image}
             alt={`${card.nameJP || card.nameEN} preview`}
-            className="w-full h-auto object-contain rounded-[4.2%]"
+            className="w-full h-auto object-contain"
             style={{ aspectRatio: "63 / 88" }}
             onError={handleImgError}
             referrerPolicy="strict-origin-when-cross-origin"
           />
         </button>
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
           <div className="text-sm font-semibold text-gray-100 truncate">{card.nameJP || card.nameEN}</div>
           <div className="text-[11px] text-gray-400">{card.set || card.era || "—"}</div>
         </div>
@@ -986,12 +987,11 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
 
 const LoadingScreen: React.FC<{
   progress: number;
-  swirlEpoch: number;
+  swirlDelay: number;
   showPassword?: boolean;
   onPasswordSubmit?: (password: string) => void;
   isAuthenticating?: boolean;
-}> = ({ progress, swirlEpoch, showPassword, onPasswordSubmit, isAuthenticating }) => {
-  const swirlDelay = -((Date.now() - swirlEpoch) % 5000) / 1000;
+}> = ({ progress, swirlDelay, showPassword, onPasswordSubmit, isAuthenticating }) => {
   const [input, setInput] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
