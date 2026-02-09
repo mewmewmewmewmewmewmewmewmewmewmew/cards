@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "17.5";
+const APP_VERSION = "17.6";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -926,11 +926,12 @@ const StatsModal: React.FC<{
           background: rgba(203, 151, 165, 0.7);
         }
         .progress-hatch {
-          animation: hatchMove 3s linear infinite;
+          background-size: 16px 16px;
+          animation: hatchMove 1.5s linear infinite;
         }
         @keyframes hatchMove {
           from { background-position: 0 0; }
-          to { background-position: 12px 0; }
+          to { background-position: 16px 0; }
         }
       `}</style>
     </div>
@@ -999,7 +1000,7 @@ const StatsList: React.FC<{
 );
 
 const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCard) => void }> = ({ card, onOpenCard }) => (
-  <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+  <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-r-2xl rounded-l-none border border-[#2a2a2a] bg-[#141414] p-4">
     {!card ? (
       <div className="text-[11px] text-gray-500">Select a card to preview.</div>
     ) : (
