@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "14.9";
+const APP_VERSION = "15.0";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -1005,7 +1005,7 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
           <img
             src={card.image}
             alt={`${card.nameJP || card.nameEN} preview`}
-            className="mx-auto h-[220px] w-auto object-contain"
+            className="w-full h-auto object-contain"
             style={{ aspectRatio: "63 / 88" }}
             onError={handleImgError}
             referrerPolicy="strict-origin-when-cross-origin"
@@ -1016,30 +1016,30 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
           <div className="text-[11px] text-gray-400">{card.set || card.era || "—"}</div>
         </div>
         <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] text-gray-300">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-0.5">
             <span className="text-gray-500">Number</span>
             <span className="text-gray-100">{card.number || "—"}</span>
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-0.5">
             <span className="text-gray-500">Year</span>
             <span className="text-gray-100">{card.year ? String(card.year) : "—"}</span>
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-0.5">
             <span className="text-gray-500">Release</span>
             <span className="text-gray-100">{formatDate(card.release) || "—"}</span>
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-0.5">
             <span className="text-gray-500">Grade</span>
             <span className="text-gray-100">{card.pc || "—"}</span>
           </div>
           {card.rarity && (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-0.5">
               <span className="text-gray-500">Rarity</span>
               <span className="text-gray-100">{card.rarity}</span>
             </div>
           )}
           {card.edition && (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-0.5">
               <span className="text-gray-500">Edition</span>
               <span className="text-gray-100">{card.edition}</span>
             </div>
