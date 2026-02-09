@@ -387,6 +387,10 @@ export default function PokeCardGallery() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
+  const [statsTab, setStatsTab] = useState<"total" | "details">("total");
+  const [showPSA10, setShowPSA10] = useState(true);
+  const [showPSA19, setShowPSA19] = useState(true);
+  const [showNeed, setShowNeed] = useState(true);
   const [mew, setMew] = useState(true);
   const [cameo, setCameo] = useState(false);
   const [intl, setIntl] = useState(false);
@@ -552,12 +556,15 @@ export default function PokeCardGallery() {
 
     const build = (cards: PokeCard[]) => {
       const owned = cards.filter((card) => card.pc);
-      const total = owned.length;
-      const psa10 = owned.filter((card) => card.pc === "PSA10").length;
+      const total = cards.length;
+      const psa10Cards = cards.filter((card) => card.pc === "PSA10");
+      const psa10 = psa10Cards.length;
       const raw = owned.filter((card) => card.pc === "RAW").length;
       const lowerGrades = Array.from({ length: 9 }, (_, i) => `PSA${i + 1}`);
+      const psa19Cards = cards.filter((card) => lowerGrades.includes(card.pc || ""));
       const lower = lowerGrades.map((grade) => ({ grade, count: owned.filter((card) => card.pc === grade).length }));
-      return { total, psa10, raw, lower };
+      const needCards = cards.filter((card) => card.pc !== "PSA10");
+      return { total, psa10, raw, lower, psa10Cards, psa19Cards, needCards };
     };
 
     return categories.map((category) => {
@@ -680,15 +687,28 @@ export default function PokeCardGallery() {
         type="button"
         onClick={() => setShowStats(true)}
         aria-label="Open owned card stats"
-        className="fixed bottom-4 left-4 z-40 rounded-full p-2 bg-black/40 border border-white/10 backdrop-blur hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-[#cb97a5]"
+        className="fixed bottom-4 left-4 z-40 p-1.5 focus:outline-none focus:ring-2 focus:ring-[#cb97a5]"
       >
         <img
           src="https://mew.cards/img/logo.png"
           alt="Owned stats"
-          className="h-8 w-8 opacity-70 grayscale"
+          className="h-4 w-4 opacity-50 grayscale transition-opacity duration-150 hover:opacity-100"
         />
       </button>
-      {showStats && <StatsModal onClose={() => setShowStats(false)} stats={ownedStats} />}
+      {showStats && (
+        <StatsModal
+          onClose={() => setShowStats(false)}
+          stats={ownedStats}
+          statsTab={statsTab}
+          setStatsTab={setStatsTab}
+          showPSA10={showPSA10}
+          setShowPSA10={setShowPSA10}
+          showPSA19={showPSA19}
+          setShowPSA19={setShowPSA19}
+          showNeed={showNeed}
+          setShowNeed={setShowNeed}
+        />
+      )}
       {selected && <DetailModal card={selected} onClose={() => setSelected(null)} language={language} setLanguage={setLanguage} />}
     </div>
   );
@@ -748,57 +768,182 @@ const StatsModal: React.FC<{
     psa10: number;
     raw: number;
     lower: Array<{ grade: string; count: number }>;
+    psa10Cards: PokeCard[];
+    psa19Cards: PokeCard[];
+    needCards: PokeCard[];
   }>;
-}> = ({ onClose, stats }) => (
+  statsTab: "total" | "details";
+  setStatsTab: React.Dispatch<React.SetStateAction<"total" | "details">>;
+  showPSA10: boolean;
+  setShowPSA10: React.Dispatch<React.SetStateAction<boolean>>;
+  showPSA19: boolean;
+  setShowPSA19: React.Dispatch<React.SetStateAction<boolean>>;
+  showNeed: boolean;
+  setShowNeed: React.Dispatch<React.SetStateAction<boolean>>;
+}> = ({
+  onClose,
+  stats,
+  statsTab,
+  setStatsTab,
+  showPSA10,
+  setShowPSA10,
+  showPSA19,
+  setShowPSA19,
+  showNeed,
+  setShowNeed,
+}) => (
   <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
       <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
       <div className="px-5 pb-6 pt-6 sm:px-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-gray-100">Owned stats</h2>
             <p className="mt-1 text-sm text-gray-400">PSA10 progress by category</p>
           </div>
+          <div className="flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
+            <button
+              type="button"
+              onClick={() => setStatsTab("total")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                statsTab === "total" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              Total
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatsTab("details")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                statsTab === "details" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              Details
+            </button>
+          </div>
         </div>
-        <div className="mt-5 space-y-4">
-          {stats.map((section) => {
-            const percent = section.total ? Math.round((section.psa10 / section.total) * 100) : 0;
-            const progressText = section.total ? `${section.psa10}/${section.total}` : "0/0";
-            return (
-              <div key={section.key} className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-gray-200">{section.label}</div>
-                  <div className="text-[11px] text-gray-400">PSA10 {progressText}</div>
-                </div>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#262626]">
-                  <div className="h-full bg-[#cb97a5] transition-all" style={{ width: `${percent}%` }} />
-                </div>
-                <div className="mt-2 text-[11px] text-gray-400">
-                  Total owned: {section.total} · PSA10 progress: {progressText}
-                </div>
-                {section.total === 0 ? (
-                  <div className="mt-3 text-xs text-gray-500">No owned cards logged yet.</div>
-                ) : (
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-                    <div className="rounded-lg border border-[#2a2a2a] bg-[#101010] px-2 py-1">
-                      <div className="text-[10px] text-gray-500">RAW</div>
-                      <div className="text-sm font-semibold text-gray-200">{section.raw}</div>
-                    </div>
-                    {section.lower.map((item) => (
-                      <div key={`${section.key}-${item.grade}`} className="rounded-lg border border-[#2a2a2a] bg-[#101010] px-2 py-1">
-                        <div className="text-[10px] text-gray-500">{item.grade}</div>
-                        <div className="text-sm font-semibold text-gray-200">{item.count}</div>
-                      </div>
-                    ))}
+        {statsTab === "total" ? (
+          <div className="mt-5 space-y-4">
+            {stats.map((section) => {
+              const percent = section.total ? Math.round((section.psa10 / section.total) * 100) : 0;
+              const progressText = section.total ? `${section.psa10}/${section.total}` : "0/0";
+              return (
+                <div key={section.key} className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-gray-200">{section.label}</div>
+                    <div className="text-[11px] text-gray-400">PSA10 {progressText}</div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#262626]">
+                    <div className="h-full bg-[#cb97a5] transition-all" style={{ width: `${percent}%` }} />
+                  </div>
+                  <div className="mt-2 text-[11px] text-gray-400">
+                    Total cards: {section.total} · PSA10 progress: {progressText}
+                  </div>
+                  {section.total === 0 ? (
+                    <div className="mt-3 text-xs text-gray-500">No cards loaded yet.</div>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                      <div className="rounded-lg border border-[#2a2a2a] bg-[#101010] px-2 py-1">
+                        <div className="text-[10px] text-gray-500">RAW</div>
+                        <div className="text-sm font-semibold text-gray-200">{section.raw}</div>
+                      </div>
+                      {section.lower.map((item) => (
+                        <div key={`${section.key}-${item.grade}`} className="rounded-lg border border-[#2a2a2a] bg-[#101010] px-2 py-1">
+                          <div className="text-[10px] text-gray-500">{item.grade}</div>
+                          <div className="text-sm font-semibold text-gray-200">{item.count}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-5">
+            <div className="flex flex-wrap gap-2">
+              <TogglePill label="PSA10" active={showPSA10} onClick={() => setShowPSA10((v) => !v)} />
+              <TogglePill label="PSA1-9" active={showPSA19} onClick={() => setShowPSA19((v) => !v)} />
+              <TogglePill label="Need" active={showNeed} onClick={() => setShowNeed((v) => !v)} />
+            </div>
+            <div className="mt-4 space-y-4">
+              {showPSA10 && (
+                <StatsList title="PSA10" sections={stats.map((section) => ({
+                  key: section.key,
+                  label: section.label,
+                  cards: section.psa10Cards,
+                }))} />
+              )}
+              {showPSA19 && (
+                <StatsList title="PSA1-9" sections={stats.map((section) => ({
+                  key: section.key,
+                  label: section.label,
+                  cards: section.psa19Cards,
+                }))} />
+              )}
+              {showNeed && (
+                <StatsList title="Need" sections={stats.map((section) => ({
+                  key: section.key,
+                  label: section.label,
+                  cards: section.needCards,
+                }))} />
+              )}
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  </div>
+);
+
+const TogglePill: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={classNames(
+      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+      active ? "border-[#cb97a5] bg-[#cb97a5]/15 text-[#cb97a5]" : "border-[#2a2a2a] text-gray-400 hover:text-gray-200"
+    )}
+    aria-pressed={active}
+  >
+    <span className={classNames("flex h-3 w-3 items-center justify-center rounded border", active ? "border-[#cb97a5]" : "border-[#3a3a3a]")}>
+      {active && (
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      )}
+    </span>
+    {label}
+  </button>
+);
+
+const StatsList: React.FC<{
+  title: string;
+  sections: Array<{ key: string; label: string; cards: PokeCard[] }>;
+}> = ({ title, sections }) => (
+  <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+    <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</div>
+    <div className="mt-3 space-y-3">
+      {sections.map((section) => (
+        <div key={section.key}>
+          <div className="text-[11px] font-semibold text-gray-300">{section.label}</div>
+          {section.cards.length === 0 ? (
+            <div className="mt-1 text-[11px] text-gray-500">None</div>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {section.cards.map((card) => (
+                <li key={`${section.key}-${title}-${card.id}`} className="text-[11px] text-gray-300">
+                  <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
+                  <span className="text-gray-500"> · {card.year || "—"}</span>
+                  <span className="text-gray-500"> · {card.number || "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
     </div>
   </div>
 );
