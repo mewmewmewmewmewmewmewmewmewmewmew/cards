@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "14.8";
+const APP_VERSION = "14.9";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -754,6 +754,10 @@ export default function PokeCardGallery() {
           stats={ownedStats}
           onSelectCard={(card) => setStatsSelected(card)}
           selectedCard={statsSelected}
+          onOpenCard={(card) => {
+            setSelected(card);
+            setShowStats(false);
+          }}
           detailsTab={detailsTab}
           setDetailsTab={setDetailsTab}
         />
@@ -820,6 +824,7 @@ const StatsModal: React.FC<{
   };
   onSelectCard: (card: PokeCard) => void;
   selectedCard: PokeCard | null;
+  onOpenCard: (card: PokeCard) => void;
   detailsTab: "psa10" | "psa19" | "need" | "all";
   setDetailsTab: React.Dispatch<React.SetStateAction<"psa10" | "psa19" | "need" | "all">>;
 }> = ({
@@ -827,6 +832,7 @@ const StatsModal: React.FC<{
   stats,
   onSelectCard,
   selectedCard,
+  onOpenCard,
   detailsTab,
   setDetailsTab,
 }) => (
@@ -917,7 +923,7 @@ const StatsModal: React.FC<{
               )}
             </div>
           </div>
-          <StatsPreview card={selectedCard} />
+          <StatsPreview card={selectedCard} onOpenCard={onOpenCard} />
         </div>
       </div>
     </div>
@@ -984,13 +990,18 @@ const StatsList: React.FC<{
   </div>
 );
 
-const StatsPreview: React.FC<{ card: PokeCard | null }> = ({ card }) => (
+const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCard) => void }> = ({ card, onOpenCard }) => (
   <div className="h-full overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
     {!card ? (
       <div className="text-[11px] text-gray-500">Select a card to preview.</div>
     ) : (
       <div className="space-y-3">
-        <div className="relative w-full overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#111111]">
+        <button
+          type="button"
+          onClick={() => onOpenCard(card)}
+          className="relative w-full"
+          aria-label={`Open details for ${card.nameJP || card.nameEN}`}
+        >
           <img
             src={card.image}
             alt={`${card.nameJP || card.nameEN} preview`}
@@ -999,20 +1010,41 @@ const StatsPreview: React.FC<{ card: PokeCard | null }> = ({ card }) => (
             onError={handleImgError}
             referrerPolicy="strict-origin-when-cross-origin"
           />
-        </div>
+        </button>
         <div className="flex items-baseline justify-between gap-2">
           <div className="text-sm font-semibold text-gray-100 truncate">{card.nameJP || card.nameEN}</div>
-          <div className="text-[11px] text-gray-400">{card.era || "—"}</div>
+          <div className="text-[11px] text-gray-400">{card.set || card.era || "—"}</div>
         </div>
-        {card.set && <div className="text-[11px] text-gray-400">{card.set}</div>}
-        <div className="grid grid-cols-2 gap-2">
-          <InfoBubble label="Number" value={card.number || "—"} />
-          <InfoBubble label="Year" value={card.year ? String(card.year) : undefined} />
-          <InfoBubble label="Release" value={formatDate(card.release)} />
-          <InfoBubble label="Grade" value={card.pc || "—"} />
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] text-gray-300">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-gray-500">Number</span>
+            <span className="text-gray-100">{card.number || "—"}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-gray-500">Year</span>
+            <span className="text-gray-100">{card.year ? String(card.year) : "—"}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-gray-500">Release</span>
+            <span className="text-gray-100">{formatDate(card.release) || "—"}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-gray-500">Grade</span>
+            <span className="text-gray-100">{card.pc || "—"}</span>
+          </div>
+          {card.rarity && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-gray-500">Rarity</span>
+              <span className="text-gray-100">{card.rarity}</span>
+            </div>
+          )}
+          {card.edition && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-gray-500">Edition</span>
+              <span className="text-gray-100">{card.edition}</span>
+            </div>
+          )}
         </div>
-        {card.rarity && <InfoBubble label="Rarity" value={card.rarity} />}
-        {card.edition && <InfoBubble label="Edition" value={card.edition} />}
       </div>
     )}
   </div>
