@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "14.6";
+const APP_VERSION = "14.7";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -389,6 +389,7 @@ export default function PokeCardGallery() {
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [detailsTab, setDetailsTab] = useState<"psa10" | "psa19" | "need" | "all">("all");
+  const [statsSelected, setStatsSelected] = useState<PokeCard | null>(null);
   const [mew, setMew] = useState(true);
   const [cameo, setCameo] = useState(false);
   const [intl, setIntl] = useState(false);
@@ -554,6 +555,29 @@ export default function PokeCardGallery() {
     const needCards = sourceCards.filter((card) => card.pc !== "PSA10");
     return { total, psa10, psa10Cards, psa19Cards, needCards, allCards: sourceCards };
   }, [sourceCards]);
+
+  const activeStatsCards = useMemo(() => {
+    switch (detailsTab) {
+      case "psa10":
+        return ownedStats.psa10Cards;
+      case "psa19":
+        return ownedStats.psa19Cards;
+      case "need":
+        return ownedStats.needCards;
+      default:
+        return ownedStats.allCards;
+    }
+  }, [detailsTab, ownedStats]);
+
+  useEffect(() => {
+    if (activeStatsCards.length === 0) {
+      setStatsSelected(null);
+      return;
+    }
+    if (!statsSelected || !activeStatsCards.some((card) => card.id === statsSelected.id)) {
+      setStatsSelected(activeStatsCards[0]);
+    }
+  }, [activeStatsCards, statsSelected]);
 
   const handlePasswordSubmit = (submittedPassword: string) => {
     setIsAuthenticating(true); // Start pulse
@@ -728,10 +752,8 @@ export default function PokeCardGallery() {
         <StatsModal
           onClose={() => setShowStats(false)}
           stats={ownedStats}
-          onSelectCard={(card) => {
-            setSelected(card);
-            setShowStats(false);
-          }}
+          onSelectCard={(card) => setStatsSelected(card)}
+          selectedCard={statsSelected}
           detailsTab={detailsTab}
           setDetailsTab={setDetailsTab}
         />
@@ -797,12 +819,14 @@ const StatsModal: React.FC<{
     allCards: PokeCard[];
   };
   onSelectCard: (card: PokeCard) => void;
+  selectedCard: PokeCard | null;
   detailsTab: "psa10" | "psa19" | "need" | "all";
   setDetailsTab: React.Dispatch<React.SetStateAction<"psa10" | "psa19" | "need" | "all">>;
 }> = ({
   onClose,
   stats,
   onSelectCard,
+  selectedCard,
   detailsTab,
   setDetailsTab,
 }) => (
@@ -876,21 +900,24 @@ const StatsModal: React.FC<{
             </button>
           </div>
         </div>
-        <div className="mt-4 flex-1 overflow-y-auto pr-1">
-          <div className="space-y-4">
-            {detailsTab === "psa10" && (
-              <StatsList cards={stats.psa10Cards} onSelectCard={onSelectCard} />
-            )}
-            {detailsTab === "psa19" && (
-              <StatsList cards={stats.psa19Cards} onSelectCard={onSelectCard} />
-            )}
-            {detailsTab === "need" && (
-              <StatsList cards={stats.needCards} onSelectCard={onSelectCard} />
-            )}
-            {detailsTab === "all" && (
-              <StatsList cards={stats.allCards} onSelectCard={onSelectCard} sortMode="release" />
-            )}
+        <div className="mt-4 grid flex-1 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] gap-4 overflow-hidden">
+          <div className="min-h-0 overflow-y-auto pr-1">
+            <div className="space-y-4">
+              {detailsTab === "psa10" && (
+                <StatsList cards={stats.psa10Cards} onSelectCard={onSelectCard} selectedId={selectedCard?.id || null} />
+              )}
+              {detailsTab === "psa19" && (
+                <StatsList cards={stats.psa19Cards} onSelectCard={onSelectCard} selectedId={selectedCard?.id || null} />
+              )}
+              {detailsTab === "need" && (
+                <StatsList cards={stats.needCards} onSelectCard={onSelectCard} selectedId={selectedCard?.id || null} />
+              )}
+              {detailsTab === "all" && (
+                <StatsList cards={stats.allCards} onSelectCard={onSelectCard} sortMode="release" selectedId={selectedCard?.id || null} />
+              )}
+            </div>
           </div>
+          <StatsPreview card={selectedCard} />
         </div>
       </div>
     </div>
@@ -900,8 +927,9 @@ const StatsModal: React.FC<{
 const StatsList: React.FC<{
   cards: PokeCard[];
   onSelectCard: (card: PokeCard) => void;
+  selectedId: string | null;
   sortMode?: "default" | "release";
-}> = ({ cards, onSelectCard, sortMode = "default" }) => (
+}> = ({ cards, onSelectCard, selectedId, sortMode = "default" }) => (
   <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
     {cards.length === 0 ? (
       <div className="text-[11px] text-gray-500">None</div>
@@ -922,11 +950,16 @@ const StatsList: React.FC<{
             return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
           })
           .map((card) => (
-            <li key={card.id} className="group relative">
+            <li key={card.id}>
               <button
                 type="button"
                 onClick={() => onSelectCard(card)}
-                className="grid w-full grid-cols-[52px_44px_64px_1fr] items-center gap-2 text-left text-[11px] text-gray-300 hover:text-gray-100"
+                className={classNames(
+                  "grid w-full grid-cols-[52px_44px_64px_1fr] items-center gap-2 rounded-md px-1 py-1 text-left text-[11px] transition-colors",
+                  selectedId === card.id
+                    ? "bg-[#1f1f1f] text-gray-100"
+                    : "text-gray-300 hover:bg-[#1b1b1b] hover:text-gray-100"
+                )}
               >
                 <span
                   className={classNames(
@@ -944,20 +977,42 @@ const StatsList: React.FC<{
                 <span className="text-gray-500">{card.number || "—"}</span>
                 <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
               </button>
-              <div className="pointer-events-none absolute left-full top-1/2 z-50 hidden -translate-y-1/2 pl-3 group-hover:block">
-                <div className="overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#111111] shadow-2xl">
-                  <img
-                    src={card.image}
-                    alt={`${card.nameJP || card.nameEN} preview`}
-                    className="h-[300px] w-auto object-contain"
-                    onError={handleImgError}
-                    referrerPolicy="strict-origin-when-cross-origin"
-                  />
-                </div>
-              </div>
             </li>
           ))}
       </ul>
+    )}
+  </div>
+);
+
+const StatsPreview: React.FC<{ card: PokeCard | null }> = ({ card }) => (
+  <div className="h-full overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+    {!card ? (
+      <div className="text-[11px] text-gray-500">Select a card to preview.</div>
+    ) : (
+      <div className="space-y-3">
+        <div className="relative w-full overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#111111]">
+          <img
+            src={card.image}
+            alt={`${card.nameJP || card.nameEN} preview`}
+            className="w-full object-contain"
+            style={{ aspectRatio: "63 / 88" }}
+            onError={handleImgError}
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+        <div>
+          <div className="text-sm font-semibold text-gray-100">{card.nameJP || card.nameEN}</div>
+          {card.set && <div className="text-[11px] text-gray-400">{card.set}</div>}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <InfoBubble label="Number" value={card.number || "—"} />
+          <InfoBubble label="Year" value={card.year ? String(card.year) : undefined} />
+          <InfoBubble label="Release" value={formatDate(card.release)} />
+          <InfoBubble label="Grade" value={card.pc || "—"} />
+        </div>
+        {card.rarity && <InfoBubble label="Rarity" value={card.rarity} />}
+        {card.edition && <InfoBubble label="Edition" value={card.edition} />}
+      </div>
     )}
   </div>
 );
