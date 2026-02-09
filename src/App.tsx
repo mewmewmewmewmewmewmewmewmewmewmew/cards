@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "14.7";
+const APP_VERSION = "14.8";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -900,7 +900,7 @@ const StatsModal: React.FC<{
             </button>
           </div>
         </div>
-        <div className="mt-4 grid flex-1 grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] gap-4 overflow-hidden">
+        <div className="mt-4 grid flex-1 grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] gap-4 overflow-hidden">
           <div className="min-h-0 overflow-y-auto pr-1">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
@@ -985,7 +985,7 @@ const StatsList: React.FC<{
 );
 
 const StatsPreview: React.FC<{ card: PokeCard | null }> = ({ card }) => (
-  <div className="h-full overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+  <div className="h-full overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
     {!card ? (
       <div className="text-[11px] text-gray-500">Select a card to preview.</div>
     ) : (
@@ -994,16 +994,17 @@ const StatsPreview: React.FC<{ card: PokeCard | null }> = ({ card }) => (
           <img
             src={card.image}
             alt={`${card.nameJP || card.nameEN} preview`}
-            className="w-full object-contain"
+            className="mx-auto h-[220px] w-auto object-contain"
             style={{ aspectRatio: "63 / 88" }}
             onError={handleImgError}
             referrerPolicy="strict-origin-when-cross-origin"
           />
         </div>
-        <div>
-          <div className="text-sm font-semibold text-gray-100">{card.nameJP || card.nameEN}</div>
-          {card.set && <div className="text-[11px] text-gray-400">{card.set}</div>}
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="text-sm font-semibold text-gray-100 truncate">{card.nameJP || card.nameEN}</div>
+          <div className="text-[11px] text-gray-400">{card.era || "—"}</div>
         </div>
+        {card.set && <div className="text-[11px] text-gray-400">{card.set}</div>}
         <div className="grid grid-cols-2 gap-2">
           <InfoBubble label="Number" value={card.number || "—"} />
           <InfoBubble label="Year" value={card.year ? String(card.year) : undefined} />
