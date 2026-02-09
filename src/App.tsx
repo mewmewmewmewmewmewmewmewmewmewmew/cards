@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "16.1";
+const APP_VERSION = "16.2";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -649,7 +649,7 @@ export default function PokeCardGallery() {
       </div>
       </header>
       {searchOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm sm:hidden" onClick={() => setSearchOpen(false)}>
+        <div className="fixed inset-0 z-[950] bg-black/80 backdrop-blur-sm sm:hidden" onClick={() => setSearchOpen(false)}>
           <div className="mx-auto mt-24 max-w-md px-4" onClick={(e) => e.stopPropagation()}>
             <div className="rounded-2xl border border-[#2a2a2a] bg-[#161616] p-4">
               <div className="flex items-center gap-2">
@@ -803,7 +803,7 @@ const StatsModal: React.FC<{
   detailsTab,
   setDetailsTab,
 }) => (
-  <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
+  <div className="fixed inset-0 z-[900] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
       <div className="flex h-full flex-col px-5 pb-6 pt-6 sm:px-6">
         <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
@@ -1136,7 +1136,7 @@ const DetailModal: React.FC<{
   const displayOrigin = (language === 'JP' && card.originJP) ? card.originJP : card.originEN;
 
   return (
-  <div className="fixed inset-0 z-60 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
+  <div className="fixed inset-0 z-[999] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
       <div className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
