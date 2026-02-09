@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "17.0";
+const APP_VERSION = "17.1";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -244,9 +244,11 @@ function parseCSV(csv: string): PokeCard[] {
   for (let r = 1; r < rows.length; r++) {
     const cols = rows[r];
     const get = (j: number) => (j >= 0 && j < cols.length ? cols[j] : '');
-    const nameEN = get(idxNameEN);
-    const image = get(idxImage);
-    if (!nameEN || !image) continue;
+    const nameENRaw = get(idxNameEN);
+    const nameJPRaw = get(idxNameJP);
+    const nameEN = nameENRaw || nameJPRaw;
+    const image = get(idxImage) || IMG_FALLBACK;
+    if (!nameEN) continue;
 
     const typesField = get(idxTypes);
     const types = typesField ? typesField.split('|').map(t => t.trim()).filter(Boolean) : [];
@@ -269,7 +271,7 @@ function parseCSV(csv: string): PokeCard[] {
     const card: PokeCard = {
       id,
       nameEN,
-      nameJP: get(idxNameJP) || undefined,
+      nameJP: nameJPRaw || undefined,
       notesEN: get(idxNotesEN) || undefined,
       notesJP: get(idxNotesJP) || undefined,
       originEN: get(idxOriginEN) || undefined,
