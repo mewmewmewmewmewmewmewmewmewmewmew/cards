@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "17.2";
+const APP_VERSION = "17.3";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -854,13 +854,14 @@ const StatsModal: React.FC<{
           </div>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:flex-1 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] sm:overflow-hidden">
-          <div className="stats-scroll pr-1 sm:min-h-0 sm:overflow-y-auto">
+          <div className="stats-scroll rounded-2xl border border-[#2a2a2a] bg-[#141414] overflow-hidden pr-1 sm:min-h-0 sm:overflow-y-auto">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
                 <StatsList
                   cards={stats.psa10Cards}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
+                  containerClassName="rounded-none border-0 bg-transparent p-4"
                 />
               )}
               {detailsTab === "psa19" && (
@@ -868,6 +869,7 @@ const StatsModal: React.FC<{
                   cards={stats.psa19Cards}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
+                  containerClassName="rounded-none border-0 bg-transparent p-4"
                 />
               )}
               {detailsTab === "need" && (
@@ -875,6 +877,7 @@ const StatsModal: React.FC<{
                   cards={stats.needCards}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
+                  containerClassName="rounded-none border-0 bg-transparent p-4"
                 />
               )}
               {detailsTab === "all" && (
@@ -883,11 +886,12 @@ const StatsModal: React.FC<{
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   sortMode="release"
                   selectedId={selectedCard?.id || null}
+                  containerClassName="rounded-none border-0 bg-transparent p-4"
                 />
               )}
             </div>
           </div>
-          <div className="hidden sm:block">
+          <div className="hidden sm:flex sm:min-h-0 sm:flex-col">
             <StatsPreview card={selectedCard} onOpenCard={onOpenCard} />
           </div>
         </div>
@@ -927,8 +931,9 @@ const StatsList: React.FC<{
   onSelectCard: (card: PokeCard) => void;
   selectedId: string | null;
   sortMode?: "default" | "release";
-}> = ({ cards, onSelectCard, selectedId, sortMode = "default" }) => (
-  <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+  containerClassName?: string;
+}> = ({ cards, onSelectCard, selectedId, sortMode = "default", containerClassName }) => (
+  <div className={classNames("rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4", containerClassName)}>
     {cards.length === 0 ? (
       <div className="text-[11px] text-gray-500">None</div>
     ) : (
@@ -983,11 +988,11 @@ const StatsList: React.FC<{
 );
 
 const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCard) => void }> = ({ card, onOpenCard }) => (
-  <div className="h-full overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+  <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
     {!card ? (
       <div className="text-[11px] text-gray-500">Select a card to preview.</div>
     ) : (
-      <div className="stats-scroll h-full overflow-y-auto pr-2 space-y-3">
+      <div className="stats-scroll flex-1 min-h-0 overflow-y-auto pr-2 space-y-3">
         <button
           type="button"
           onClick={() => onOpenCard(card)}
