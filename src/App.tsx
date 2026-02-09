@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "16.9";
+const APP_VERSION = "17.0";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -611,7 +611,7 @@ export default function PokeCardGallery() {
       <BackgroundGradient />
       <header className="sticky top-0 z-40 border-b border-[#2a2a2a]/60 bg-black/30 backdrop-blur">
         <div className="mx-auto max-w-7xl px-3 py-2">
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-full flex-row flex-wrap items-center gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <img src="https://mew.cards/img/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
               <div>
@@ -619,7 +619,7 @@ export default function PokeCardGallery() {
                 <div className="-mt-0.5 text-[11px] text-gray-400">Complete Japanese List</div>
               </div>
             </div>
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex w-full flex-row flex-wrap items-center gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
               <div className="flex flex-wrap items-center gap-1">
                 <Toggle label="Mew" active={mew} onClick={() => setMew(v => !v)} />
                 <Toggle label="Cameo" active={cameo} onClick={() => setCameo(v => !v)} />
@@ -634,7 +634,7 @@ export default function PokeCardGallery() {
                 >
                   {releaseSortDesc ? "Date ▼" : "Date ▲"}
                 </button>
-                <div className="relative w-full sm:w-60">
+                <div className="relative w-36 sm:w-60">
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full h-8 rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 pr-8 text-[13px] text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]" />
                 {q && (
                   <button onClick={() => setQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-gray-200 hover:bg-[#2f2f2f]" aria-label="Clear search">
@@ -782,8 +782,8 @@ const StatsModal: React.FC<{
   setDetailsTab,
 }) => (
   <div className="fixed inset-0 z-[900] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
-    <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
-      <div className="flex max-h-[85vh] flex-col overflow-y-auto px-5 pb-6 pt-2 sm:h-full sm:max-h-none sm:overflow-hidden sm:px-6 sm:pt-6">
+    <div className="relative w-full max-w-3xl h-[100dvh] overflow-hidden rounded-none sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-full max-h-[100dvh] flex-col overflow-y-auto px-5 pb-6 pt-2 sm:h-full sm:max-h-none sm:overflow-hidden sm:px-6 sm:pt-6">
         <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[11px] text-gray-100">PSA10 {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}</div>
