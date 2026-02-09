@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "15.5";
+const APP_VERSION = "15.6";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -940,10 +940,7 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
             referrerPolicy="strict-origin-when-cross-origin"
           />
         </button>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-          <div className="text-sm font-semibold text-gray-100 truncate">{card.nameJP || card.nameEN}</div>
-          <div className="text-[11px] text-gray-400">{card.set || card.era || "—"}</div>
-        </div>
+        <div className="text-sm font-semibold text-gray-100 truncate">{card.nameJP || card.nameEN}</div>
         <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] text-gray-300">
           <div className="flex flex-col gap-0.5">
             <span className="text-gray-500">Number</span>
@@ -967,6 +964,10 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
               <span className="text-gray-100">{card.rarity}</span>
             </div>
           )}
+          <div className="flex flex-col gap-0.5">
+            <span className="text-gray-500">Era</span>
+            <span className="text-gray-100">{card.era || "—"}</span>
+          </div>
           {card.edition && (
             <div className="flex flex-col gap-0.5">
               <span className="text-gray-500">Edition</span>
