@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "13.4";
+const APP_VERSION = "13.5";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -571,9 +571,9 @@ export default function PokeCardGallery() {
             <div className="pointer-events-none absolute bottom-4 left-4 text-[10px] font-semibold text-[#cb97a5]/80">v{APP_VERSION}</div>
             <style>{`
               @keyframes swirl {
-                0% { transform: rotate(0deg); background-position: 0% 50%; }
+                0% { background-position: 0% 50%; }
                 50% { background-position: 100% 50%; }
-                100% { transform: rotate(360deg); background-position: 0% 50%; }
+                100% { background-position: 0% 50%; }
               }
               .loading-swirl {
                 background: radial-gradient(circle at 30% 30%, rgba(255, 209, 221, 0.85), rgba(203, 151, 165, 0.35) 45%, rgba(16, 16, 16, 0) 70%);
