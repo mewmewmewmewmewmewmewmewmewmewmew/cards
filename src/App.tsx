@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "16.4";
+const APP_VERSION = "16.5";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -844,16 +844,16 @@ const StatsModal: React.FC<{
           <div className="pr-1 sm:min-h-0 sm:overflow-y-auto">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
-                <StatsList cards={stats.psa10Cards} onSelectCard={onSelectCard} selectedId={selectedCard?.id || null} />
+                <StatsList cards={stats.psa10Cards} onSelectCard={onOpenCard} selectedId={selectedCard?.id || null} />
               )}
               {detailsTab === "psa19" && (
-                <StatsList cards={stats.psa19Cards} onSelectCard={onSelectCard} selectedId={selectedCard?.id || null} />
+                <StatsList cards={stats.psa19Cards} onSelectCard={onOpenCard} selectedId={selectedCard?.id || null} />
               )}
               {detailsTab === "need" && (
-                <StatsList cards={stats.needCards} onSelectCard={onSelectCard} selectedId={selectedCard?.id || null} />
+                <StatsList cards={stats.needCards} onSelectCard={onOpenCard} selectedId={selectedCard?.id || null} />
               )}
               {detailsTab === "all" && (
-                <StatsList cards={stats.allCards} onSelectCard={onSelectCard} sortMode="release" selectedId={selectedCard?.id || null} />
+                <StatsList cards={stats.allCards} onSelectCard={onOpenCard} sortMode="release" selectedId={selectedCard?.id || null} />
               )}
             </div>
           </div>
@@ -1137,7 +1137,7 @@ const DetailModal: React.FC<{
               {card.imageBack && !isFlipped && <FlipIcon />}
             </div>
           </div>
-          <div className="flex flex-col space-y-3 p-4 pt-0 sm:p-6 sm:max-h-[80vh] sm:overflow-y-auto">
+          <div className="flex flex-col space-y-3 p-4 pt-0 sm:p-6 max-h-[70vh] overflow-y-auto sm:max-h-[80vh]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-4xl font-semibold text-gray-100 leading-tight">{displayName}</h2>
