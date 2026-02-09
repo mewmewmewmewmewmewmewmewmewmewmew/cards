@@ -67,6 +67,7 @@ export type PokeCard = {
   isCameo?: boolean;
   isIntl?: boolean;
   edition?: Edition;
+  pc?: string;
 };
 
 // ------------------------------
@@ -148,6 +149,18 @@ function parseBool(x: string | undefined): boolean | undefined {
   return s === "true" || s === "1" ? true : s === "false" || s === "0" ? false : undefined;
 }
 
+function normalizePC(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim().toUpperCase();
+  if (!trimmed) return undefined;
+  if (trimmed === "RAW") return "RAW";
+  const match = trimmed.match(/^PSA\s?(\d{1,2})$/);
+  if (!match) return undefined;
+  const grade = Number.parseInt(match[1], 10);
+  if (!Number.isFinite(grade) || grade < 1 || grade > 10) return undefined;
+  return `PSA${grade}`;
+}
+
 function stripBOM(s: string): string { return s && s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s; }
 
 function slugify(...parts: Array<string | undefined>): string {
@@ -224,6 +237,7 @@ function parseCSV(csv: string): PokeCard[] {
   const idxPSA9 = findIdx('psa9');
   const idxPSA10 = findIdx('psa10');
   const idxBGSBL = findIdx('bgsBL', ['bgs bl', 'bgs_black_label']);
+  const idxPC = findIdx('pc');
 
   const out: PokeCard[] = [];
   for (let r = 1; r < rows.length; r++) {
@@ -275,6 +289,7 @@ function parseCSV(csv: string): PokeCard[] {
       isIntl: parseBool(get(idxIsIntl)),
       edition,
       population: maybePop,
+      pc: normalizePC(get(idxPC)),
     };
     out.push(card);
   }
@@ -371,6 +386,7 @@ const BackgroundGradient: React.FC = () => (
 export default function PokeCardGallery() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PokeCard | null>(null);
+  const [showStats, setShowStats] = useState(false);
   const [mew, setMew] = useState(true);
   const [cameo, setCameo] = useState(false);
   const [intl, setIntl] = useState(false);
@@ -390,6 +406,15 @@ export default function PokeCardGallery() {
   const [password, setPassword] = useState("");
 
   useEffect(() => { document.title = "Mews (JP)"; }, []);
+
+  useEffect(() => {
+    if (!showStats) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowStats(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showStats]);
 
   // Check if password is required on initial load
   useEffect(() => {
@@ -518,6 +543,29 @@ export default function PokeCardGallery() {
 
   const filtered = useMemo(() => applyFilters(sourceCards, { q, mew, cameo, intl, sortBy: releaseSortDesc ? "releaseDesc" : "releaseAsc" }), [q, mew, cameo, intl, sourceCards, releaseSortDesc]);
 
+  const ownedStats = useMemo(() => {
+    const categories = [
+      { key: "mew", label: "Japanese", flag: "isMew" as const },
+      { key: "cameo", label: "Cameo", flag: "isCameo" as const },
+      { key: "intl", label: "Unique", flag: "isIntl" as const },
+    ];
+
+    const build = (cards: PokeCard[]) => {
+      const owned = cards.filter((card) => card.pc);
+      const total = owned.length;
+      const psa10 = owned.filter((card) => card.pc === "PSA10").length;
+      const raw = owned.filter((card) => card.pc === "RAW").length;
+      const lowerGrades = Array.from({ length: 9 }, (_, i) => `PSA${i + 1}`);
+      const lower = lowerGrades.map((grade) => ({ grade, count: owned.filter((card) => card.pc === grade).length }));
+      return { total, psa10, raw, lower };
+    };
+
+    return categories.map((category) => {
+      const cards = sourceCards.filter((card) => card[category.flag]);
+      return { ...category, ...build(cards) };
+    });
+  }, [sourceCards]);
+
   const handlePasswordSubmit = (submittedPassword: string) => {
     setIsAuthenticating(true); // Start pulse
     setPassword(submittedPassword); // Set password to trigger data fetch effect
@@ -628,6 +676,19 @@ export default function PokeCardGallery() {
           </ul>
         )}
       </main>
+      <button
+        type="button"
+        onClick={() => setShowStats(true)}
+        aria-label="Open owned card stats"
+        className="fixed bottom-4 left-4 z-40 rounded-full p-2 bg-black/40 border border-white/10 backdrop-blur hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-[#cb97a5]"
+      >
+        <img
+          src="https://mew.cards/img/logo.png"
+          alt="Owned stats"
+          className="h-8 w-8 opacity-70 grayscale"
+        />
+      </button>
+      {showStats && <StatsModal onClose={() => setShowStats(false)} stats={ownedStats} />}
       {selected && <DetailModal card={selected} onClose={() => setSelected(null)} language={language} setLanguage={setLanguage} />}
     </div>
   );
@@ -675,6 +736,70 @@ const EmptyState: React.FC = () => (
   <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#2a2a2a] bg-[#121212] px-6 py-16 text-center text-gray-400">
     <div className="text-4xl">🔍</div>
     <div className="text-sm">No cards match your filters.</div>
+  </div>
+);
+
+const StatsModal: React.FC<{
+  onClose: () => void;
+  stats: Array<{
+    key: string;
+    label: string;
+    total: number;
+    psa10: number;
+    raw: number;
+    lower: Array<{ grade: string; count: number }>;
+  }>;
+}> = ({ onClose, stats }) => (
+  <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
+    <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <div className="px-5 pb-6 pt-6 sm:px-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-100">Owned stats</h2>
+            <p className="mt-1 text-sm text-gray-400">PSA10 progress by category</p>
+          </div>
+        </div>
+        <div className="mt-5 space-y-4">
+          {stats.map((section) => {
+            const percent = section.total ? Math.round((section.psa10 / section.total) * 100) : 0;
+            const progressText = section.total ? `${section.psa10}/${section.total}` : "0/0";
+            return (
+              <div key={section.key} className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-gray-200">{section.label}</div>
+                  <div className="text-[11px] text-gray-400">PSA10 {progressText}</div>
+                </div>
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#262626]">
+                  <div className="h-full bg-[#cb97a5] transition-all" style={{ width: `${percent}%` }} />
+                </div>
+                <div className="mt-2 text-[11px] text-gray-400">
+                  Total owned: {section.total} · PSA10 progress: {progressText}
+                </div>
+                {section.total === 0 ? (
+                  <div className="mt-3 text-xs text-gray-500">No owned cards logged yet.</div>
+                ) : (
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    <div className="rounded-lg border border-[#2a2a2a] bg-[#101010] px-2 py-1">
+                      <div className="text-[10px] text-gray-500">RAW</div>
+                      <div className="text-sm font-semibold text-gray-200">{section.raw}</div>
+                    </div>
+                    {section.lower.map((item) => (
+                      <div key={`${section.key}-${item.grade}`} className="rounded-lg border border-[#2a2a2a] bg-[#101010] px-2 py-1">
+                        <div className="text-[10px] text-gray-500">{item.grade}</div>
+                        <div className="text-sm font-semibold text-gray-200">{item.count}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   </div>
 );
 
@@ -854,4 +979,3 @@ function runDevTests() {
 
 // To run tests, open the browser console and call runDevTests()
 // runDevTests();
-
