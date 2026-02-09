@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "15.7";
+const APP_VERSION = "15.8";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -410,7 +410,7 @@ export default function PokeCardGallery() {
   const [swirlEpoch] = useState(() => Date.now());
   const swirlDelay = useMemo(() => -((Date.now() - swirlEpoch) % 5000) / 1000, [swirlEpoch]);
 
-  useEffect(() => { document.title = "Mews (JP)"; }, []);
+  useEffect(() => { document.title = "Mew"; }, []);
 
   useEffect(() => {
     if (!showStats) return;
@@ -603,26 +603,30 @@ export default function PokeCardGallery() {
       <BackgroundGradient />
       <header className="sticky top-0 z-50 border-b border-[#2a2a2a]/60 bg-black/30 backdrop-blur">
         <div className="mx-auto max-w-7xl px-3 py-2">
-          <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <img src="https://mew.cards/img/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
-              <h1 className="text-base sm:text-lg font-semibold tracking-tight">Mews (JP)</h1>
+              <div>
+                <h1 className="text-base sm:text-lg font-semibold tracking-tight">Mew</h1>
+                <div className="text-[11px] text-gray-400">Complete Japanese List</div>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+              <div className="flex flex-wrap items-center gap-1">
                 <Toggle label="Mew" active={mew} onClick={() => setMew(v => !v)} />
                 <Toggle label="Cameo" active={cameo} onClick={() => setCameo(v => !v)} />
                 <Toggle label="Intl" active={intl} onClick={() => setIntl(v => !v)} />
               </div>
-              <button
-                type="button"
-                onClick={() => setReleaseSortDesc(v => !v)}
-                aria-label={releaseSortDesc ? "Sort by date: new to old" : "Sort by date: old to new"}
-                className="text-[12px] text-gray-400 hover:text-gray-200 px-1 py-0.5 rounded outline-none focus:outline-none"
-              >
-                {releaseSortDesc ? "Date ▼" : "Date ▲"}
-              </button>
-              <div className="relative w-44 sm:w-60">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReleaseSortDesc(v => !v)}
+                  aria-label={releaseSortDesc ? "Sort by date: new to old" : "Sort by date: old to new"}
+                  className="text-[12px] text-gray-400 hover:text-gray-200 px-1 py-0.5 rounded outline-none focus:outline-none"
+                >
+                  {releaseSortDesc ? "Date ▼" : "Date ▲"}
+                </button>
+                <div className="relative w-full sm:w-60">
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full h-8 rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 pr-8 text-[13px] text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]" />
                 {q && (
                   <button onClick={() => setQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-gray-200 hover:bg-[#2f2f2f]" aria-label="Clear search">
@@ -835,7 +839,7 @@ const StatsModal: React.FC<{
             </button>
           </div>
         </div>
-        <div className="mt-4 grid flex-1 grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] gap-4 overflow-hidden">
+        <div className="mt-4 grid flex-1 grid-cols-1 gap-4 overflow-hidden sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
           <div className="min-h-0 overflow-y-auto pr-1">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
@@ -890,7 +894,7 @@ const StatsList: React.FC<{
                 type="button"
                 onClick={() => onSelectCard(card)}
                 className={classNames(
-                  "grid w-full grid-cols-[52px_44px_64px_1fr] items-center gap-2 rounded-md px-1 py-1 text-left text-[11px] transition-colors",
+                  "grid w-full grid-cols-[40px_36px_52px_1fr] items-center gap-2 rounded-md px-1 py-1 text-left text-[10px] transition-colors sm:grid-cols-[52px_44px_64px_1fr] sm:text-[11px]",
                   selectedId === card.id
                     ? "bg-[#1f1f1f] text-gray-100"
                     : "text-gray-300 hover:bg-[#1b1b1b] hover:text-gray-100"
