@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "14.4";
+const APP_VERSION = "14.5";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -565,7 +565,7 @@ export default function PokeCardGallery() {
         <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
             <div className="relative h-28 w-28">
                 <div className="loading-swirl absolute inset-0" aria-hidden="true" />
-                <img src="https://mew.cards/img/logo.png" alt="Loading..." className="h-full w-full opacity-20" />
+                <img src="https://mew.cards/img/logo.png" alt="Loading..." className="h-full w-full opacity-25" />
             </div>
             <div className="h-16" />
             <div className="pointer-events-none absolute bottom-4 left-4 text-[10px] font-semibold text-[#cb97a5]/80">v{APP_VERSION}</div>
@@ -607,7 +607,7 @@ export default function PokeCardGallery() {
           <img
             src="https://mew.cards/img/logo.png"
             alt="Loading..."
-            className="h-full w-full absolute top-0 left-0 opacity-30"
+            className="h-full w-full absolute top-0 left-0 opacity-25"
           />
           <img
             src="https://mew.cards/img/logo.png"
@@ -816,8 +816,8 @@ const StatsModal: React.FC<{
           <div
             className="mt-2 h-2 w-full overflow-hidden rounded-full"
             style={{
-              backgroundColor: "#3a1f24",
-              backgroundImage: "repeating-linear-gradient(135deg, rgba(244,114,182,0.28) 0 2px, rgba(58,31,36,0.9) 2px 8px)",
+              backgroundColor: "#262626",
+              backgroundImage: "repeating-linear-gradient(135deg, rgba(244,114,182,0.28) 0 2px, rgba(0,0,0,0) 2px 6px)",
             }}
           >
             <div
@@ -972,7 +972,7 @@ const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; i
                     type="password"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    className="w-28 text-center h-10 rounded-lg border border-white/20 bg-[#101010] focus:bg-[#232323] px-3 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-0"
+                    className="w-28 text-center h-10 rounded-lg border border-white/20 bg-[#101010] focus:bg-[#232323] px-3 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-0 animate-password-in"
                     placeholder=""
                     disabled={isAuthenticating}
                 />
@@ -983,6 +983,10 @@ const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; i
                 0% { background-position: 0% 50%; }
                 50% { background-position: 100% 50%; }
                 100% { background-position: 0% 50%; }
+              }
+              @keyframes passwordIn {
+                0% { opacity: 0; transform: translateY(6px); }
+                100% { opacity: 1; transform: translateY(0); }
               }
               .loading-swirl {
                 background: radial-gradient(circle at 30% 30%, rgba(255, 209, 221, 0.85), rgba(203, 151, 165, 0.35) 45%, rgba(16, 16, 16, 0) 70%);
@@ -998,6 +1002,9 @@ const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; i
                 -webkit-mask-size: contain;
                 -webkit-mask-repeat: no-repeat;
                 -webkit-mask-position: center;
+              }
+              .animate-password-in {
+                animation: passwordIn 500ms ease 150ms both;
               }
             `}</style>
         </div>
