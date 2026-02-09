@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "16.2";
+const APP_VERSION = "16.3";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -805,7 +805,7 @@ const StatsModal: React.FC<{
 }) => (
   <div className="fixed inset-0 z-[900] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
-      <div className="flex h-full flex-col px-5 pb-6 pt-6 sm:px-6">
+      <div className="flex max-h-[85vh] flex-col overflow-y-auto px-5 pb-6 pt-6 sm:h-full sm:max-h-none sm:overflow-hidden sm:px-6">
         <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[11px] text-gray-100">PSA10 {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}</div>
@@ -873,8 +873,8 @@ const StatsModal: React.FC<{
             </button>
           </div>
         </div>
-        <div className="mt-4 grid flex-1 grid-cols-1 gap-4 overflow-hidden sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
-          <div className="min-h-0 overflow-y-auto pr-1">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:flex-1 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] sm:overflow-hidden">
+          <div className="pr-1 sm:min-h-0 sm:overflow-y-auto">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
                 <StatsList cards={stats.psa10Cards} onSelectCard={onSelectCard} selectedId={selectedCard?.id || null} />
