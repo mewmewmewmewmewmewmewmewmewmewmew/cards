@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "16.0";
+const APP_VERSION = "16.1";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -388,6 +388,7 @@ export default function PokeCardGallery() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [detailsTab, setDetailsTab] = useState<"psa10" | "psa19" | "need" | "all">("all");
   const [statsSelected, setStatsSelected] = useState<PokeCard | null>(null);
   const [mew, setMew] = useState(true);
@@ -601,14 +602,14 @@ export default function PokeCardGallery() {
   return (
     <div className="relative min-h-screen bg-[#101010] font-sans text-gray-100">
       <BackgroundGradient />
-      <header className="sticky top-0 z-50 border-b border-[#2a2a2a]/60 bg-black/30 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-[#2a2a2a]/60 bg-black/30 backdrop-blur">
         <div className="mx-auto max-w-7xl px-3 py-2">
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <img src="https://mew.cards/img/logo.png" alt="Mew Cards Logo" className="h-8 w-8" />
               <div>
                 <h1 className="text-base sm:text-lg font-semibold tracking-tight">Mew</h1>
-                <div className="text-[11px] text-gray-400">Complete Japanese List</div>
+                <div className="-mt-0.5 text-[11px] text-gray-400">Complete Japanese List</div>
               </div>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
@@ -626,7 +627,15 @@ export default function PokeCardGallery() {
                 >
                   {releaseSortDesc ? "Date ▼" : "Date ▲"}
                 </button>
-                <div className="relative w-full sm:w-60">
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  className="sm:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-gray-300 hover:text-gray-100"
+                  aria-label="Open search"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+                <div className="relative hidden sm:block w-60">
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full h-8 rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 pr-8 text-[13px] text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]" />
                 {q && (
                   <button onClick={() => setQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-gray-200 hover:bg-[#2f2f2f]" aria-label="Clear search">
@@ -639,6 +648,30 @@ export default function PokeCardGallery() {
         </div>
       </div>
       </header>
+      {searchOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm sm:hidden" onClick={() => setSearchOpen(false)}>
+          <div className="mx-auto mt-24 max-w-md px-4" onClick={(e) => e.stopPropagation()}>
+            <div className="rounded-2xl border border-[#2a2a2a] bg-[#161616] p-4">
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search…"
+                  className="w-full h-10 rounded-lg border border-white/20 bg-white/10 px-3 text-[13px] text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(false)}
+                  className="text-[12px] text-gray-400 hover:text-gray-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="relative z-10 mx-auto max-w-7xl px-4 pt-8 pb-16">
         {filtered.length === 0 ? (
@@ -674,7 +707,7 @@ export default function PokeCardGallery() {
         type="button"
         onClick={() => setShowStats(true)}
         aria-label="Open owned card stats"
-        className="fixed bottom-4 left-4 z-40 p-1.5 focus:outline-none"
+        className="fixed bottom-4 left-4 z-50 p-1.5 focus:outline-none"
       >
         <img
           src="https://mew.cards/img/logo.png"
@@ -770,7 +803,7 @@ const StatsModal: React.FC<{
   detailsTab,
   setDetailsTab,
 }) => (
-  <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
+  <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
       <div className="flex h-full flex-col px-5 pb-6 pt-6 sm:px-6">
         <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
@@ -1103,7 +1136,7 @@ const DetailModal: React.FC<{
   const displayOrigin = (language === 'JP' && card.originJP) ? card.originJP : card.originEN;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
+  <div className="fixed inset-0 z-60 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
       <div className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -1176,6 +1209,12 @@ const DetailModal: React.FC<{
                 </div>
               </div>
             )}
+            <button
+              onClick={onClose}
+              className="mt-2 w-full rounded-lg border border-[#2a2a2a] bg-[#111111] py-2 text-xs font-semibold text-gray-300 sm:hidden"
+            >
+              Back to list
+            </button>
           </div>
         </div>
         <button
