@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "17.3";
+const APP_VERSION = "17.4";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -791,7 +791,7 @@ const StatsModal: React.FC<{
             <div className="text-[11px] text-gray-100">PSA10 {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}</div>
           </div>
           <div
-            className="mt-2 h-2 w-full overflow-hidden rounded-full"
+            className="mt-2 h-2 w-full overflow-hidden rounded-full progress-hatch"
             style={{
               backgroundColor: "#262626",
               backgroundImage: "repeating-linear-gradient(135deg, rgba(244,114,182,0.28) 0 2px, rgba(0,0,0,0) 2px 6px)",
@@ -854,7 +854,7 @@ const StatsModal: React.FC<{
           </div>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:flex-1 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] sm:overflow-hidden">
-          <div className="stats-scroll rounded-2xl border border-[#2a2a2a] bg-[#141414] overflow-hidden pr-1 sm:min-h-0 sm:overflow-y-auto">
+          <div className="stats-scroll stats-scroll-edge rounded-2xl border border-[#2a2a2a] bg-[#141414] overflow-hidden pr-1 sm:min-h-0 sm:overflow-y-auto">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
                 <StatsList
@@ -907,6 +907,10 @@ const StatsModal: React.FC<{
           scrollbar-width: thin;
           scrollbar-color: rgba(203, 151, 165, 0.45) rgba(20, 20, 20, 0.9);
         }
+        .stats-scroll-edge {
+          padding-right: 10px;
+          margin-right: -10px;
+        }
         .stats-scroll::-webkit-scrollbar {
           width: 8px;
         }
@@ -920,6 +924,14 @@ const StatsModal: React.FC<{
         }
         .stats-scroll::-webkit-scrollbar-thumb:hover {
           background: rgba(203, 151, 165, 0.7);
+        }
+        .progress-hatch {
+          background-size: 14px 14px;
+          animation: hatchMove 2.2s linear infinite;
+        }
+        @keyframes hatchMove {
+          from { background-position: 0 0; }
+          to { background-position: 14px 0; }
         }
       `}</style>
     </div>
@@ -992,7 +1004,7 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
     {!card ? (
       <div className="text-[11px] text-gray-500">Select a card to preview.</div>
     ) : (
-      <div className="stats-scroll flex-1 min-h-0 overflow-y-auto pr-2 space-y-3">
+      <div className="stats-scroll stats-scroll-edge flex-1 min-h-0 overflow-y-auto pr-2 space-y-3">
         <button
           type="button"
           onClick={() => onOpenCard(card)}
