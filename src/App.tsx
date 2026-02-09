@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "13.1";
+const APP_VERSION = "13.2";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -779,16 +779,39 @@ const StatsModal: React.FC<{
             <div className="mt-3 text-xs text-gray-500">No cards loaded yet.</div>
           )}
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <select
-            value={detailsTab}
-            onChange={(e) => setDetailsTab(e.target.value as "psa10" | "psa19" | "need")}
-            className="h-8 rounded-lg border border-white/20 bg-white/10 px-3 text-[12px] font-semibold text-gray-200 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]"
-          >
-            <option value="psa10">PSA10</option>
-            <option value="psa19">PSA1-9</option>
-            <option value="need">Need</option>
-          </select>
+        <div className="mt-4 flex flex-wrap">
+          <div className="flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
+            <button
+              type="button"
+              onClick={() => setDetailsTab("psa10")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                detailsTab === "psa10" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              PSA10
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetailsTab("psa19")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                detailsTab === "psa19" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              PSA1-9
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetailsTab("need")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                detailsTab === "need" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              Need
+            </button>
+          </div>
         </div>
         <div className="mt-4 flex-1 overflow-y-auto pr-1">
           <div className="space-y-4">
