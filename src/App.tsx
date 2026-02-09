@@ -699,6 +699,10 @@ export default function PokeCardGallery() {
         <StatsModal
           onClose={() => setShowStats(false)}
           stats={ownedStats}
+          onSelectCard={(card) => {
+            setSelected(card);
+            setShowStats(false);
+          }}
           statsTab={statsTab}
           setStatsTab={setStatsTab}
           showPSA10={showPSA10}
@@ -772,6 +776,7 @@ const StatsModal: React.FC<{
     psa19Cards: PokeCard[];
     needCards: PokeCard[];
   }>;
+  onSelectCard: (card: PokeCard) => void;
   statsTab: "total" | "details";
   setStatsTab: React.Dispatch<React.SetStateAction<"total" | "details">>;
   showPSA10: boolean;
@@ -783,6 +788,7 @@ const StatsModal: React.FC<{
 }> = ({
   onClose,
   stats,
+  onSelectCard,
   statsTab,
   setStatsTab,
   showPSA10,
@@ -793,11 +799,11 @@ const StatsModal: React.FC<{
   setShowNeed,
 }) => (
   <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
-    <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
       <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
-      <div className="px-5 pb-6 pt-6 sm:px-6">
+      <div className="flex h-full flex-col px-5 pb-6 pt-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-gray-100">Owned stats</h2>
@@ -827,7 +833,7 @@ const StatsModal: React.FC<{
           </div>
         </div>
         {statsTab === "total" ? (
-          <div className="mt-5 space-y-4">
+          <div className="mt-5 space-y-4 overflow-y-auto pr-1">
             {stats.map((section) => {
               const percent = section.total ? Math.round((section.psa10 / section.total) * 100) : 0;
               const progressText = section.total ? `${section.psa10}/${section.total}` : "0/0";
@@ -864,33 +870,33 @@ const StatsModal: React.FC<{
             })}
           </div>
         ) : (
-          <div className="mt-5">
+          <div className="mt-5 flex flex-1 flex-col overflow-hidden">
             <div className="flex flex-wrap gap-2">
               <TogglePill label="PSA10" active={showPSA10} onClick={() => setShowPSA10((v) => !v)} />
               <TogglePill label="PSA1-9" active={showPSA19} onClick={() => setShowPSA19((v) => !v)} />
               <TogglePill label="Need" active={showNeed} onClick={() => setShowNeed((v) => !v)} />
             </div>
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 flex-1 space-y-4 overflow-y-auto pr-1">
               {showPSA10 && (
                 <StatsList title="PSA10" sections={stats.map((section) => ({
                   key: section.key,
                   label: section.label,
                   cards: section.psa10Cards,
-                }))} />
+                }))} onSelectCard={onSelectCard} />
               )}
               {showPSA19 && (
                 <StatsList title="PSA1-9" sections={stats.map((section) => ({
                   key: section.key,
                   label: section.label,
                   cards: section.psa19Cards,
-                }))} />
+                }))} onSelectCard={onSelectCard} />
               )}
               {showNeed && (
                 <StatsList title="Need" sections={stats.map((section) => ({
                   key: section.key,
                   label: section.label,
                   cards: section.needCards,
-                }))} />
+                }))} onSelectCard={onSelectCard} />
               )}
             </div>
           </div>
@@ -922,7 +928,8 @@ const TogglePill: React.FC<{ label: string; active: boolean; onClick: () => void
 const StatsList: React.FC<{
   title: string;
   sections: Array<{ key: string; label: string; cards: PokeCard[] }>;
-}> = ({ title, sections }) => (
+  onSelectCard: (card: PokeCard) => void;
+}> = ({ title, sections, onSelectCard }) => (
   <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
     <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</div>
     <div className="mt-3 space-y-3">
@@ -933,13 +940,32 @@ const StatsList: React.FC<{
             <div className="mt-1 text-[11px] text-gray-500">None</div>
           ) : (
             <ul className="mt-1 space-y-1">
-              {section.cards.map((card) => (
-                <li key={`${section.key}-${title}-${card.id}`} className="text-[11px] text-gray-300">
-                  <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
-                  <span className="text-gray-500"> · {card.year || "—"}</span>
-                  <span className="text-gray-500"> · {card.number || "—"}</span>
-                </li>
-              ))}
+              {[...section.cards]
+                .sort((a, b) => {
+                  const yearA = a.year || 0;
+                  const yearB = b.year || 0;
+                  if (yearA !== yearB) return yearA - yearB;
+                  const numA = a.number || "";
+                  const numB = b.number || "";
+                  const numCmp = numA.localeCompare(numB, undefined, { numeric: true, sensitivity: "base" });
+                  if (numCmp !== 0) return numCmp;
+                  const nameA = a.nameJP || a.nameEN;
+                  const nameB = b.nameJP || b.nameEN;
+                  return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+                })
+                .map((card) => (
+                  <li key={`${section.key}-${title}-${card.id}`}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectCard(card)}
+                      className="flex w-full items-center gap-2 text-left text-[11px] text-gray-300 hover:text-gray-100"
+                    >
+                      <span className="text-gray-500">{card.year || "—"}</span>
+                      <span className="text-gray-500">{card.number || "—"}</span>
+                      <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
+                    </button>
+                  </li>
+                ))}
             </ul>
           )}
         </div>
