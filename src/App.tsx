@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "13.9";
+const APP_VERSION = "14.0";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -388,7 +388,7 @@ export default function PokeCardGallery() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
-  const [detailsTab, setDetailsTab] = useState<"psa10" | "psa19" | "need">("need");
+  const [detailsTab, setDetailsTab] = useState<"psa10" | "psa19" | "need" | "all">("need");
   const [mew, setMew] = useState(true);
   const [cameo, setCameo] = useState(false);
   const [intl, setIntl] = useState(false);
@@ -552,7 +552,7 @@ export default function PokeCardGallery() {
     const lowerGrades = Array.from({ length: 9 }, (_, i) => `PSA${i + 1}`);
     const psa19Cards = sourceCards.filter((card) => lowerGrades.includes(card.pc || ""));
     const needCards = sourceCards.filter((card) => card.pc !== "PSA10");
-    return { total, psa10, psa10Cards, psa19Cards, needCards };
+    return { total, psa10, psa10Cards, psa19Cards, needCards, allCards: sourceCards };
   }, [sourceCards]);
 
   const handlePasswordSubmit = (submittedPassword: string) => {
@@ -794,10 +794,11 @@ const StatsModal: React.FC<{
     psa10Cards: PokeCard[];
     psa19Cards: PokeCard[];
     needCards: PokeCard[];
+    allCards: PokeCard[];
   };
   onSelectCard: (card: PokeCard) => void;
-  detailsTab: "psa10" | "psa19" | "need";
-  setDetailsTab: React.Dispatch<React.SetStateAction<"psa10" | "psa19" | "need">>;
+  detailsTab: "psa10" | "psa19" | "need" | "all";
+  setDetailsTab: React.Dispatch<React.SetStateAction<"psa10" | "psa19" | "need" | "all">>;
 }> = ({
   onClose,
   stats,
@@ -810,7 +811,7 @@ const StatsModal: React.FC<{
       <div className="flex h-full flex-col px-5 pb-6 pt-6 sm:px-6">
         <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-[11px] text-gray-400">PSA10 {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}</div>
+            <div className="text-[11px] text-gray-100">PSA10 {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}</div>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#262626]">
             <div
@@ -857,6 +858,16 @@ const StatsModal: React.FC<{
             >
               Need
             </button>
+            <button
+              type="button"
+              onClick={() => setDetailsTab("all")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                detailsTab === "all" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              All
+            </button>
           </div>
         </div>
         <div className="mt-4 flex-1 overflow-y-auto pr-1">
@@ -870,6 +881,9 @@ const StatsModal: React.FC<{
             {detailsTab === "need" && (
               <StatsList cards={stats.needCards} onSelectCard={onSelectCard} />
             )}
+            {detailsTab === "all" && (
+              <StatsList cards={stats.allCards} onSelectCard={onSelectCard} sortMode="release" />
+            )}
           </div>
         </div>
       </div>
@@ -880,7 +894,8 @@ const StatsModal: React.FC<{
 const StatsList: React.FC<{
   cards: PokeCard[];
   onSelectCard: (card: PokeCard) => void;
-}> = ({ cards, onSelectCard }) => (
+  sortMode?: "default" | "release";
+}> = ({ cards, onSelectCard, sortMode = "default" }) => (
   <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
     {cards.length === 0 ? (
       <div className="text-[11px] text-gray-500">None</div>
@@ -888,6 +903,7 @@ const StatsList: React.FC<{
       <ul className="space-y-1">
         {[...cards]
           .sort((a, b) => {
+            if (sortMode === "release") return releaseTs(a) - releaseTs(b);
             const yearA = a.year || 0;
             const yearB = b.year || 0;
             if (yearA !== yearB) return yearA - yearB;
