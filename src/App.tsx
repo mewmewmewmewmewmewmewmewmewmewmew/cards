@@ -142,6 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
+const APP_VERSION = "13.1";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -566,6 +567,7 @@ export default function PokeCardGallery() {
                 <img src="https://mew.cards/img/logo.png" alt="Loading..." className="h-full w-full animate-pulse opacity-30" />
             </div>
             <div className="h-16" />
+            <div className="pointer-events-none absolute bottom-4 left-4 text-[10px] font-semibold text-[#cb97a5]/80">v{APP_VERSION}</div>
         </div>
     );
   }
@@ -778,20 +780,26 @@ const StatsModal: React.FC<{
           )}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <TogglePill label="PSA10" active={detailsTab === "psa10"} onClick={() => setDetailsTab("psa10")} />
-          <TogglePill label="PSA1-9" active={detailsTab === "psa19"} onClick={() => setDetailsTab("psa19")} />
-          <TogglePill label="Need" active={detailsTab === "need"} onClick={() => setDetailsTab("need")} />
+          <select
+            value={detailsTab}
+            onChange={(e) => setDetailsTab(e.target.value as "psa10" | "psa19" | "need")}
+            className="h-8 rounded-lg border border-white/20 bg-white/10 px-3 text-[12px] font-semibold text-gray-200 shadow-sm outline-none focus:ring-2 focus:ring-[#cb97a5]"
+          >
+            <option value="psa10">PSA10</option>
+            <option value="psa19">PSA1-9</option>
+            <option value="need">Need</option>
+          </select>
         </div>
         <div className="mt-4 flex-1 overflow-y-auto pr-1">
           <div className="space-y-4">
             {detailsTab === "psa10" && (
-              <StatsList title="PSA10" sections={[{ key: "psa10", label: "PSA10", cards: stats.psa10Cards }]} onSelectCard={onSelectCard} />
+              <StatsList cards={stats.psa10Cards} onSelectCard={onSelectCard} />
             )}
             {detailsTab === "psa19" && (
-              <StatsList title="PSA1-9" sections={[{ key: "psa19", label: "PSA1-9", cards: stats.psa19Cards }]} onSelectCard={onSelectCard} />
+              <StatsList cards={stats.psa19Cards} onSelectCard={onSelectCard} />
             )}
             {detailsTab === "need" && (
-              <StatsList title="Need" sections={[{ key: "need", label: "Need", cards: stats.needCards }]} onSelectCard={onSelectCard} />
+              <StatsList cards={stats.needCards} onSelectCard={onSelectCard} />
             )}
           </div>
         </div>
@@ -800,72 +808,44 @@ const StatsModal: React.FC<{
   </div>
 );
 
-const TogglePill: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={classNames(
-      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-      active ? "border-[#cb97a5] bg-[#cb97a5]/15 text-[#cb97a5]" : "border-[#2a2a2a] text-gray-400 hover:text-gray-200"
-    )}
-    aria-pressed={active}
-  >
-    <span className={classNames("flex h-3 w-3 items-center justify-center rounded border", active ? "border-[#cb97a5]" : "border-[#3a3a3a]")}>
-      {active && (
-        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-      )}
-    </span>
-    {label}
-  </button>
-);
-
 const StatsList: React.FC<{
-  title: string;
-  sections: Array<{ key: string; label: string; cards: PokeCard[] }>;
+  cards: PokeCard[];
   onSelectCard: (card: PokeCard) => void;
-}> = ({ title, sections, onSelectCard }) => (
+}> = ({ cards, onSelectCard }) => (
   <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
-    <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</div>
-    <div className="mt-3 space-y-3">
-      {sections.map((section) => (
-        <div key={section.key}>
-          <div className="text-[11px] font-semibold text-gray-300">{section.label}</div>
-          {section.cards.length === 0 ? (
-            <div className="mt-1 text-[11px] text-gray-500">None</div>
-          ) : (
-            <ul className="mt-1 space-y-1">
-              {[...section.cards]
-                .sort((a, b) => {
-                  const yearA = a.year || 0;
-                  const yearB = b.year || 0;
-                  if (yearA !== yearB) return yearA - yearB;
-                  const numA = a.number || "";
-                  const numB = b.number || "";
-                  const numCmp = numA.localeCompare(numB, undefined, { numeric: true, sensitivity: "base" });
-                  if (numCmp !== 0) return numCmp;
-                  const nameA = a.nameJP || a.nameEN;
-                  const nameB = b.nameJP || b.nameEN;
-                  return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
-                })
-                .map((card) => (
-                  <li key={`${section.key}-${title}-${card.id}`}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectCard(card)}
-                      className="grid w-full grid-cols-[52px_44px_64px_1fr] items-center gap-2 text-left text-[11px] text-gray-300 hover:text-gray-100"
-                    >
-                      <span className="text-[10px] font-semibold text-gray-500">{card.pc || ""}</span>
-                      <span className="text-gray-500">{card.year || "—"}</span>
-                      <span className="text-gray-500">{card.number || "—"}</span>
-                      <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
-                    </button>
-                  </li>
-                ))}
-            </ul>
-          )}
-        </div>
-      ))}
-    </div>
+    {cards.length === 0 ? (
+      <div className="text-[11px] text-gray-500">None</div>
+    ) : (
+      <ul className="space-y-1">
+        {[...cards]
+          .sort((a, b) => {
+            const yearA = a.year || 0;
+            const yearB = b.year || 0;
+            if (yearA !== yearB) return yearA - yearB;
+            const numA = a.number || "";
+            const numB = b.number || "";
+            const numCmp = numA.localeCompare(numB, undefined, { numeric: true, sensitivity: "base" });
+            if (numCmp !== 0) return numCmp;
+            const nameA = a.nameJP || a.nameEN;
+            const nameB = b.nameJP || b.nameEN;
+            return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+          })
+          .map((card) => (
+            <li key={card.id}>
+              <button
+                type="button"
+                onClick={() => onSelectCard(card)}
+                className="grid w-full grid-cols-[52px_44px_64px_1fr] items-center gap-2 text-left text-[11px] text-gray-300 hover:text-gray-100"
+              >
+                <span className="text-[10px] font-semibold text-gray-500">{card.pc || ""}</span>
+                <span className="text-gray-500">{card.year || "—"}</span>
+                <span className="text-gray-500">{card.number || "—"}</span>
+                <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
+              </button>
+            </li>
+          ))}
+      </ul>
+    )}
   </div>
 );
 
