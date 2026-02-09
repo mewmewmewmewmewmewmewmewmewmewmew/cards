@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "15.3";
+const APP_VERSION = "15.4";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -933,7 +933,7 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
           <img
             src={card.image}
             alt={`${card.nameJP || card.nameEN} preview`}
-            className="w-full h-auto object-contain"
+            className="w-full h-auto object-contain rounded-[4.2%]"
             style={{ aspectRatio: "63 / 88" }}
             onError={handleImgError}
             referrerPolicy="strict-origin-when-cross-origin"
@@ -991,7 +991,7 @@ const LoadingScreen: React.FC<{
   onPasswordSubmit?: (password: string) => void;
   isAuthenticating?: boolean;
 }> = ({ progress, swirlEpoch, showPassword, onPasswordSubmit, isAuthenticating }) => {
-  const swirlDelay = useMemo(() => -((Date.now() - swirlEpoch) % 5000) / 1000, [swirlEpoch]);
+  const swirlDelay = -((Date.now() - swirlEpoch) % 5000) / 1000;
   const [input, setInput] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
