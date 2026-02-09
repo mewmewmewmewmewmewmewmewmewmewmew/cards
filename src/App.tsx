@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "14.5";
+const APP_VERSION = "14.6";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -922,7 +922,7 @@ const StatsList: React.FC<{
             return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
           })
           .map((card) => (
-            <li key={card.id}>
+            <li key={card.id} className="group relative">
               <button
                 type="button"
                 onClick={() => onSelectCard(card)}
@@ -944,6 +944,17 @@ const StatsList: React.FC<{
                 <span className="text-gray-500">{card.number || "—"}</span>
                 <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
               </button>
+              <div className="pointer-events-none absolute left-full top-1/2 z-50 hidden -translate-y-1/2 pl-3 group-hover:block">
+                <div className="overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#111111] shadow-2xl">
+                  <img
+                    src={card.image}
+                    alt={`${card.nameJP || card.nameEN} preview`}
+                    className="h-[300px] w-auto object-contain"
+                    onError={handleImgError}
+                    referrerPolicy="strict-origin-when-cross-origin"
+                  />
+                </div>
+              </div>
             </li>
           ))}
       </ul>
