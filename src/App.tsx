@@ -387,9 +387,7 @@ export default function PokeCardGallery() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
-  const [showPSA10, setShowPSA10] = useState(false);
-  const [showPSA19, setShowPSA19] = useState(false);
-  const [showNeed, setShowNeed] = useState(true);
+  const [detailsTab, setDetailsTab] = useState<"psa10" | "psa19" | "need">("need");
   const [mew, setMew] = useState(true);
   const [cameo, setCameo] = useState(false);
   const [intl, setIntl] = useState(false);
@@ -686,12 +684,8 @@ export default function PokeCardGallery() {
             setSelected(card);
             setShowStats(false);
           }}
-          showPSA10={showPSA10}
-          setShowPSA10={setShowPSA10}
-          showPSA19={showPSA19}
-          setShowPSA19={setShowPSA19}
-          showNeed={showNeed}
-          setShowNeed={setShowNeed}
+          detailsTab={detailsTab}
+          setDetailsTab={setDetailsTab}
         />
       )}
       {selected && <DetailModal card={selected} onClose={() => setSelected(null)} language={language} setLanguage={setLanguage} />}
@@ -754,22 +748,14 @@ const StatsModal: React.FC<{
     needCards: PokeCard[];
   };
   onSelectCard: (card: PokeCard) => void;
-  showPSA10: boolean;
-  setShowPSA10: React.Dispatch<React.SetStateAction<boolean>>;
-  showPSA19: boolean;
-  setShowPSA19: React.Dispatch<React.SetStateAction<boolean>>;
-  showNeed: boolean;
-  setShowNeed: React.Dispatch<React.SetStateAction<boolean>>;
+  detailsTab: "psa10" | "psa19" | "need";
+  setDetailsTab: React.Dispatch<React.SetStateAction<"psa10" | "psa19" | "need">>;
 }> = ({
   onClose,
   stats,
   onSelectCard,
-  showPSA10,
-  setShowPSA10,
-  showPSA19,
-  setShowPSA19,
-  showNeed,
-  setShowNeed,
+  detailsTab,
+  setDetailsTab,
 }) => (
   <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
@@ -792,19 +778,19 @@ const StatsModal: React.FC<{
           )}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <TogglePill label="PSA10" active={showPSA10} onClick={() => setShowPSA10((v) => !v)} />
-          <TogglePill label="PSA1-9" active={showPSA19} onClick={() => setShowPSA19((v) => !v)} />
-          <TogglePill label="Need" active={showNeed} onClick={() => setShowNeed((v) => !v)} />
+          <TogglePill label="PSA10" active={detailsTab === "psa10"} onClick={() => setDetailsTab("psa10")} />
+          <TogglePill label="PSA1-9" active={detailsTab === "psa19"} onClick={() => setDetailsTab("psa19")} />
+          <TogglePill label="Need" active={detailsTab === "need"} onClick={() => setDetailsTab("need")} />
         </div>
         <div className="mt-4 flex-1 overflow-y-auto pr-1">
           <div className="space-y-4">
-            {showPSA10 && (
+            {detailsTab === "psa10" && (
               <StatsList title="PSA10" sections={[{ key: "psa10", label: "PSA10", cards: stats.psa10Cards }]} onSelectCard={onSelectCard} />
             )}
-            {showPSA19 && (
+            {detailsTab === "psa19" && (
               <StatsList title="PSA1-9" sections={[{ key: "psa19", label: "PSA1-9", cards: stats.psa19Cards }]} onSelectCard={onSelectCard} />
             )}
-            {showNeed && (
+            {detailsTab === "need" && (
               <StatsList title="Need" sections={[{ key: "need", label: "Need", cards: stats.needCards }]} onSelectCard={onSelectCard} />
             )}
           </div>
