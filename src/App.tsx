@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "16.7";
+const APP_VERSION = "16.8";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -697,13 +697,10 @@ export default function PokeCardGallery() {
           onSelectCard={(card) => setStatsSelected(card)}
           selectedCard={statsSelected}
           onOpenCard={(card) => {
-            if (isMobile) {
-              setSelected(card);
-              setShowStats(false);
-            } else {
-              setStatsSelected(card);
-            }
+            setSelected(card);
+            setShowStats(false);
           }}
+          isMobile={isMobile}
           detailsTab={detailsTab}
           setDetailsTab={setDetailsTab}
         />
@@ -771,6 +768,7 @@ const StatsModal: React.FC<{
   onSelectCard: (card: PokeCard) => void;
   selectedCard: PokeCard | null;
   onOpenCard: (card: PokeCard) => void;
+  isMobile: boolean;
   detailsTab: "psa10" | "psa19" | "need" | "all";
   setDetailsTab: React.Dispatch<React.SetStateAction<"psa10" | "psa19" | "need" | "all">>;
 }> = ({
@@ -779,6 +777,7 @@ const StatsModal: React.FC<{
   onSelectCard,
   selectedCard,
   onOpenCard,
+  isMobile,
   detailsTab,
   setDetailsTab,
 }) => (
@@ -856,16 +855,33 @@ const StatsModal: React.FC<{
           <div className="pr-1 sm:min-h-0 sm:overflow-y-auto">
             <div className="space-y-4">
               {detailsTab === "psa10" && (
-                <StatsList cards={stats.psa10Cards} onSelectCard={onOpenCard} selectedId={selectedCard?.id || null} />
+                <StatsList
+                  cards={stats.psa10Cards}
+                  onSelectCard={isMobile ? onOpenCard : onSelectCard}
+                  selectedId={selectedCard?.id || null}
+                />
               )}
               {detailsTab === "psa19" && (
-                <StatsList cards={stats.psa19Cards} onSelectCard={onOpenCard} selectedId={selectedCard?.id || null} />
+                <StatsList
+                  cards={stats.psa19Cards}
+                  onSelectCard={isMobile ? onOpenCard : onSelectCard}
+                  selectedId={selectedCard?.id || null}
+                />
               )}
               {detailsTab === "need" && (
-                <StatsList cards={stats.needCards} onSelectCard={onOpenCard} selectedId={selectedCard?.id || null} />
+                <StatsList
+                  cards={stats.needCards}
+                  onSelectCard={isMobile ? onOpenCard : onSelectCard}
+                  selectedId={selectedCard?.id || null}
+                />
               )}
               {detailsTab === "all" && (
-                <StatsList cards={stats.allCards} onSelectCard={onOpenCard} sortMode="release" selectedId={selectedCard?.id || null} />
+                <StatsList
+                  cards={stats.allCards}
+                  onSelectCard={isMobile ? onOpenCard : onSelectCard}
+                  sortMode="release"
+                  selectedId={selectedCard?.id || null}
+                />
               )}
             </div>
           </div>
@@ -1118,7 +1134,7 @@ const DetailModal: React.FC<{
 
   return (
   <div className="fixed inset-0 z-[999] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
-      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto sm:overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative h-[100dvh] w-full max-w-3xl overflow-y-auto sm:h-auto sm:max-h-[90vh] sm:overflow-hidden rounded-none sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
