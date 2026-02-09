@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "13.8";
+const APP_VERSION = "13.9";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -906,7 +906,18 @@ const StatsList: React.FC<{
                 onClick={() => onSelectCard(card)}
                 className="grid w-full grid-cols-[52px_44px_64px_1fr] items-center gap-2 text-left text-[11px] text-gray-300 hover:text-gray-100"
               >
-                <span className="text-[10px] font-semibold text-gray-500">{card.pc || ""}</span>
+                <span
+                  className={classNames(
+                    "text-[10px] font-semibold",
+                    card.pc === "PSA10"
+                      ? "text-emerald-300"
+                      : card.pc
+                        ? "text-rose-300"
+                        : "text-gray-500"
+                  )}
+                >
+                  {card.pc || ""}
+                </span>
                 <span className="text-gray-500">{card.year || "—"}</span>
                 <span className="text-gray-500">{card.number || "—"}</span>
                 <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
