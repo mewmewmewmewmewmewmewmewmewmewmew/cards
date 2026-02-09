@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "15.2";
+const APP_VERSION = "15.3";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -585,16 +585,16 @@ export default function PokeCardGallery() {
     setPassword(submittedPassword); // Set password to trigger data fetch effect
   };
 
-  if (!authChecked) {
-    return <LoadingScreen progress={loadingProgress} swirlEpoch={swirlEpoch} />;
-  }
-
-  if (passwordRequired && !isAuthenticated) {
-      return <PasswordScreen onPasswordSubmit={handlePasswordSubmit} isAuthenticating={isAuthenticating} swirlEpoch={swirlEpoch} />;
-  }
-
-  if (!imagesLoaded && isAuthenticated) {
-    return <LoadingScreen progress={loadingProgress} swirlEpoch={swirlEpoch} />;
+  if (!authChecked || !imagesLoaded || (passwordRequired && !isAuthenticated)) {
+    return (
+      <LoadingScreen
+        progress={loadingProgress}
+        swirlEpoch={swirlEpoch}
+        showPassword={passwordRequired && !isAuthenticated}
+        onPasswordSubmit={handlePasswordSubmit}
+        isAuthenticating={isAuthenticating}
+      />
+    );
   }
 
   return (
@@ -927,7 +927,7 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
         <button
           type="button"
           onClick={() => onOpenCard(card)}
-          className="relative w-full overflow-hidden rounded-[4.2%]"
+          className="relative w-full overflow-hidden rounded-[4.2%] border border-[#2a2a2a] bg-[#0f0f0f]"
           aria-label={`Open details for ${card.nameJP || card.nameEN}`}
         >
           <img
@@ -984,33 +984,66 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
   </div>
 );
 
-const LoadingScreen: React.FC<{ progress: number; swirlEpoch: number }> = ({ progress, swirlEpoch }) => {
+const LoadingScreen: React.FC<{
+  progress: number;
+  swirlEpoch: number;
+  showPassword?: boolean;
+  onPasswordSubmit?: (password: string) => void;
+  isAuthenticating?: boolean;
+}> = ({ progress, swirlEpoch, showPassword, onPasswordSubmit, isAuthenticating }) => {
   const swirlDelay = useMemo(() => -((Date.now() - swirlEpoch) % 5000) / 1000, [swirlEpoch]);
+  const [input, setInput] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input && !isAuthenticating && onPasswordSubmit) {
+      onPasswordSubmit(input);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
       <div className="relative h-28 w-28">
         <div className="loading-swirl absolute inset-0" aria-hidden="true" style={{ animationDelay: `${swirlDelay}s` }} />
-      <img
-        src="https://mew.cards/img/logo.png"
-        alt="Loading..."
-        className="h-full w-full absolute top-0 left-0 opacity-25"
-      />
-      <img
-        src="https://mew.cards/img/logo.png"
-        alt="Loading..."
-        className="h-full w-full absolute top-0 left-0 transition-all duration-300 ease-linear"
-        style={{
-          clipPath: `inset(${100 - progress}% 0 0 0)`
-        }}
-      />
+        <img
+          src="https://mew.cards/img/logo.png"
+          alt="Loading..."
+          className="h-full w-full absolute top-0 left-0 opacity-25"
+        />
+        <img
+          src="https://mew.cards/img/logo.png"
+          alt="Loading..."
+          className="h-full w-full absolute top-0 left-0 transition-all duration-300 ease-linear"
+          style={{
+            clipPath: `inset(${100 - progress}% 0 0 0)`
+          }}
+        />
       </div>
-      <div className="h-16" />
+      {showPassword ? (
+        <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4 h-16 justify-start">
+          <input
+            type="password"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className="w-28 text-center h-10 rounded-lg border border-white/20 bg-[#101010] focus:bg-[#232323] px-3 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-0 animate-password-in"
+            placeholder=""
+            disabled={isAuthenticating}
+          />
+          <div className="h-4" />
+        </form>
+      ) : (
+        <div className="h-16" />
+      )}
       <div className="pointer-events-none absolute bottom-4 left-4 text-[10px] font-semibold text-[#cb97a5]/80">v{APP_VERSION}</div>
       <style>{`
       @keyframes swirl {
         0% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
+      }
+      @keyframes passwordIn {
+        0% { opacity: 0; transform: translateY(6px); }
+        100% { opacity: 1; transform: translateY(0); }
       }
       .loading-swirl {
         background: radial-gradient(circle at 30% 30%, rgba(255, 209, 221, 0.85), rgba(203, 151, 165, 0.35) 45%, rgba(16, 16, 16, 0) 70%);
@@ -1027,71 +1060,14 @@ const LoadingScreen: React.FC<{ progress: number; swirlEpoch: number }> = ({ pro
         -webkit-mask-repeat: no-repeat;
         -webkit-mask-position: center;
       }
+      .animate-password-in {
+        animation: passwordIn 500ms ease 150ms both;
+      }
     `}</style>
     </div>
   );
 };
 
-const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; isAuthenticating: boolean; swirlEpoch: number }> = ({ onPasswordSubmit, isAuthenticating, swirlEpoch }) => {
-    const [input, setInput] = useState("");
-    const swirlDelay = useMemo(() => -((Date.now() - swirlEpoch) % 5000) / 1000, [swirlEpoch]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (input && !isAuthenticating) {
-            onPasswordSubmit(input);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
-            <div className="relative h-28 w-28">
-                <div className="loading-swirl absolute inset-0 z-0" aria-hidden="true" style={{ animationDelay: `${swirlDelay}s` }} />
-                <img src="https://mew.cards/img/logo.png" alt="Mew Cards Logo" className={classNames("h-full w-full opacity-25 relative z-10", isAuthenticating && "animate-pulse")} />
-            </div>
-            <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4 h-16 justify-start">
-                <input
-                    type="password"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    className="w-28 text-center h-10 rounded-lg border border-white/20 bg-[#101010] focus:bg-[#232323] px-3 text-sm text-gray-200 placeholder:text-gray-400 shadow-sm outline-none focus:ring-0 animate-password-in"
-                    placeholder=""
-                    disabled={isAuthenticating}
-                />
-                 <div className="h-4" />
-            </form>
-            <style>{`
-              @keyframes swirl {
-                0% { background-position: 0% 50%; }
-                50% { background-position: 100% 50%; }
-                100% { background-position: 0% 50%; }
-              }
-              @keyframes passwordIn {
-                0% { opacity: 0; transform: translateY(6px); }
-                100% { opacity: 1; transform: translateY(0); }
-              }
-              .loading-swirl {
-                background: radial-gradient(circle at 30% 30%, rgba(255, 209, 221, 0.85), rgba(203, 151, 165, 0.35) 45%, rgba(16, 16, 16, 0) 70%);
-                background-size: 200% 200%;
-                opacity: 0.8;
-                filter: blur(6px);
-                animation: swirl 5s linear infinite;
-                mask-image: url("https://mew.cards/img/logo.png");
-                mask-size: contain;
-                mask-repeat: no-repeat;
-                mask-position: center;
-                -webkit-mask-image: url("https://mew.cards/img/logo.png");
-                -webkit-mask-size: contain;
-                -webkit-mask-repeat: no-repeat;
-                -webkit-mask-position: center;
-              }
-              .animate-password-in {
-                animation: passwordIn 500ms ease 150ms both;
-              }
-            `}</style>
-        </div>
-    );
-};
 
 const FlipIcon = () => (
   <div className="absolute bottom-2 right-2 z-20 rounded-full bg-black/50 p-2 text-white/80 backdrop-blur-sm">
