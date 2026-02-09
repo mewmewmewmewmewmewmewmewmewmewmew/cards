@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "13.7";
+const APP_VERSION = "13.8";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -931,8 +931,8 @@ const PasswordScreen: React.FC<{ onPasswordSubmit: (password: string) => void; i
     return (
         <div className="fixed inset-0 bg-[#101010] flex flex-col items-center justify-center gap-4 p-4">
             <div className="relative h-28 w-28">
-                <div className="loading-swirl absolute inset-0" aria-hidden="true" />
-                <img src="https://mew.cards/img/logo.png" alt="Mew Cards Logo" className={classNames("h-full w-full", isAuthenticating && "animate-pulse")} />
+                <div className="loading-swirl absolute inset-0 z-0" aria-hidden="true" />
+                <img src="https://mew.cards/img/logo.png" alt="Mew Cards Logo" className={classNames("h-full w-full opacity-25 relative z-10", isAuthenticating && "animate-pulse")} />
             </div>
             <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4 h-16 justify-start">
                 <input
