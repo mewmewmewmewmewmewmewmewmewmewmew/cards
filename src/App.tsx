@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "16.6";
+const APP_VERSION = "16.7";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -389,6 +389,7 @@ export default function PokeCardGallery() {
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [detailsTab, setDetailsTab] = useState<"psa10" | "psa19" | "need" | "all">("all");
+  const [isMobile, setIsMobile] = useState(false);
   const [statsSelected, setStatsSelected] = useState<PokeCard | null>(null);
   const [mew, setMew] = useState(true);
   const [cameo, setCameo] = useState(false);
@@ -420,6 +421,13 @@ export default function PokeCardGallery() {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showStats]);
+
+  useEffect(() => {
+    const updateIsMobile = () => setIsMobile(window.matchMedia("(max-width: 639px)").matches);
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+    return () => window.removeEventListener("resize", updateIsMobile);
+  }, []);
 
   // Check if password is required on initial load
   useEffect(() => {
@@ -689,8 +697,12 @@ export default function PokeCardGallery() {
           onSelectCard={(card) => setStatsSelected(card)}
           selectedCard={statsSelected}
           onOpenCard={(card) => {
-            setSelected(card);
-            setShowStats(false);
+            if (isMobile) {
+              setSelected(card);
+              setShowStats(false);
+            } else {
+              setStatsSelected(card);
+            }
           }}
           detailsTab={detailsTab}
           setDetailsTab={setDetailsTab}
@@ -772,7 +784,7 @@ const StatsModal: React.FC<{
 }) => (
   <div className="fixed inset-0 z-[900] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
-      <div className="flex max-h-[85vh] flex-col overflow-y-auto px-5 pb-6 pt-6 sm:h-full sm:max-h-none sm:overflow-hidden sm:px-6">
+      <div className="flex max-h-[85vh] flex-col overflow-y-auto px-5 pb-6 pt-4 sm:h-full sm:max-h-none sm:overflow-hidden sm:px-6 sm:pt-6">
         <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[11px] text-gray-100">PSA10 {stats.total ? `${stats.psa10}/${stats.total}` : "0/0"}</div>
@@ -1137,7 +1149,7 @@ const DetailModal: React.FC<{
               {card.imageBack && !isFlipped && <FlipIcon />}
             </div>
           </div>
-          <div className="flex flex-col space-y-3 p-4 pt-0 sm:p-6 sm:max-h-[80vh] sm:overflow-y-auto">
+          <div className="flex flex-col space-y-3 p-4 pt-2 sm:p-6 sm:max-h-[80vh] sm:overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-4xl font-semibold text-gray-100 leading-tight">{displayName}</h2>
