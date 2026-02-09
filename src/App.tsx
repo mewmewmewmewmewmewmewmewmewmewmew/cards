@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "16.5";
+const APP_VERSION = "16.6";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -1106,7 +1106,7 @@ const DetailModal: React.FC<{
 
   return (
   <div className="fixed inset-0 z-[999] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
-      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto sm:overflow-hidden rounded-t-3xl sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-3 right-3 z-10 rounded-full p-2 text-gray-400 hover:bg-[#1f1f1f] focus:outline-none focus:ring-2 focus:ring-[#cb97a5]" aria-label="Close">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
@@ -1137,7 +1137,7 @@ const DetailModal: React.FC<{
               {card.imageBack && !isFlipped && <FlipIcon />}
             </div>
           </div>
-          <div className="flex flex-col space-y-3 p-4 pt-0 sm:p-6 max-h-[70vh] overflow-y-auto sm:max-h-[80vh]">
+          <div className="flex flex-col space-y-3 p-4 pt-0 sm:p-6 sm:max-h-[80vh] sm:overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-4xl font-semibold text-gray-100 leading-tight">{displayName}</h2>
