@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "14.2";
+const APP_VERSION = "14.3";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -817,7 +817,7 @@ const StatsModal: React.FC<{
             className="mt-2 h-2 w-full overflow-hidden rounded-full"
             style={{
               backgroundColor: "#3a1f24",
-              backgroundImage: "repeating-linear-gradient(135deg, rgba(244,114,182,0.28) 0 6px, rgba(58,31,36,0.9) 6px 12px)",
+              backgroundImage: "repeating-linear-gradient(135deg, rgba(244,114,182,0.28) 0 1px, rgba(58,31,36,0.9) 1px 3px)",
             }}
           >
             <div
