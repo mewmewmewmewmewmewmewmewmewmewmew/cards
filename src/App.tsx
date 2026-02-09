@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "15.9";
+const APP_VERSION = "16.0";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -637,6 +637,7 @@ export default function PokeCardGallery() {
             </div>
           </div>
         </div>
+      </div>
       </header>
 
       <main className="relative z-10 mx-auto max-w-7xl px-4 pt-8 pb-16">
