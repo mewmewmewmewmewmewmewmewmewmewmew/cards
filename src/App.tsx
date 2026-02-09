@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "15.6";
+const APP_VERSION = "15.7";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -953,10 +953,6 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
           <div className="flex flex-col gap-0.5">
             <span className="text-gray-500">Release</span>
             <span className="text-gray-100">{formatDate(card.release) || "—"}</span>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-gray-500">Grade</span>
-            <span className="text-gray-100">{card.pc || "—"}</span>
           </div>
           {card.rarity && (
             <div className="flex flex-col gap-0.5">
