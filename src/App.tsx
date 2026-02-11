@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "18.7";
+const APP_VERSION = "18.8";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -1256,12 +1256,22 @@ const DetailModal: React.FC<{
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-4xl font-semibold text-gray-100 leading-tight">{displayName}</h2>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  {card.number && card.number !== "N/A" && (
-                    <p className="text-base font-semibold text-[#cb97a5]">{card.number}</p>
-                  )}
-                  {card.rarity && <Tag label={card.rarity} />}
-                  {card.edition && (<span className="rounded bg-[#cb97a5]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#cb97a5]">{card.edition}</span>)}
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {card.number && card.number !== "N/A" && (
+                      <p className="text-base font-semibold text-[#cb97a5]">{card.number}</p>
+                    )}
+                    {card.rarity && <Tag label={card.rarity} />}
+                    {card.edition && (<span className="rounded bg-[#cb97a5]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#cb97a5]">{card.edition}</span>)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLanguage(l => (l === 'JP' ? 'EN' : 'JP'))}
+                    aria-label="Toggle language"
+                    className="sm:hidden rounded-full border border-[#cb97a5] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-gray-300 shadow-sm hover:bg-[#1f1f1f] focus:outline-none focus:bg-[#2f2f2f]"
+                  >
+                    {language}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1305,7 +1315,7 @@ const DetailModal: React.FC<{
           type="button"
           onClick={() => setLanguage(l => (l === 'JP' ? 'EN' : 'JP'))}
           aria-label="Toggle language"
-          className="absolute bottom-4 right-4 z-20 rounded-full border border-[#cb97a5] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-gray-300 shadow-sm hover:bg-[#1f1f1f] focus:outline-none focus:bg-[#2f2f2f]"
+          className="hidden sm:inline-flex absolute bottom-4 right-4 z-20 rounded-full border border-[#cb97a5] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-gray-300 shadow-sm hover:bg-[#1f1f1f] focus:outline-none focus:bg-[#2f2f2f]"
         >
           {language}
         </button>
