@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "18.6";
+const APP_VERSION = "18.7";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -692,20 +692,22 @@ export default function PokeCardGallery() {
           </ul>
         )}
       </main>
-      <div className="fixed bottom-4 left-4 z-50 flex flex-col items-center gap-2">
+      <div className="fixed bottom-4 left-4 z-50 flex flex-col items-center gap-1">
         <button
           type="button"
           onClick={() => setDesaturateNeed((v) => !v)}
           aria-label="Toggle need list desaturation"
           className={classNames(
-            "rounded-lg sm:rounded-none p-2 sm:p-1.5 bg-black/50 sm:bg-transparent border border-white/10 sm:border-transparent focus:outline-none",
-            desaturateNeed && "ring-1 ring-[#cb97a5]/60"
+            "rounded-lg sm:rounded-none p-2 sm:p-1.5 bg-black/50 sm:bg-transparent border border-white/10 sm:border-transparent focus:outline-none"
           )}
         >
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
-            className="h-4 w-4 opacity-50 grayscale transition-opacity duration-150 hover:opacity-100"
+            className={classNames(
+              "h-4 w-4 transition-opacity duration-150 hover:opacity-100",
+              desaturateNeed ? "text-white opacity-100" : "opacity-50 grayscale"
+            )}
             fill="none"
             stroke="currentColor"
             strokeWidth="1.6"
