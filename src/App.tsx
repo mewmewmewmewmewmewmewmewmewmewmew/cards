@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "18.9";
+const APP_VERSION = "19.0";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -1316,7 +1316,7 @@ const DetailModal: React.FC<{
           type="button"
           onClick={() => setLanguage(l => (l === 'JP' ? 'EN' : 'JP'))}
           aria-label="Toggle language"
-          className="hidden sm:inline-flex absolute bottom-4 right-4 z-20 rounded-full border border-[#cb97a5] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-gray-300 shadow-sm hover:bg-[#1f1f1f] focus:outline-none focus:bg-[#2f2f2f]"
+          className="hidden sm:inline-flex absolute bottom-4 right-4 z-20 rounded-lg border border-[#2a2a2a] bg-[#141414] px-3 py-2 text-[11px] font-black tracking-[0.16em] text-gray-100 shadow-sm hover:bg-[#1f1f1f] focus:outline-none focus:bg-[#2f2f2f]"
         >
           {languageLabel}
         </button>
