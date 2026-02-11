@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "17.9";
+const APP_VERSION = "18.0";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -1005,12 +1005,13 @@ const StatsPreview: React.FC<{ card: PokeCard | null; onOpenCard: (card: PokeCar
       <div className="text-[11px] text-gray-500">Select a card to preview.</div>
     ) : (
       <div className="stats-scroll stats-scroll-edge flex-1 min-h-0 overflow-y-auto pr-2 space-y-3">
-        <button
-          type="button"
-          onClick={() => onOpenCard(card)}
-          className="relative w-full overflow-hidden rounded-[4.2%] border border-[#2a2a2a] bg-[#0f0f0f]"
-          aria-label={`Open details for ${card.nameJP || card.nameEN}`}
-        >
+          <button
+            type="button"
+            onClick={() => onOpenCard(card)}
+            className="relative w-full overflow-hidden border border-[#2a2a2a] bg-[#0f0f0f]"
+            style={{ borderRadius: "3mm" }}
+            aria-label={`Open details for ${card.nameJP || card.nameEN}`}
+          >
           <img
             src={card.image}
             alt={`${card.nameJP || card.nameEN} preview`}
@@ -1197,12 +1198,12 @@ const DetailModal: React.FC<{
                 style={{ transform: `rotateY(${isFlipped ? 180 : 0}deg)` }}
               >
                 {/* Front */}
-                <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
+                <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] overflow-hidden bg-[#0f0f0f]" style={{ borderRadius: "3mm" }}>
                   <img src={card.image} alt={`${displayName} front`} className="h-full w-full object-fill" style={{ aspectRatio: "63/88" }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                 </div>
                 {/* Back */}
                 {card.imageBack && (
-                  <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-[4.2%] overflow-hidden bg-[#0f0f0f]">
+                  <div className="absolute top-0 left-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] overflow-hidden bg-[#0f0f0f]" style={{ borderRadius: "3mm" }}>
                     <img src={card.imageBack} alt={`${displayName} back`} className="h-full w-full object-fill" style={{ aspectRatio: "63/88" }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
                   </div>
                 )}
