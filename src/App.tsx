@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "18.4";
+const APP_VERSION = "18.5";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -399,6 +399,7 @@ export default function PokeCardGallery() {
   const [remoteCards, setRemoteCards] = useState<PokeCard[] | null>(null);
   const [releaseSortDesc, setReleaseSortDesc] = useState(false);
   const [language, setLanguage] = useState<'EN' | 'JP'>('JP');
+  const [desaturateNeed, setDesaturateNeed] = useState(false);
   
   const [dataStatus, setDataStatus] = useState<'loading' | 'loaded' | 'fallback'>('loading');
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -429,6 +430,16 @@ export default function PokeCardGallery() {
     updateIsMobile();
     window.addEventListener("resize", updateIsMobile);
     return () => window.removeEventListener("resize", updateIsMobile);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "m") {
+        setDesaturateNeed((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Check if password is required on initial load
@@ -661,7 +672,17 @@ export default function PokeCardGallery() {
                 <li key={card.id}>
                   <TiltCardButton onClick={() => setSelected(card)} ariaLabel={`Open details for ${displayName} ${card.set} ${card.number}`}>
                     <div className="relative aspect-[63/88] w-full overflow-hidden bg-[#0f0f0f]" style={{ borderRadius: "5.2% / 3.9%" }}>
-                      <img src={card.image} alt={displayName} className="h-full w-full object-fill" style={{ aspectRatio: '63/88' }} onError={handleImgError} referrerPolicy="strict-origin-when-cross-origin" />
+                      <img
+                        src={card.image}
+                        alt={displayName}
+                        className={classNames(
+                          "h-full w-full object-fill transition-[filter] duration-200",
+                          desaturateNeed && card.pc !== "PSA10" && "grayscale"
+                        )}
+                        style={{ aspectRatio: "63/88" }}
+                        onError={handleImgError}
+                        referrerPolicy="strict-origin-when-cross-origin"
+                      />
                     </div>
                   </TiltCardButton>
                   <div className="mt-1.5 flex h-5 items-center justify-between gap-1.5 px-1">
