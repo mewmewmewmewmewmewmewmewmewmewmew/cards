@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "18.8";
+const APP_VERSION = "18.9";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -1218,6 +1218,7 @@ const DetailModal: React.FC<{
   const displayName = (language === 'JP' && card.nameJP) ? card.nameJP : card.nameEN;
   const displayNotes = (language === 'JP' && card.notesJP) ? card.notesJP : card.notesEN;
   const displayOrigin = (language === 'JP' && card.originJP) ? card.originJP : card.originEN;
+  const languageLabel = language === 'JP' ? 'JA' : 'EN';
 
   return (
   <div className="fixed inset-0 z-[999] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
@@ -1256,22 +1257,12 @@ const DetailModal: React.FC<{
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-4xl font-semibold text-gray-100 leading-tight">{displayName}</h2>
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {card.number && card.number !== "N/A" && (
-                      <p className="text-base font-semibold text-[#cb97a5]">{card.number}</p>
-                    )}
-                    {card.rarity && <Tag label={card.rarity} />}
-                    {card.edition && (<span className="rounded bg-[#cb97a5]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#cb97a5]">{card.edition}</span>)}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLanguage(l => (l === 'JP' ? 'EN' : 'JP'))}
-                    aria-label="Toggle language"
-                    className="sm:hidden rounded-full border border-[#cb97a5] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-gray-300 shadow-sm hover:bg-[#1f1f1f] focus:outline-none focus:bg-[#2f2f2f]"
-                  >
-                    {language}
-                  </button>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {card.number && card.number !== "N/A" && (
+                    <p className="text-base font-semibold text-[#cb97a5]">{card.number}</p>
+                  )}
+                  {card.rarity && <Tag label={card.rarity} />}
+                  {card.edition && (<span className="rounded bg-[#cb97a5]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#cb97a5]">{card.edition}</span>)}
                 </div>
               </div>
             </div>
@@ -1303,12 +1294,22 @@ const DetailModal: React.FC<{
                 </div>
               </div>
             )}
-            <button
-              onClick={onClose}
-              className="mt-2 w-full rounded-lg border border-[#cb97a5]/40 bg-[#cb97a5]/20 py-2 text-xs font-semibold text-[#f6d7df] sm:hidden"
-            >
-              Back to list
-            </button>
+            <div className="mt-2 flex items-center gap-2 sm:hidden">
+              <button
+                onClick={onClose}
+                className="flex-1 rounded-lg border border-[#cb97a5]/40 bg-[#cb97a5]/20 py-2 text-xs font-semibold text-[#f6d7df]"
+              >
+                Back to list
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage(l => (l === 'JP' ? 'EN' : 'JP'))}
+                aria-label="Toggle language"
+                className="rounded-lg border border-[#2a2a2a] bg-[#141414] px-3 py-2 text-[11px] font-black tracking-[0.16em] text-gray-100"
+              >
+                {languageLabel}
+              </button>
+            </div>
           </div>
         </div>
         <button
@@ -1317,7 +1318,7 @@ const DetailModal: React.FC<{
           aria-label="Toggle language"
           className="hidden sm:inline-flex absolute bottom-4 right-4 z-20 rounded-full border border-[#cb97a5] bg-[#1a1a1a] px-2.5 py-1 text-xs font-medium text-gray-300 shadow-sm hover:bg-[#1f1f1f] focus:outline-none focus:bg-[#2f2f2f]"
         >
-          {language}
+          {languageLabel}
         </button>
       </div>
     </div>
