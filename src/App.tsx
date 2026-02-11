@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "18.5";
+const APP_VERSION = "18.6";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -432,15 +432,6 @@ export default function PokeCardGallery() {
     return () => window.removeEventListener("resize", updateIsMobile);
   }, []);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "m") {
-        setDesaturateNeed((v) => !v);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   // Check if password is required on initial load
   useEffect(() => {
@@ -701,18 +692,45 @@ export default function PokeCardGallery() {
           </ul>
         )}
       </main>
-      <button
-        type="button"
-        onClick={() => setShowStats(true)}
-        aria-label="Open owned card stats"
-        className="fixed bottom-4 left-4 z-50 rounded-lg sm:rounded-none p-2 sm:p-1.5 bg-black/50 sm:bg-transparent border border-white/10 sm:border-transparent focus:outline-none"
-      >
-        <img
-          src="https://mew.cards/img/logo.png"
-          alt="Owned stats"
-          className="h-4 w-4 opacity-50 grayscale transition-opacity duration-150 hover:opacity-100"
-        />
-      </button>
+      <div className="fixed bottom-4 left-4 z-50 flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setDesaturateNeed((v) => !v)}
+          aria-label="Toggle need list desaturation"
+          className={classNames(
+            "rounded-lg sm:rounded-none p-2 sm:p-1.5 bg-black/50 sm:bg-transparent border border-white/10 sm:border-transparent focus:outline-none",
+            desaturateNeed && "ring-1 ring-[#cb97a5]/60"
+          )}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-4 w-4 opacity-50 grayscale transition-opacity duration-150 hover:opacity-100"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="5" y="3" width="14" height="18" rx="2" />
+            <line x1="8" y1="8" x2="16" y2="8" />
+            <line x1="8" y1="12" x2="16" y2="12" />
+            <line x1="8" y1="16" x2="13" y2="16" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowStats(true)}
+          aria-label="Open owned card stats"
+          className="rounded-lg sm:rounded-none p-2 sm:p-1.5 bg-black/50 sm:bg-transparent border border-white/10 sm:border-transparent focus:outline-none"
+        >
+          <img
+            src="https://mew.cards/img/logo.png"
+            alt="Owned stats"
+            className="h-4 w-4 opacity-50 grayscale transition-opacity duration-150 hover:opacity-100"
+          />
+        </button>
+      </div>
       {showStats && (
         <StatsModal
           onClose={() => setShowStats(false)}
