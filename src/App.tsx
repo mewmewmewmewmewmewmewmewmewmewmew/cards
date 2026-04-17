@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "19.3";
+const APP_VERSION = "19.4";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -390,7 +390,7 @@ export default function PokeCardGallery() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PokeCard | null>(null);
   const [showStats, setShowStats] = useState(false);
-  const [detailsTab, setDetailsTab] = useState<"psa10" | "psa19" | "need" | "all">("all");
+  const [detailsTab, setDetailsTab] = useState<"psa10" | "psa19" | "need" | "all" | "1st" | "unlim">("all");
   const [isMobile, setIsMobile] = useState(false);
   const [statsSelected, setStatsSelected] = useState<PokeCard | null>(null);
   const [mew, setMew] = useState(true);
@@ -567,7 +567,9 @@ export default function PokeCardGallery() {
     const lowerGrades = Array.from({ length: 9 }, (_, i) => `PSA${i + 1}`);
     const psa19Cards = sourceCards.filter((card) => lowerGrades.includes(card.pc || ""));
     const needCards = sourceCards.filter((card) => card.pc !== "PSA10");
-    return { total, psa10, psa10Cards, psa19Cards, needCards, allCards: sourceCards };
+    const firstCards = sourceCards.filter((card) => card.edition === "1st");
+    const unlimCards = sourceCards.filter((card) => card.edition === "Unlim");
+    return { total, psa10, psa10Cards, psa19Cards, needCards, firstCards, unlimCards, allCards: sourceCards };
   }, [sourceCards]);
 
   const activeStatsCards = useMemo(() => {
@@ -578,6 +580,10 @@ export default function PokeCardGallery() {
         return ownedStats.psa19Cards;
       case "need":
         return ownedStats.needCards;
+      case "1st":
+        return ownedStats.firstCards;
+      case "unlim":
+        return ownedStats.unlimCards;
       default:
         return ownedStats.allCards;
     }
@@ -806,14 +812,16 @@ const StatsModal: React.FC<{
     psa10Cards: PokeCard[];
     psa19Cards: PokeCard[];
     needCards: PokeCard[];
+    firstCards: PokeCard[];
+    unlimCards: PokeCard[];
     allCards: PokeCard[];
   };
   onSelectCard: (card: PokeCard) => void;
   selectedCard: PokeCard | null;
   onOpenCard: (card: PokeCard) => void;
   isMobile: boolean;
-  detailsTab: "psa10" | "psa19" | "need" | "all";
-  setDetailsTab: React.Dispatch<React.SetStateAction<"psa10" | "psa19" | "need" | "all">>;
+  detailsTab: "psa10" | "psa19" | "need" | "all" | "1st" | "unlim";
+  setDetailsTab: React.Dispatch<React.SetStateAction<"psa10" | "psa19" | "need" | "all" | "1st" | "unlim">>;
 }> = ({
   onClose,
   stats,
@@ -830,6 +838,8 @@ const StatsModal: React.FC<{
     const base = detailsTab === "psa10" ? stats.psa10Cards
       : detailsTab === "psa19" ? stats.psa19Cards
       : detailsTab === "need" ? stats.needCards
+      : detailsTab === "1st" ? stats.firstCards
+      : detailsTab === "unlim" ? stats.unlimCards
       : stats.allCards;
     return [...base].sort((a, b) => {
       if (detailsTab === "all") return releaseTs(a) - releaseTs(b);
@@ -907,6 +917,26 @@ const StatsModal: React.FC<{
               )}
             >
               PSA10
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetailsTab("1st")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                detailsTab === "1st" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              1st
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetailsTab("unlim")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                detailsTab === "unlim" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              Unlim
             </button>
           </div>
           <div className="flex items-center gap-2">
@@ -996,6 +1026,24 @@ const StatsModal: React.FC<{
               {detailsTab === "need" && (
                 <StatsList
                   cards={stats.needCards}
+                  onSelectCard={isMobile ? onOpenCard : onSelectCard}
+                  selectedId={selectedCard?.id || null}
+                  language={statsLang}
+                  containerClassName="rounded-none border-0 bg-transparent p-4"
+                />
+              )}
+              {detailsTab === "1st" && (
+                <StatsList
+                  cards={stats.firstCards}
+                  onSelectCard={isMobile ? onOpenCard : onSelectCard}
+                  selectedId={selectedCard?.id || null}
+                  language={statsLang}
+                  containerClassName="rounded-none border-0 bg-transparent p-4"
+                />
+              )}
+              {detailsTab === "unlim" && (
+                <StatsList
+                  cards={stats.unlimCards}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
                   language={statsLang}
