@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "19.2";
+const APP_VERSION = "19.3";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -825,6 +825,20 @@ const StatsModal: React.FC<{
   setDetailsTab,
 }) => {
   const [statsLang, setStatsLang] = useState<"en" | "jp">("jp");
+  const [statsView, setStatsView] = useState<"list" | "grid">("list");
+  const gridCards = (() => {
+    const base = detailsTab === "psa10" ? stats.psa10Cards
+      : detailsTab === "psa19" ? stats.psa19Cards
+      : detailsTab === "need" ? stats.needCards
+      : stats.allCards;
+    return [...base].sort((a, b) => {
+      if (detailsTab === "all") return releaseTs(a) - releaseTs(b);
+      if ((a.year || 0) !== (b.year || 0)) return (a.year || 0) - (b.year || 0);
+      const nc = (a.number || "").localeCompare(b.number || "", undefined, { numeric: true, sensitivity: "base" });
+      if (nc !== 0) return nc;
+      return (a.nameJP || a.nameEN).localeCompare(b.nameJP || b.nameEN, undefined, { sensitivity: "base" });
+    });
+  })();
   return (
   <div className="fixed inset-0 z-[900] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl h-[100dvh] overflow-hidden rounded-none sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
@@ -895,6 +909,18 @@ const StatsModal: React.FC<{
               PSA10
             </button>
           </div>
+          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setStatsView(v => v === "grid" ? "list" : "grid")}
+            className={classNames(
+              "flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#2a2a2a] bg-[#141414] text-xs transition-colors",
+              statsView === "grid" ? "text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+            )}
+            aria-label="Toggle grid view"
+          >
+            <i className="fa-solid fa-border-all" />
+          </button>
           <div className="flex items-center gap-1 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
             <button
               type="button"
@@ -917,7 +943,35 @@ const StatsModal: React.FC<{
               JP
             </button>
           </div>
+          </div>
         </div>
+        {statsView === "grid" ? (
+          <div className="stats-scroll mt-4 grid grid-cols-3 gap-3 overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4 sm:flex-1 sm:min-h-0 sm:grid-cols-4">
+            {gridCards.map((card) => (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => onOpenCard(card)}
+                className="flex flex-col items-center gap-1 rounded-lg p-1 text-center transition-colors hover:bg-[#1f1f1f]"
+              >
+                <div className="w-full overflow-hidden rounded-[4.2%] border border-[#2a2a2a] bg-[#0f0f0f]">
+                  <img
+                    src={card.image}
+                    alt={card.nameEN}
+                    className="aspect-[63/88] w-full object-contain"
+                  />
+                </div>
+                <span className="w-full truncate text-[9px] leading-tight text-gray-300">
+                  {statsLang === "en" ? (card.nameEN || card.nameJP) : (card.nameJP || card.nameEN)}
+                </span>
+                <span className="text-[9px] text-gray-500">{card.number || "—"}</span>
+              </button>
+            ))}
+            {gridCards.length === 0 && (
+              <div className="col-span-full text-[11px] text-gray-500">None</div>
+            )}
+          </div>
+        ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:flex-1 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] sm:overflow-hidden">
           <div className="stats-scroll stats-scroll-edge rounded-l-2xl rounded-r-none border border-[#2a2a2a] bg-[#141414] overflow-hidden pr-1 sm:min-h-0 sm:overflow-y-auto">
             <div className="space-y-4">
@@ -964,6 +1018,7 @@ const StatsModal: React.FC<{
             <StatsPreview card={selectedCard} onOpenCard={onOpenCard} />
           </div>
         </div>
+        )}
         <button
           onClick={onClose}
           className="mt-3 w-full rounded-lg border border-[#cb97a5]/40 bg-[#cb97a5]/20 py-2 text-xs font-semibold text-[#f6d7df] sm:hidden"
