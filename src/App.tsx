@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "19.4";
+const APP_VERSION = "19.5";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -964,7 +964,7 @@ const StatsModal: React.FC<{
                 <span className="w-full truncate text-[9px] leading-tight text-gray-300">
                   {statsLang === "en" ? (card.nameEN || card.nameJP) : (card.nameJP || card.nameEN)}
                 </span>
-                <span className="text-[9px] text-gray-500">{card.number || "—"}{card.edition ? ` · ${card.edition}` : ""}</span>
+                <span className="text-[9px] text-[#cb97a5]/80">{card.number || "—"}{card.edition ? ` · ${card.edition}` : ""}</span>
               </button>
             ))}
             {gridCards.length === 0 && (
