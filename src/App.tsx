@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "19.1";
+const APP_VERSION = "19.2";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -823,7 +823,9 @@ const StatsModal: React.FC<{
   isMobile,
   detailsTab,
   setDetailsTab,
-}) => (
+}) => {
+  const [statsLang, setStatsLang] = useState<"en" | "jp">("jp");
+  return (
   <div className="fixed inset-0 z-[900] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
     <div className="relative w-full max-w-3xl h-[100dvh] overflow-hidden rounded-none sm:rounded-3xl border border-[#2a2a2a] bg-[#161616] shadow-2xl sm:h-[80vh]" onClick={(e) => e.stopPropagation()}>
       <div className="stats-scroll flex h-full max-h-[100dvh] flex-col overflow-y-auto px-5 pb-6 pt-2 sm:h-full sm:max-h-none sm:overflow-hidden sm:px-6 sm:pt-6">
@@ -850,7 +852,7 @@ const StatsModal: React.FC<{
             <div className="mt-3 text-xs text-gray-500">No cards loaded yet.</div>
           )}
         </div>
-        <div className="mt-4 flex flex-wrap">
+        <div className="mt-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
             <button
               type="button"
@@ -893,6 +895,28 @@ const StatsModal: React.FC<{
               PSA10
             </button>
           </div>
+          <div className="flex items-center gap-1 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
+            <button
+              type="button"
+              onClick={() => setStatsLang("en")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                statsLang === "en" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatsLang("jp")}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                statsLang === "jp" ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              JP
+            </button>
+          </div>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:flex-1 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] sm:overflow-hidden">
           <div className="stats-scroll stats-scroll-edge rounded-l-2xl rounded-r-none border border-[#2a2a2a] bg-[#141414] overflow-hidden pr-1 sm:min-h-0 sm:overflow-y-auto">
@@ -902,6 +926,7 @@ const StatsModal: React.FC<{
                   cards={stats.psa10Cards}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
+                  language={statsLang}
                   containerClassName="rounded-none border-0 bg-transparent p-4"
                 />
               )}
@@ -910,6 +935,7 @@ const StatsModal: React.FC<{
                   cards={stats.psa19Cards}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
+                  language={statsLang}
                   containerClassName="rounded-none border-0 bg-transparent p-4"
                 />
               )}
@@ -918,6 +944,7 @@ const StatsModal: React.FC<{
                   cards={stats.needCards}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
+                  language={statsLang}
                   containerClassName="rounded-none border-0 bg-transparent p-4"
                 />
               )}
@@ -927,6 +954,7 @@ const StatsModal: React.FC<{
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   sortMode="release"
                   selectedId={selectedCard?.id || null}
+                  language={statsLang}
                   containerClassName="rounded-none border-0 bg-transparent p-4"
                 />
               )}
@@ -977,7 +1005,8 @@ const StatsModal: React.FC<{
       `}</style>
     </div>
   </div>
-);
+  );
+};
 
 const StatsList: React.FC<{
   cards: PokeCard[];
@@ -985,7 +1014,8 @@ const StatsList: React.FC<{
   selectedId: string | null;
   sortMode?: "default" | "release";
   containerClassName?: string;
-}> = ({ cards, onSelectCard, selectedId, sortMode = "default", containerClassName }) => (
+  language?: "en" | "jp";
+}> = ({ cards, onSelectCard, selectedId, sortMode = "default", containerClassName, language = "jp" }) => (
   <div className={classNames("rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4", containerClassName)}>
     {cards.length === 0 ? (
       <div className="text-[11px] text-gray-500">None</div>
@@ -1031,7 +1061,7 @@ const StatsList: React.FC<{
                 </span>
                 <span className="text-gray-500">{card.year || "—"}</span>
                 <span className="text-gray-500">{card.number || "—"}</span>
-                <span className="text-gray-100">{card.nameJP || card.nameEN}</span>
+                <span className="text-gray-100">{language === "en" ? (card.nameEN || card.nameJP) : (card.nameJP || card.nameEN)}</span>
               </button>
             </li>
           ))}
