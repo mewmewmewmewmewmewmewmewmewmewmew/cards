@@ -332,7 +332,7 @@
             <div>
                 <div class="flex justify-between items-end mb-1">
                     <label class="block text-sm font-semibold text-slate-700 uppercase tracking-wider mb-0">2. Guard Option</label>
-                    <button onclick="toggleFlip()" class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 flex items-center gap-1 transition-colors" title="Flip Guard Vertically">
+                    <button onclick="toggleFlip()" class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 flex items-center gap-1 transition-colors" title="Rotate Guard 180°">
                         <i data-lucide="refresh-cw" class="w-3 h-3"></i>
                         <span class="font-medium">Rotate</span>
                     </button>
@@ -533,7 +533,7 @@
     </div>
 
     <!-- Version -->
-    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.1</div>
+    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.2</div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -969,7 +969,7 @@
         function toggleFlip() {
             isFlipped = !isFlipped;
             const guard = document.getElementById('guardImageOverlay');
-            if (isFlipped) guard.style.transform = "translate(-50%, -50%) scaleY(-1)";
+            if (isFlipped) guard.style.transform = "translate(-50%, -50%) scaleX(-1) scaleY(-1)";
             else guard.style.transform = "translate(-50%, -50%)";
         }
 
@@ -1130,6 +1130,10 @@
         dnd.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('drop-active'); });
         dnd.addEventListener('dragleave', (e) => { e.preventDefault(); document.body.classList.remove('drop-active'); });
         dnd.addEventListener('drop', (e) => { e.preventDefault(); document.body.classList.remove('drop-active'); if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+        document.addEventListener('paste', (e) => {
+            const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
+            if (item) handleFile(item.getAsFile());
+        });
 
         function handleFile(file) {
             if (file && file.type.startsWith('image/')) {
