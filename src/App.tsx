@@ -142,7 +142,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "19.5";
+const APP_VERSION = "19.6";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -155,6 +155,7 @@ function normalizePC(value: string | undefined): string | undefined {
   const trimmed = value.trim().toUpperCase();
   if (!trimmed) return undefined;
   if (trimmed === "RAW") return "RAW";
+  if (trimmed === "N/A" || trimmed === "NA") return "N/A";
   const match = trimmed.match(/^PSA\s?(\d{1,2})$/);
   if (!match) return undefined;
   const grade = Number.parseInt(match[1], 10);
@@ -561,7 +562,7 @@ export default function PokeCardGallery() {
   const filtered = useMemo(() => applyFilters(sourceCards, { q, mew, cameo, intl, sortBy: releaseSortDesc ? "releaseDesc" : "releaseAsc" }), [q, mew, cameo, intl, sourceCards, releaseSortDesc]);
 
   const ownedStats = useMemo(() => {
-    const total = sourceCards.length;
+    const total = sourceCards.filter((card) => card.pc !== "N/A").length;
     const psa10Cards = sourceCards.filter((card) => card.pc === "PSA10");
     const psa10 = psa10Cards.length;
     const lowerGrades = Array.from({ length: 9 }, (_, i) => `PSA${i + 1}`);
@@ -668,7 +669,7 @@ export default function PokeCardGallery() {
                         alt={displayName}
                         className={classNames(
                           "h-full w-full object-fill transition-[filter] duration-200",
-                          desaturateNeed && card.pc !== "PSA10" && "grayscale"
+                          desaturateNeed && card.pc !== "PSA10" && (card.pc === "N/A" ? "grayscale opacity-25" : "grayscale")
                         )}
                         style={{ aspectRatio: "63/88" }}
                         onError={handleImgError}
