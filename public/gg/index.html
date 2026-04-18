@@ -533,7 +533,7 @@
     </div>
 
     <!-- Version -->
-    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.2</div>
+    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.3</div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -1395,10 +1395,27 @@
             }
         }
         
-        window.findByCert = () => {
+        window.findByCert = async () => {
             const cert = prompt("Please enter the PSA Certification Number:");
-            if (cert && cert.trim()) {
-                window.open(`https://www.psacard.com/cert/${cert.trim()}`, '_blank');
+            if (!cert || !cert.trim()) return;
+            const certNum = cert.trim();
+
+            const btn = document.querySelector('[onclick="findByCert()"]');
+            if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+
+            try {
+                const res = await fetch(`https://psa-proxy.mew-860.workers.dev/?cert=${encodeURIComponent(certNum)}`);
+                if (res.ok) {
+                    const blob = await res.blob();
+                    handleFile(new File([blob], `psa-${certNum}.jpg`, { type: blob.type }));
+                } else {
+                    window.open(`https://www.psacard.com/cert/${certNum}`, '_blank');
+                }
+            } catch (err) {
+                console.error('PSA lookup failed:', err);
+                window.open(`https://www.psacard.com/cert/${certNum}`, '_blank');
+            } finally {
+                if (btn) { btn.disabled = false; btn.style.opacity = ''; }
             }
         };
 
