@@ -28,14 +28,12 @@
     </script>
     
     <!-- Icon Library -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
     
     <!-- Cropper.js -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
-    <!-- html2canvas -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- CRITICAL SCRIPT: Must be in HEAD to catch image load errors immediately -->
     <script>
@@ -534,6 +532,9 @@
         </div>
     </div>
 
+    <!-- Version -->
+    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.0</div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof lucide !== 'undefined') {
@@ -659,6 +660,8 @@
 
         // DATA FETCHING
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ5OLGw_I77Cxa-6Lq15tV3-pPFgBqcVzQmhYH8SiuyDK8vdvGn4rRH8DAFxdh00IWXXY6savQ5yiPx/pub?output=csv';
+        const CACHE_KEY = 'gg_guard_options_v1';
+        const CACHE_TTL = 60 * 60 * 1000; // 1 hour
         let allGuardOptions = [];
         let currentCompany = 'PSA'; 
         let currentSelectionName = 'None';
@@ -713,11 +716,24 @@
         async function fetchGuardOptions() {
             let parsed = [];
             try {
-                const response = await fetch(`${SHEET_URL}&t=${Date.now()}`);
-                if(!response.ok) throw new Error("Bad response");
-                const text = await response.text();
-                parsed = parseCSV(text);
-                
+                try {
+                    const raw = localStorage.getItem(CACHE_KEY);
+                    if (raw) {
+                        const { ts, data } = JSON.parse(raw);
+                        if (Date.now() - ts < CACHE_TTL && data.length > 0) parsed = data;
+                    }
+                } catch(e) {}
+
+                if (!parsed.length) {
+                    const response = await fetch(SHEET_URL);
+                    if(!response.ok) throw new Error("Bad response");
+                    const text = await response.text();
+                    parsed = parseCSV(text);
+                    if (parsed.length > 0) {
+                        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: parsed })); } catch(e) {}
+                    }
+                }
+
                 if(parsed.length > 0) {
                     allGuardOptions = parsed;
                 } else {
