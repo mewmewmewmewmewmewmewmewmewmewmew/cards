@@ -269,6 +269,15 @@
             width: 100%;
             height: 100%;
         }
+
+        /* Rotate button icon animation */
+        @keyframes half-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(180deg); }
+        }
+        .spin-once {
+            animation: half-spin 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col py-4 text-slate-800 relative transition-colors duration-300 lg:h-screen lg:overflow-hidden overflow-y-auto">
@@ -319,12 +328,14 @@
                     <button onclick="setCompany('psa')" id="btn-psa" class="company-btn active-company py-2 px-3 rounded-lg text-sm font-bold transition-all text-center">
                         PSA
                     </button>
-                    <button disabled id="btn-bgs" class="company-btn py-2 px-3 rounded-lg text-sm font-bold transition-all text-center text-slate-400 cursor-not-allowed opacity-50">
-                        BGS
-                    </button>
-                    <button disabled id="btn-cgc" class="company-btn py-2 px-3 rounded-lg text-sm font-bold transition-all text-center text-slate-400 cursor-not-allowed opacity-50">
-                        CGC
-                    </button>
+                    <div class="relative group">
+                        <button disabled id="btn-bgs" class="company-btn w-full py-2 px-3 rounded-lg text-sm font-bold transition-all text-center text-slate-400 cursor-not-allowed opacity-50">BGS</button>
+                        <div class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 text-white text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">Coming soon</div>
+                    </div>
+                    <div class="relative group">
+                        <button disabled id="btn-cgc" class="company-btn w-full py-2 px-3 rounded-lg text-sm font-bold transition-all text-center text-slate-400 cursor-not-allowed opacity-50">CGC</button>
+                        <div class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 text-white text-[10px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">Coming soon</div>
+                    </div>
                 </div>
             </div>
 
@@ -377,20 +388,25 @@
 
             <!-- Actions (No Label) -->
             <div>
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-2 gap-2">
                     <button type="button" onclick="findByCert()" class="py-2.5 px-2 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Find by Cert Number">
                         <i data-lucide="search" class="w-3.5 h-3.5"></i>
                         by Cert
                     </button>
-                    
+
                     <button type="button" onclick="clearImage()" class="py-2.5 px-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Remove Image">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                         Clear
                     </button>
-                    
+
                     <button id="saveBtn" type="button" onclick="downloadPreview()" class="py-2.5 px-2 rounded-lg border border-slate-200 dark:border-slate-500 text-slate-900 dark:text-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Save Image">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         Save
+                    </button>
+
+                    <button type="button" onclick="copyToClipboard()" class="py-2.5 px-2 rounded-lg border border-slate-200 dark:border-slate-500 text-slate-900 dark:text-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors" title="Copy Image to Clipboard">
+                        <i data-lucide="clipboard-copy" class="w-3.5 h-3.5"></i>
+                        Copy
                     </button>
                 </div>
             </div>
@@ -408,7 +424,7 @@
                     <img id="guardImageOverlay" src="" 
                          onerror="handleImageError(this)"
                          class="absolute z-50 pointer-events-none hidden" 
-                         style="width: 107.22%; max-width: none; left: 50%; top: 50%; transform: translate(-50%, -50%); transition: transform 0.3s ease;">
+                         style="width: 107.22%; max-width: none; left: 50%; top: 50%; transform: translate(-50%, -50%); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);">
 
                     <!-- Slab Container -->
                     <div id="slabContainer" class="company-psa w-full relative overflow-hidden bg-white/10 rounded-[18px]" style="container-type: inline-size;">
@@ -533,7 +549,7 @@
     </div>
 
     <!-- Version -->
-    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.3</div>
+    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.4</div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -926,7 +942,7 @@
             });
         }
 
-        let isFlipped = false;
+        let flipAngle = 0;
 
         darkModeToggle.addEventListener('change', (e) => {
             if (e.target.checked) document.body.classList.add('dark-mode');
@@ -967,10 +983,16 @@
         });
 
         function toggleFlip() {
-            isFlipped = !isFlipped;
+            flipAngle += 180;
             const guard = document.getElementById('guardImageOverlay');
-            if (isFlipped) guard.style.transform = "translate(-50%, -50%) scaleX(-1) scaleY(-1)";
-            else guard.style.transform = "translate(-50%, -50%)";
+            guard.style.transform = `translate(-50%, -50%) rotate(${flipAngle}deg)`;
+
+            const icon = document.querySelector('[onclick="toggleFlip()"] [data-lucide="refresh-cw"]');
+            if (icon) {
+                icon.classList.remove('spin-once');
+                void icon.offsetWidth;
+                icon.classList.add('spin-once');
+            }
         }
 
         function setCompany(company) {
@@ -1261,137 +1283,100 @@
             fileInput.value = ''; 
         }
         
-        window.downloadPreview = async function() {
-            // UPDATED: Fixed Output Width to 609
+        async function buildCanvas() {
             const OUTPUT_WIDTH = 609;
-            
-            // UPDATED: Specific Slab Dimensions from request
             const SLAB_W = 568;
             const SLAB_H = 958;
-            
-            // Check for guard to adjust height dynamically
+
             const guardImg = document.getElementById('guardImageOverlay');
             const hasGuard = guardImg && !guardImg.classList.contains('hidden') && guardImg.naturalWidth > 0;
-            
-            let OUTPUT_HEIGHT = 1000; // Default minimum height
-            
+
+            let OUTPUT_HEIGHT = 1000;
             if (hasGuard) {
-                // Guard is 107.22% of the SLAB width
-                const guardW = SLAB_W * 1.0722; 
+                const guardW = SLAB_W * 1.0722;
                 const guardH = guardW * (guardImg.naturalHeight / guardImg.naturalWidth);
-                // If guard is taller than default, expand canvas to fit
-                if (guardH > OUTPUT_HEIGHT) {
-                    OUTPUT_HEIGHT = Math.ceil(guardH);
-                }
+                if (guardH > OUTPUT_HEIGHT) OUTPUT_HEIGHT = Math.ceil(guardH);
             }
-            
-            // Calculate centering offsets for the slab within the canvas
+
             const slabX = (OUTPUT_WIDTH - SLAB_W) / 2;
             const slabY = (OUTPUT_HEIGHT - SLAB_H) / 2;
-
-            // Scale factors relative to original reference (1200x2102)
             const scaleX = SLAB_W / PSA_REF_WIDTH;
             const scaleY = SLAB_H / PSA_REF_HEIGHT;
-            
-            try {
-                const canvas = document.createElement('canvas');
-                canvas.width = OUTPUT_WIDTH;
-                canvas.height = OUTPUT_HEIGHT;
-                const ctx = canvas.getContext('2d');
-                
-                // --- 1. DRAW SLAB BACKGROUND ---
-                const slabImg = document.getElementById('slabImageOverlay');
-                if (slabImg && slabImg.naturalWidth > 0) {
-                    const slabFilter = slabImg.style.filter;
-                    if(slabFilter && slabFilter !== 'none') {
-                        ctx.save();
-                        ctx.filter = slabFilter;
-                        ctx.drawImage(slabImg, slabX, slabY, SLAB_W, SLAB_H);
-                        ctx.restore();
-                    } else {
-                        ctx.drawImage(slabImg, slabX, slabY, SLAB_W, SLAB_H);
-                    }
-                }
 
-                // --- 2. DRAW USER CARD ---
-                const cardImg = document.getElementById('userCardImage');
-                if (cardImg && !cardImg.classList.contains('hidden') && cardImg.naturalWidth > 0) {
-                    const cardW = PSA_CARD_WIDTH_PX * scaleX;
-                    const ratio = cardImg.naturalHeight / cardImg.naturalWidth;
-                    const cardH = cardW * ratio;
-                    
-                    // Card is centered relative to the SLAB (horizontally)
-                    const cardRelX = ((PSA_REF_WIDTH - PSA_CARD_WIDTH_PX) / 2) * scaleX;
-                    const cardX = slabX + cardRelX;
-                    
-                    // Bottom offset scaled by Y height relative to slab bottom
-                    const cardY = slabY + SLAB_H - (PSA_CARD_BOTTOM_PX * scaleY) - cardH;
+            const canvas = document.createElement('canvas');
+            canvas.width = OUTPUT_WIDTH;
+            canvas.height = OUTPUT_HEIGHT;
+            const ctx = canvas.getContext('2d');
 
-                    ctx.save();
-                    const b = brightRange.value;
-                    const c = contrastRange.value;
-                    const s = satRange.value;
-                    ctx.filter = `brightness(${b}%) contrast(${c}%) saturate(${s}%)`;
-                    
-                    ctx.drawImage(cardImg, cardX, cardY, cardW, cardH);
+            const slabImg = document.getElementById('slabImageOverlay');
+            if (slabImg && slabImg.naturalWidth > 0) {
+                const slabFilter = slabImg.style.filter;
+                if (slabFilter && slabFilter !== 'none') {
+                    ctx.save(); ctx.filter = slabFilter;
+                    ctx.drawImage(slabImg, slabX, slabY, SLAB_W, SLAB_H);
                     ctx.restore();
+                } else {
+                    ctx.drawImage(slabImg, slabX, slabY, SLAB_W, SLAB_H);
                 }
+            }
 
-                // --- 3. DRAW GUARD OVERLAY ---
-                if (hasGuard) {
-                    // Recalculate dimensions for drawing (same logic as above)
-                    const guardW = SLAB_W * 1.0722; 
-                    const guardH = guardW * (guardImg.naturalHeight / guardImg.naturalWidth);
-                    
-                    // Center guard relative to CANVAS
-                    const guardX = (OUTPUT_WIDTH - guardW) / 2;
-                    const guardY = (OUTPUT_HEIGHT - guardH) / 2;
-                    
-                    ctx.drawImage(guardImg, guardX, guardY, guardW, guardH);
-                }
+            const cardImg = document.getElementById('userCardImage');
+            if (cardImg && !cardImg.classList.contains('hidden') && cardImg.naturalWidth > 0) {
+                const cardW = PSA_CARD_WIDTH_PX * scaleX;
+                const cardH = cardW * (cardImg.naturalHeight / cardImg.naturalWidth);
+                const cardX = slabX + ((PSA_REF_WIDTH - PSA_CARD_WIDTH_PX) / 2) * scaleX;
+                const cardY = slabY + SLAB_H - (PSA_CARD_BOTTOM_PX * scaleY) - cardH;
+                ctx.save();
+                ctx.filter = `brightness(${brightRange.value}%) contrast(${contrastRange.value}%) saturate(${satRange.value}%)`;
+                ctx.drawImage(cardImg, cardX, cardY, cardW, cardH);
+                ctx.restore();
+            }
 
-                // --- 4. DRAW TEXT ---
-                if (currentSelectionName !== 'None' && (!guardLabelText || guardLabelText.style.display !== 'none')) {
-                    const text = currentSelectionName.toUpperCase();
-                    
-                    // Font size is relative to SLAB width (3.5%)
-                    const fontSize = SLAB_W * 0.035; 
-                    
-                    await document.fonts.ready;
-                    
-                    ctx.font = `${fontSize}px "Univers 55", "Inter", sans-serif`;
-                    ctx.fillStyle = "#242424"; 
-                    ctx.textBaseline = "top";
-                    ctx.textAlign = "left";
-                    
-                    ctx.lineWidth = fontSize * 0.01; 
-                    ctx.strokeStyle = "#242424";
-                    
-                    // Position relative to SLAB origin (slabX, slabY)
-                    // CSS Left: 12.1% of slab
-                    // CSS Top: 7.4% of slab
-                    const textRelX = SLAB_W * 0.121;
-                    const textRelY = SLAB_H * 0.074;
-                    
-                    const textX = slabX + textRelX;
-                    const textY = slabY + textRelY; 
-                    
-                    ctx.fillText(text, textX, textY);
-                    ctx.strokeText(text, textX, textY);
-                }
+            if (hasGuard) {
+                const guardW = SLAB_W * 1.0722;
+                const guardH = guardW * (guardImg.naturalHeight / guardImg.naturalWidth);
+                ctx.drawImage(guardImg, (OUTPUT_WIDTH - guardW) / 2, (OUTPUT_HEIGHT - guardH) / 2, guardW, guardH);
+            }
 
-                // --- 5. SAVE ---
+            if (currentSelectionName !== 'None' && (!guardLabelText || guardLabelText.style.display !== 'none')) {
+                const fontSize = SLAB_W * 0.035;
+                await document.fonts.ready;
+                ctx.font = `${fontSize}px "Univers 55", "Inter", sans-serif`;
+                ctx.fillStyle = '#242424';
+                ctx.textBaseline = 'top';
+                ctx.textAlign = 'left';
+                ctx.lineWidth = fontSize * 0.01;
+                ctx.strokeStyle = '#242424';
+                ctx.fillText(currentSelectionName.toUpperCase(), slabX + SLAB_W * 0.121, slabY + SLAB_H * 0.074);
+                ctx.strokeText(currentSelectionName.toUpperCase(), slabX + SLAB_W * 0.121, slabY + SLAB_H * 0.074);
+            }
+
+            return canvas;
+        }
+
+        window.downloadPreview = async function() {
+            try {
+                const canvas = await buildCanvas();
                 const safeName = currentSelectionName.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-');
-                const filename = `${currentCompany}_${safeName}.png`;
-                
                 const link = document.createElement('a');
-                link.download = filename;
+                link.download = `${currentCompany}_${safeName}.png`;
                 link.href = canvas.toDataURL('image/png');
                 link.click();
-
             } catch (err) {
                 console.error("Save failed:", err);
                 alert("Save failed. Check console for details.");
+            }
+        }
+
+        window.copyToClipboard = async function() {
+            try {
+                const canvas = await buildCanvas();
+                canvas.toBlob(async (blob) => {
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                }, 'image/png');
+            } catch (err) {
+                console.error("Copy failed:", err);
+                alert("Copy failed. Check console for details.");
             }
         }
         
