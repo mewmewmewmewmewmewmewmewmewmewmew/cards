@@ -549,7 +549,7 @@
     </div>
 
     <!-- Version -->
-    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.5</div>
+    <div id="app-version" style="position:fixed;bottom:8px;left:12px;font-size:11px;color:#94a3b8;z-index:50;pointer-events:none;font-family:monospace;letter-spacing:0.05em;">v1.6</div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -820,7 +820,7 @@
                 
                 // Create Button Grid
                 const grid = document.createElement('div');
-                grid.className = 'flex flex-wrap gap-3';
+                grid.className = 'flex flex-wrap gap-2';
                 
                 // Sanitize set name for ID usage
                 const safeSetName = setName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
@@ -833,7 +833,7 @@
                     btn.title = opt.Name || 'Unknown';
                     
                     // Button Base Style
-                    btn.className = `w-10 h-10 rounded-full shadow-md hover:scale-110 hover:ring-2 transition-all duration-200 ring-offset-2 focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700`;
+                    btn.className = `w-14 h-6 rounded-md shadow-md hover:scale-105 hover:ring-2 transition-all duration-200 ring-offset-2 focus:outline-none guard-option-btn relative overflow-hidden bg-slate-200 dark:bg-slate-700`;
                     
                     const c1 = normalizeHex(opt['Color 1']);
                     const c2 = opt['Color 2'] ? normalizeHex(opt['Color 2']) : null;
@@ -855,12 +855,12 @@
                     btn.style.backgroundColor = c1; 
 
                     const sheen = document.createElement('div');
-                    sheen.className = 'absolute inset-0 rounded-full bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
+                    sheen.className = 'absolute inset-0 rounded-md bg-gradient-to-tr from-white/40 to-transparent pointer-events-none';
                     btn.appendChild(sheen);
                     
                     // Border Overlay
                     const borderOverlay = document.createElement('div');
-                    borderOverlay.className = 'absolute inset-0 rounded-full border border-black/10 dark:border-white/10 pointer-events-none';
+                    borderOverlay.className = 'absolute inset-0 rounded-md border border-black/10 dark:border-white/10 pointer-events-none';
                     btn.appendChild(borderOverlay);
                     
                     let highlight = opt.Highlight ? normalizeHex(opt.Highlight) : c1;
