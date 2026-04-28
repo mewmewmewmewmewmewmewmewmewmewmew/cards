@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+function trackEvent(action: string, params?: Record<string, unknown>) {
+  (window as any).gtag?.('event', action, params);
+}
+
 // --- Single-file React gallery for Pokémon cards (Mew-focused) ---
 // Theme: Dark gray (#101010) with pink accents (#cb97a5)
 // - Flags inferred by tab name ("Japanese" -> isMew, "Cameo" -> isCameo, "Unique" -> isIntl)
@@ -142,7 +146,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "19.7";
+const APP_VERSION = "19.8";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -418,6 +422,12 @@ export default function PokeCardGallery() {
   useEffect(() => { document.title = "Mew"; }, []);
 
   useEffect(() => {
+    if (!q.trim()) return;
+    const t = setTimeout(() => trackEvent('search', { search_term: q.trim() }), 800);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  useEffect(() => {
     if (!showStats) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setShowStats(false);
@@ -626,9 +636,9 @@ export default function PokeCardGallery() {
             </div>
             <div className="flex w-full flex-row flex-wrap items-center gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
               <div className="flex flex-wrap items-center gap-1">
-                <Toggle label="Mew" active={mew} onClick={() => setMew(v => !v)} />
-                <Toggle label="Cameo" active={cameo} onClick={() => setCameo(v => !v)} />
-                <Toggle label="Intl" active={intl} onClick={() => setIntl(v => !v)} />
+                <Toggle label="Mew" active={mew} onClick={() => { setMew(v => !v); trackEvent('filter_toggle', { filter: 'mew', active: !mew }); }} />
+                <Toggle label="Cameo" active={cameo} onClick={() => { setCameo(v => !v); trackEvent('filter_toggle', { filter: 'cameo', active: !cameo }); }} />
+                <Toggle label="Intl" active={intl} onClick={() => { setIntl(v => !v); trackEvent('filter_toggle', { filter: 'intl', active: !intl }); }} />
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -662,7 +672,7 @@ export default function PokeCardGallery() {
               const displayName = (language === 'JP' && card.nameJP) ? card.nameJP : card.nameEN;
               return (
                 <li key={card.id}>
-                  <TiltCardButton onClick={() => setSelected(card)} ariaLabel={`Open details for ${displayName} ${card.set} ${card.number}`}>
+                  <TiltCardButton onClick={() => { setSelected(card); trackEvent('card_click', { card_name: card.nameEN, card_set: card.set, card_number: card.number }); }} ariaLabel={`Open details for ${displayName} ${card.set} ${card.number}`}>
                     <div className="relative aspect-[63/88] w-full overflow-hidden bg-[#0f0f0f]" style={{ borderRadius: "5.2% / 3.9%" }}>
                       <img
                         src={card.image}
@@ -723,7 +733,7 @@ export default function PokeCardGallery() {
         </button>
         <button
           type="button"
-          onClick={() => setShowStats(true)}
+          onClick={() => { setShowStats(true); trackEvent('stats_modal_open'); }}
           aria-label="Open owned card stats"
           className="rounded-lg sm:rounded-none p-2 sm:p-1.5 bg-black/50 sm:bg-transparent border border-white/10 sm:border-transparent focus:outline-none"
         >
@@ -913,7 +923,7 @@ const StatsModal: React.FC<{
           <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setStatsView(v => v === "grid" ? "list" : "grid")}
+            onClick={() => setStatsView(v => { const next = v === "grid" ? "list" : "grid"; trackEvent('stats_view_toggle', { view: next }); return next; })}
             className={classNames(
               "flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#2a2a2a] bg-[#141414] text-xs transition-colors",
               statsView === "grid" ? "text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
@@ -1389,7 +1399,7 @@ const DetailModal: React.FC<{
               </button>
               <button
                 type="button"
-                onClick={() => setLanguage(l => (l === 'JP' ? 'EN' : 'JP'))}
+                onClick={() => setLanguage(l => { const next = l === 'JP' ? 'EN' : 'JP'; trackEvent('language_toggle', { language: next }); return next; })}
                 aria-label="Toggle language"
                 className="rounded-lg border border-[#2a2a2a] bg-[#141414] px-3 py-2 text-[11px] font-black tracking-[0.16em] text-gray-100"
               >
