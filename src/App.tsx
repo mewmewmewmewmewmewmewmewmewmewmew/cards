@@ -146,7 +146,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "20.4";
+const APP_VERSION = "20.5";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -1250,7 +1250,7 @@ const LoadingScreen: React.FC<{
         <div className="h-16" />
       )}
       <div className="pointer-events-none absolute bottom-4 left-4 text-[10px] font-semibold text-[#cb97a5]/80">v{APP_VERSION}</div>
-      <div className="absolute bottom-[5%] flex gap-8 items-center">
+      <div className="absolute bottom-[5%] flex gap-12 items-center">
         <a href="https://mew.cards/gg" target="_blank" rel="noopener noreferrer" className="opacity-50 hover:opacity-90 transition-all duration-200">
           <img src="https://mew.cards/gg/img/logo.png" alt="Grading Guard Visualizer" className="h-[90px] w-[90px] object-contain grayscale hover:grayscale-0 transition-all duration-200" />
         </a>
