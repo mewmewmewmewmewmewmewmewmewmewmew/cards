@@ -146,7 +146,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "21.3";
+const APP_VERSION = "21.4";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -686,7 +686,7 @@ export default function PokeCardGallery() {
                         referrerPolicy="strict-origin-when-cross-origin"
                       />
                       {card.edition?.toLowerCase() === 'error' && (
-                        <div className="absolute bottom-[10%] left-0 right-0 py-2 text-center text-[13px] font-bold uppercase tracking-wide text-white" style={{ backgroundImage: 'repeating-linear-gradient(-45deg, rgba(220,38,38,0.8) 0, rgba(220,38,38,0.8) 1.5px, transparent 1.5px, transparent 4.5px)', textShadow: '0 0 4px rgba(220,38,38,1), 0 0 8px rgba(220,38,38,0.9), 1px 1px 0 rgba(180,0,0,0.8), -1px -1px 0 rgba(180,0,0,0.8)' }}>
+                        <div className="absolute bottom-[10%] left-0 right-0 py-2 text-center text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundImage: 'repeating-linear-gradient(-45deg, rgba(220,38,38,0.8) 0, rgba(220,38,38,0.8) 1.5px, transparent 1.5px, transparent 4.5px)', textShadow: '0 0 4px rgba(220,38,38,1), 0 0 8px rgba(220,38,38,0.9), 1px 1px 0 rgba(180,0,0,0.8), -1px -1px 0 rgba(180,0,0,0.8)' }}>
                           Error
                         </div>
                       )}
