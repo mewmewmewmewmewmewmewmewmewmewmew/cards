@@ -146,7 +146,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "19.8";
+const APP_VERSION = "19.9";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -1250,6 +1250,16 @@ const LoadingScreen: React.FC<{
         <div className="h-16" />
       )}
       <div className="pointer-events-none absolute bottom-4 left-4 text-[10px] font-semibold text-[#cb97a5]/80">v{APP_VERSION}</div>
+      <div className="absolute bottom-6 flex gap-8">
+        <a href="https://mew.cards/gg" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1.5 opacity-30 hover:opacity-70 transition-opacity duration-200">
+          <img src="https://mew.cards/gg/img/logo.png" alt="Grading Guard Visualizer" className="h-10 w-10 object-contain" />
+          <span className="text-[9px] text-gray-400">Grading Guard</span>
+        </a>
+        <a href="https://centering.mew.cards" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-1.5 opacity-30 hover:opacity-70 transition-opacity duration-200">
+          <img src="https://mew.cards/img/centerlogo.png" alt="Centering Tool" className="h-10 w-10 object-contain" />
+          <span className="text-[9px] text-gray-400">Centering</span>
+        </a>
+      </div>
       <style>{`
       @keyframes swirl {
         0% { background-position: 0% 50%; }
