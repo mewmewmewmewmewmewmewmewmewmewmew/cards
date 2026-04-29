@@ -146,7 +146,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "20.7";
+const APP_VERSION = "20.8";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -685,7 +685,7 @@ export default function PokeCardGallery() {
                         onError={handleImgError}
                         referrerPolicy="strict-origin-when-cross-origin"
                       />
-                      {card.edition === 'Error' && (
+                      {card.edition?.toLowerCase() === 'error' && (
                         <div className="absolute bottom-0 left-0 right-0 bg-red-600/90 py-0.5 text-center text-[9px] font-bold uppercase tracking-wide text-white">
                           Error
                         </div>
