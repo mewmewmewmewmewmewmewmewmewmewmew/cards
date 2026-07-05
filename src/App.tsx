@@ -146,7 +146,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "21.6";
+const APP_VERSION = "21.7";
 const CONFIG_CACHE_KEY = "mew_config_v1";
 
 function parseBool(x: string | undefined): boolean | undefined {
@@ -496,6 +496,46 @@ export default function PokeCardGallery() {
         { name: TAB_MAPPINGS.intl, flag: 'isIntl' },
       ];
 
+      const applyGroups = (groups: Array<{ cards: PokeCard[]; flag: 'isMew' | 'isCameo' | 'isIntl' }>) => {
+        if (groups.length > 0) {
+          setRemoteCards(mergeCardsNoDedupe(groups));
+          setDataStatus('loaded');
+        } else {
+          setRemoteCards(null);
+          setDataStatus('fallback');
+        }
+        setIsAuthenticated(true); // Grant access
+      };
+
+      // Try the combined endpoint first: one Apps Script round trip instead of
+      // three. Falls back to per-sheet fetches if the deployed script predates
+      // the getAll action (it responds with an "Error: ..." string, which
+      // fails JSON.parse below).
+      try {
+        let url = `${APPS_SCRIPT_URL}?action=getAll&sheets=${encodeURIComponent(sources.map(s => s.name).join(','))}`;
+        if (passwordRequired) {
+            url += `&password=${encodeURIComponent(password)}`;
+        }
+        const res = await fetch(url);
+        const text = await res.text();
+        if (text.startsWith("Error: Authentication Failed")) {
+            setPassword(""); // Clear incorrect password
+            setRemoteCards(null);
+            setIsAuthenticating(false); // Stop pulse on failure
+            return;
+        }
+        const json = JSON.parse(text);
+        if (json && json.sheets) {
+          const groups = sources
+            .map(s => ({ cards: parseCSV(json.sheets[s.name] || ""), flag: s.flag }))
+            .filter(g => g.cards.length > 0);
+          applyGroups(groups);
+          return;
+        }
+      } catch {
+        // Old script deployment — fall through to per-sheet fetching.
+      }
+
       const results = await Promise.allSettled(
         sources.map(s => {
           let url = `${APPS_SCRIPT_URL}?sheet=${encodeURIComponent(s.name)}`;
@@ -537,14 +577,7 @@ export default function PokeCardGallery() {
         return acc;
       }, []);
 
-      if (successfulGroups.length > 0) {
-        setRemoteCards(mergeCardsNoDedupe(successfulGroups));
-        setDataStatus('loaded');
-      } else {
-        setRemoteCards(null);
-        setDataStatus('fallback');
-      }
-      setIsAuthenticated(true); // Grant access
+      applyGroups(successfulGroups);
     };
     
     // Run if it's a public gallery, or if a password has been submitted.
