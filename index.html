@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>mew cards</title>
     <link rel="icon" type="image/png" href="https://mew.cards/img/logo.png" />
+    <!-- Warm up connections used on the critical path (config fetch + lock screen logo) -->
+    <link rel="preconnect" href="https://script.google.com" crossorigin />
+    <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin />
+    <link rel="preconnect" href="https://mew.cards" />
+    <link rel="preload" as="image" href="https://mew.cards/img/logo.png" />
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7XHLHGMDE7"></script>
     <script>
@@ -13,12 +18,24 @@
       gtag('js', new Date());
       gtag('config', 'G-7XHLHGMDE7');
     </script>
+    <!-- Font Awesome is only used by the cursor sparkles (which have an emoji
+         fallback), so load it without blocking first paint -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"
+      />
+    </noscript>
 
 </head>
   <body class="bg-[#101010] text-gray-100">

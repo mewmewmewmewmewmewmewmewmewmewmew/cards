@@ -146,7 +146,8 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "21.5";
+const APP_VERSION = "21.6";
+const CONFIG_CACHE_KEY = "mew_config_v1";
 
 function parseBool(x: string | undefined): boolean | undefined {
   if (!x) return undefined;
@@ -446,19 +447,36 @@ export default function PokeCardGallery() {
 
   // Check if password is required on initial load
   useEffect(() => {
+    // Apps Script round trips are slow (1s+), so trust the cached answer from the
+    // last visit to show the lock/password UI immediately, then re-verify below.
+    let cachedConfig: string | null = null;
+    try { cachedConfig = localStorage.getItem(CONFIG_CACHE_KEY); } catch {}
+    if (cachedConfig === "private") {
+        setPasswordRequired(true);
+        setAuthChecked(true);
+    } else if (cachedConfig === "public") {
+        setIsAuthenticated(true);
+        setAuthChecked(true);
+    }
     const checkAuth = async () => {
         try {
             const res = await fetch(`${APPS_SCRIPT_URL}?action=getConfig`);
             const config = await res.json();
+            try { localStorage.setItem(CONFIG_CACHE_KEY, config.passwordEnabled ? "private" : "public"); } catch {}
             if (config.passwordEnabled) {
                 setPasswordRequired(true);
+                // A stale "public" cache may have optimistically authenticated; undo it.
+                // (Safe: with a "public" cache no password field was shown, so the user
+                // can't have authenticated legitimately in the meantime.)
+                if (cachedConfig === "public") setIsAuthenticated(false);
             } else {
+                setPasswordRequired(false);
                 setIsAuthenticated(true);
             }
         } catch (error) {
             console.error("Failed to fetch config:", error);
             // Fallback to public if config fails to load
-            setIsAuthenticated(true); 
+            if (cachedConfig !== "private") setIsAuthenticated(true);
         } finally {
             setAuthChecked(true);
         }
@@ -541,9 +559,14 @@ export default function PokeCardGallery() {
   useEffect(() => {
     if (dataStatus !== 'loaded' || !isAuthenticated) return;
 
-    const imageUrls = sourceCards.flatMap(card => [card.image, card.imageBack]).filter(Boolean) as string[];
+    // Only gate the gallery on front images; backs are only visible after
+    // flipping a card in the detail modal, so they warm in the background.
+    const imageUrls = sourceCards.map(card => card.image).filter(Boolean) as string[];
+    const backUrls = sourceCards.map(card => card.imageBack).filter(Boolean) as string[];
+    const warmBacks = () => backUrls.forEach(url => { const img = new Image(); img.src = url; });
     if (imageUrls.length === 0) {
       setImagesLoaded(true);
+      warmBacks();
       return;
     }
 
@@ -561,6 +584,7 @@ export default function PokeCardGallery() {
         setLoadingProgress(progress);
         if (loadedCount === totalCount) {
           setTimeout(() => setImagesLoaded(true), 400);
+          warmBacks();
         }
       };
       img.onload = onFinish;
@@ -935,7 +959,7 @@ const StatsModal: React.FC<{
             )}
             aria-label="Toggle grid view"
           >
-            <i className="fa-solid fa-border-all" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true"><path d="M384 96l0 128-128 0 0-128 128 0zm0 192l0 128-128 0 0-128 128 0zM192 224L64 224 64 96l128 0 0 128zM64 288l128 0 0 128L64 416l0-128zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z"/></svg>
           </button>
           <div className="flex items-center gap-1 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
             <button
