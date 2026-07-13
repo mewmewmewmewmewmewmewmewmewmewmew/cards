@@ -146,7 +146,7 @@ function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
 // ------------------------------
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" } as const;
-const APP_VERSION = "21.7";
+const APP_VERSION = "21.8";
 const CONFIG_CACHE_KEY = "mew_config_v1";
 
 function parseBool(x: string | undefined): boolean | undefined {
@@ -899,11 +899,18 @@ const StatsModal: React.FC<{
 }) => {
   const [statsLang, setStatsLang] = useState<"en" | "jp">("jp");
   const [statsView, setStatsView] = useState<"list" | "grid">("list");
+  const [catMew, setCatMew] = useState(true);
+  const [catCameo, setCatCameo] = useState(true);
+  const [catIntl, setCatIntl] = useState(true);
+  const filterByCat = (cards: PokeCard[]) =>
+    cards.filter((c) => (catMew && c.isMew) || (catCameo && c.isCameo) || (catIntl && c.isIntl));
   const gridCards = (() => {
-    const base = detailsTab === "psa10" ? stats.psa10Cards
+    const base = filterByCat(
+      detailsTab === "psa10" ? stats.psa10Cards
       : detailsTab === "psa19" ? stats.psa19Cards
       : detailsTab === "need" ? stats.needCards
-      : stats.allCards;
+      : stats.allCards
+    );
     return [...base].sort((a, b) => {
       if (detailsTab === "all") return releaseTs(a) - releaseTs(b);
       if ((a.year || 0) !== (b.year || 0)) return (a.year || 0) - (b.year || 0);
@@ -1018,6 +1025,40 @@ const StatsModal: React.FC<{
           </div>
           </div>
         </div>
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-full border border-[#2a2a2a] bg-[#141414] p-1">
+            <button
+              type="button"
+              onClick={() => setCatMew(v => !v)}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                catMew ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              Mew
+            </button>
+            <button
+              type="button"
+              onClick={() => setCatCameo(v => !v)}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                catCameo ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              Cameo
+            </button>
+            <button
+              type="button"
+              onClick={() => setCatIntl(v => !v)}
+              className={classNames(
+                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                catIntl ? "bg-[#cb97a5]/20 text-[#cb97a5]" : "text-gray-400 hover:text-gray-200"
+              )}
+            >
+              Intl
+            </button>
+          </div>
+        </div>
         {statsView === "grid" ? (
           <div className="stats-scroll mt-4 grid grid-cols-3 gap-3 overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4 sm:flex-1 sm:min-h-0 sm:grid-cols-4">
             {gridCards.map((card) => (
@@ -1050,7 +1091,7 @@ const StatsModal: React.FC<{
             <div className="space-y-4">
               {detailsTab === "psa10" && (
                 <StatsList
-                  cards={stats.psa10Cards}
+                  cards={filterByCat(stats.psa10Cards)}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
                   language={statsLang}
@@ -1059,7 +1100,7 @@ const StatsModal: React.FC<{
               )}
               {detailsTab === "psa19" && (
                 <StatsList
-                  cards={stats.psa19Cards}
+                  cards={filterByCat(stats.psa19Cards)}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
                   language={statsLang}
@@ -1068,7 +1109,7 @@ const StatsModal: React.FC<{
               )}
               {detailsTab === "need" && (
                 <StatsList
-                  cards={stats.needCards}
+                  cards={filterByCat(stats.needCards)}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   selectedId={selectedCard?.id || null}
                   language={statsLang}
@@ -1077,7 +1118,7 @@ const StatsModal: React.FC<{
               )}
               {detailsTab === "all" && (
                 <StatsList
-                  cards={stats.allCards}
+                  cards={filterByCat(stats.allCards)}
                   onSelectCard={isMobile ? onOpenCard : onSelectCard}
                   sortMode="release"
                   selectedId={selectedCard?.id || null}
