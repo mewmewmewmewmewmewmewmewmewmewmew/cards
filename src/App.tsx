@@ -546,13 +546,17 @@ class MewCatalog extends React.Component<Any, Any> {
       fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-muted)",
       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", alignSelf: "center",
     });
-    const groupOf = sortKey === "set" ? (c: Any) => c.set || "Unlisted set"
+    const groupOf = (sortKey === "set" || sortKey === "date") ? (c: Any) => c.set || "Unlisted set"
       : sortKey === "illustrator" ? (c: Any) => c.illustrator || "Illustrator unknown"
       : null;
-    const groupCounts: Any = {};
-    if (groupOf) filtered.forEach((c: Any) => { const g = groupOf(c); groupCounts[g] = (groupCounts[g] || 0) + 1; });
+    // Count consecutive runs (date order can revisit a set), keyed by run start.
+    const runCounts: number[] = [];
+    if (groupOf) {
+      let prev: Any = null, start = -1;
+      filtered.forEach((c: Any, i: number) => { const g = groupOf(c); if (g !== prev) { start = i; prev = g; runCounts[start] = 0; } runCounts[start]++; });
+    }
     let lastGroup: Any = null;
-    const tiles = filtered.map((c: Any) => {
+    const tiles = filtered.map((c: Any, idx: number) => {
       const dim = s.ownerMode && s.desaturate && c.pc !== "PSA10";
       const g = groupOf ? groupOf(c) : null;
       const newGroup = g !== null && g !== lastGroup;
@@ -562,7 +566,7 @@ class MewCatalog extends React.Component<Any, Any> {
       const bgs = c.population && typeof c.population.bgsBL === "number" ? c.population.bgsBL : null;
       return {
         groupLabel: newGroup ? g : "",
-        groupCount: newGroup ? `${groupCounts[g]}` : "",
+        groupCount: newGroup ? `${runCounts[idx]}` : "",
         groupStyle: {
           gridColumn: "1 / -1", display: "flex", alignItems: "baseline", gap: 10,
           margin: firstGroup ? "6px 0 4px" : "38px 0 4px", padding: narrow ? "0 6px 8px" : "0 8px 8px",
@@ -650,9 +654,8 @@ class MewCatalog extends React.Component<Any, Any> {
       showSubtitle: !(s.compact),
       compactSidebar: s.compact,
       sectionStyle: s.narrow ? { display: "contents" } : { display: "flex", flexDirection: "column", gap: 10 },
-      // Mobile uses the icon too (a full field overlapped the centred scope toggles).
-      showSearchField: !s.compact,
-      showSearchIcon: s.compact,
+      showSearchField: !s.compact && !s.narrow,
+      showSearchIcon: s.compact || s.narrow,
       searchFieldStyle: {
         display: "flex", alignItems: "center", gap: 8, boxSizing: "border-box",
         height: 40, padding: "0 12px",
@@ -691,12 +694,11 @@ class MewCatalog extends React.Component<Any, Any> {
       searchPanelStyle: {
         ...this.railMenu(s.searchAnchor),
         ...(s.searchAnchor && !s.narrow ? { top: s.searchAnchor.top + (s.searchAnchorH || 0) } : null),
+        ...(s.narrow ? { position: "fixed", top: "auto", left: 10, right: 10, width: "auto", minWidth: 0, bottom: (s.barH || 53) + 8, height: 40 } : null),
         display: "flex", alignItems: "center", gap: 8, zIndex: 40,
         height: 36, padding: "0 12px", boxSizing: "border-box", maxHeight: "none",
         background: "var(--surface-card)", border: "1px solid var(--line-strong)",
         borderRadius: "var(--web-radius-sm)", boxShadow: "var(--shadow-raised)",
-        // Mobile: pop up above the bottom bar, full width minus the 10px gutters.
-        ...(s.narrow ? { position: "fixed", top: "auto", bottom: (s.barH || 53) + 8, left: 10, right: 10, width: "auto", minWidth: 0, zIndex: 160 } : null),
       },
       mewIconStyle: { ...this.scopeIcon(s.mew), background: "transparent", ...(s.narrow ? {} : { height: 56, minHeight: 56 }) },
       cameoIconStyle: this.scopeIcon(s.cameo),
