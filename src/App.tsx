@@ -695,7 +695,7 @@ class MewCatalog extends React.Component<Any, Any> {
         background: "var(--surface-card)", border: "1px solid var(--line-strong)",
         borderRadius: "var(--web-radius-sm)", boxShadow: "var(--shadow-raised)",
       },
-      mewIconStyle: { ...this.scopeIcon(s.mew), background: s.mew ? "var(--surface-tint)" : "transparent", ...(s.narrow ? {} : { height: 56, minHeight: 56 }) },
+      mewIconStyle: { ...this.scopeIcon(s.mew), background: "transparent", ...(s.narrow ? {} : { height: 56, minHeight: 56 }) },
       cameoIconStyle: this.scopeIcon(s.cameo),
       intlIconStyle: this.scopeIcon(s.intl),
       eyebrowStyle: {
@@ -869,6 +869,7 @@ class MewCatalog extends React.Component<Any, Any> {
         gridTemplateRows: `repeat(${wallRows}, ${wallRowH}px)`,
         gridAutoColumns: "min-content",
         overflowX: "auto", overflowY: "hidden", overscrollBehaviorX: "contain", touchAction: narrow ? "none" : "auto",
+        ...(filtered.length === 0 ? { display: "none" } : null),
       },
       collGridStyle: {
         display: "grid", gap: s.narrow ? 10 : 14, marginTop: s.narrow ? 16 : 22,
@@ -1375,12 +1376,12 @@ class MewCatalog extends React.Component<Any, Any> {
                   </div>
                 )}
                 {v.isLoadingCards && (
-                  <div style={{ marginTop: 40, padding: "56px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
+                  <div style={{ marginTop: 20, padding: "56px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
                     <div style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>{v.tLoading}</div>
                   </div>
                 )}
                 {v.isEmpty && (
-                  <div style={{ marginTop: 40, padding: "56px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
+                  <div style={{ marginTop: 20, padding: "56px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
                     <div style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>{v.tNoResults}</div>
                     <div style={{ marginTop: 8, fontFamily: "var(--font-body)", fontSize: "var(--web-body)", color: "var(--text-muted)" }}>{v.tNoResultsBody}</div>
                   </div>
