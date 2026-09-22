@@ -1300,7 +1300,7 @@ class MewCatalog extends React.Component<Any, Any> {
                   </div>
                 )}
                 <div style={v.langThemeRowStyle}>
-                  <HoverEl onClick={v.toggleLang} aria-label="Toggle language" title={v.langTitle} style={v.langBtnStyle} hoverStyle={HOVER_PINK}>{v.langLabel}</HoverEl>
+                  <button type="button" onClick={v.toggleLang} aria-label="Toggle language" title={v.langTitle} style={v.langBtnStyle} data-hover-pink="1">{v.langLabel}</button>
                   <HoverEl onClick={v.toggleTheme} aria-label="Toggle theme" title={v.themeTitle} style={v.iconBtnStyle} hoverStyle={HOVER_PINK}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .9 1.6h5.2c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z"></path></svg>
                   </HoverEl>

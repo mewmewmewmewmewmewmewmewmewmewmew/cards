@@ -58,6 +58,10 @@ aside button:focus-visible { outline: 2px solid var(--pink-700); outline-offset:
 /* No zoom on focus: iOS zooms into any field under 16px */
 @media (max-width: 699px) { input, select, textarea { font-size: 16px !important; } }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* EN/JA: muted grey; pink on hover only where hover exists, so taps don't leave it stuck pink */
+button { -webkit-tap-highlight-color: transparent; }
+[data-hover-pink], [data-hover-pink]:active, [data-hover-pink]:focus, [data-hover-pink]:focus-visible { color: var(--text-muted) !important; outline: none !important; }
+@media (hover: hover) { [data-hover-pink]:hover { color: var(--pink-700) !important; } }
 #cursor-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; }
 .cursor-star { position: absolute; font-size: 1rem; line-height: 1; will-change: transform, opacity; animation-duration: 1500ms; animation-fill-mode: forwards; filter: drop-shadow(0 0 1.5rem rgba(238,185,213,.25)); user-select: none; }
 @keyframes fall-1 {
