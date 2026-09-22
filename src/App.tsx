@@ -64,7 +64,7 @@ class MewCatalog extends React.Component<Any, Any> {
   _ro: Any; _barRo: Any; _mq: Any; _theme: Any; _themePinned = false;
   _resize: Any; _key: Any; _hash: Any; _away: Any; _pageScroll: Any;
   _wallProg: Any; _wallWheel: Any; _wallMove: Any; _wallOut: Any;
-  _wallTouchStart: Any; _wallTouchMove: Any; _swirlDelay: Any;
+  _wallTouchStart: Any; _wallTouchMove: Any; _swirlDelay: Any; _wallRefFn: Any; _touch: Any;
 
   state: Any = {
     D: null, cards: [], status: "loading", progress: 0, imagesLoaded: false,
@@ -675,7 +675,7 @@ class MewCatalog extends React.Component<Any, Any> {
       eraWrapStyle: s.narrow
         ? { position: "fixed", top: 10, left: 10, zIndex: 60, display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 40 }
         : (s.compact
-            ? { position: "relative", width: "100%", display: "flex", flexDirection: "column", alignItems: "stretch", gap: 10 }
+            ? { position: "relative", width: "100%", display: "flex", justifyContent: "center" }
             : { position: "relative", display: "flex", flexDirection: "column", gap: 10 }),
       railSearchWrapStyle: s.narrow
         ? { position: "relative", display: "flex", width: 44, flex: "0 0 44px" }
@@ -768,7 +768,7 @@ class MewCatalog extends React.Component<Any, Any> {
         padding: s.narrow ? "0 6px 8px" : "0 8px 8px", borderBottom: "1px solid var(--line-strong)",
         fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)",
       },
-      wallRef: (el: Any) => {
+      wallRef: this._wallRefFn || (this._wallRefFn = (el: Any) => {
         if (this._wallEl === el) return;
         if (this._wallEl && this._wallWheel) this._wallEl.removeEventListener("wheel", this._wallWheel);
         if (this._wallEl && this._wallProg) this._wallEl.removeEventListener("scroll", this._wallProg);
@@ -823,21 +823,23 @@ class MewCatalog extends React.Component<Any, Any> {
           const glare = face.querySelector("[data-card-glare]");
           if (glare) glare.style.opacity = "0";
         };
-        let tx = 0, ty = 0, tl = 0, axis: Any = null;
+        // Drag state lives on the instance: scrolling re-renders, which can
+        // re-run this ref and re-bind listeners mid-gesture.
+        const T = this._touch || (this._touch = { tx: 0, ty: 0, tl: 0, axis: null });
         this._wallTouchStart = (ev: Any) => {
           const tt = ev.touches[0];
-          tx = tt.clientX; ty = tt.clientY; tl = el.scrollLeft; axis = null;
+          T.tx = tt.clientX; T.ty = tt.clientY; T.tl = el.scrollLeft; T.axis = null;
         };
         this._wallTouchMove = (ev: Any) => {
           const tt = ev.touches[0];
-          const dx = tt.clientX - tx, dy = tt.clientY - ty;
-          if (axis === null) {
+          const dx = tt.clientX - T.tx, dy = tt.clientY - T.ty;
+          if (T.axis === null) {
             if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-            axis = "wall";
+            T.axis = "wall";
           }
           const max = el.scrollWidth - el.clientWidth;
           if (max <= 0) return;
-          const next = tl - dx - dy;
+          const next = T.tl - dx - dy;
           if ((next < 0 && el.scrollLeft <= 0) || (next > max && el.scrollLeft >= max)) return;
           el.scrollLeft = Math.max(0, Math.min(max, next));
           if (ev.cancelable) ev.preventDefault();
@@ -847,7 +849,7 @@ class MewCatalog extends React.Component<Any, Any> {
         el.addEventListener("mousemove", this._wallMove);
         el.addEventListener("mouseout", this._wallOut);
         if (this._resize) requestAnimationFrame(this._resize);
-      },
+      }),
       scrollProgressStyle: s.listView
         ? {
             position: "fixed", top: 0, width: 2, zIndex: 8,
@@ -1034,6 +1036,7 @@ class MewCatalog extends React.Component<Any, Any> {
         fontFamily: "var(--font-data)", fontSize: "var(--web-small)",
         ...this.railCell(),
         ...(s.compact ? { background: "transparent" } : null),
+        ...(s.compact && !s.narrow ? { width: 32, marginLeft: 0, marginRight: 0, flex: "0 0 32px" } : null),
         ...(s.narrow ? { width: 40, height: 40, minHeight: 40, flex: "0 0 40px", background: "transparent", border: "none", borderRadius: 0, padding: 0, justifyContent: "center" } : null),
       },
       eraCaretStyle: {
