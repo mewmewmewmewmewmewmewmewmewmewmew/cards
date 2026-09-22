@@ -1,0 +1,91 @@
+/* Mew Catalog — Web layer
+   Screen-only tokens: larger type scale, elevation, motion, focus, dark theme.
+   Print tokens stay authoritative for the book; nothing here changes B5 output. */
+:root {
+  /* Web type scale (screen px) */
+  --web-hero: 64px;
+  --web-h1: 40px;
+  --web-h2: 28px;
+  --web-h3: 20px;
+  --web-body: 16px;
+  --web-small: 14px;
+  --web-label: 11px;
+  --web-leading-tight: 1.15;
+  --web-leading: 1.6;
+
+  /* Screen radii — slightly softer than print, still near-square */
+  --web-radius-sm: 4px;
+  --web-radius: 8px;
+  --web-radius-pill: 999px;
+
+  /* Elevation — web-native depth (never used in print) */
+  --shadow-lift: 0 1px 2px rgba(33,31,34,.06), 0 2px 8px rgba(33,31,34,.06);
+  --shadow-raised: 0 2px 4px rgba(33,31,34,.06), 0 8px 24px rgba(33,31,34,.10);
+
+  /* Motion */
+  --ease: cubic-bezier(.2,.6,.3,1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur: 200ms; /* @kind other */
+
+  /* Focus */
+  --focus-ring: 0 0 0 2px var(--surface-page), 0 0 0 4px var(--pink-700);
+
+  /* Interactive surfaces */
+  --surface-hover: var(--grey-050);
+  --surface-active: var(--grey-100);
+  --surface-sunken: var(--grey-050);
+  --control-height: 40px;
+
+  /* Links */
+  --link: var(--pink-800);
+  --link-hover: var(--pink-700);
+}
+
+[data-theme="dark"] {
+  --white: #FFFFFF;
+  --ink: #F3F1F4;
+  --grey-050: #232128;
+  --grey-100: #2A2830;
+  --grey-200: #35323C;
+  --grey-300: #454250;
+  --grey-400: #7C7889;
+  --grey-500: #9A96A6;
+  --grey-600: #BAB6C4;
+  --grey-800: #E2DFE8;
+
+  --surface-page: #141317;
+  --surface-card: #1C1B21;
+  --surface-tint: #2A1B24;
+  --surface-image: #26242C;
+  --surface-inverse: #F3F1F4;
+  --surface-hover: #232128;
+  --surface-active: #2A2830;
+  --surface-sunken: #101014;
+
+  --text-title: #F3F1F4;
+  --text-body: #DCD9E2;
+  --text-muted: #9A96A6;
+  --text-faint: #7C7889;
+  --text-accent: var(--pink-400);
+  --text-on-inverse: #141317;
+
+  --line-hairline: #302D38;
+  --line-strong: #423E4C;
+  --line-accent: var(--pink-700);
+
+  --link: var(--pink-400);
+  --link-hover: var(--pink-300);
+
+  --grade-psa8: var(--grey-500);
+  --grade-psa9: var(--grey-600);
+  --grade-bgs-bl: #F3F1F4;
+
+  --shadow-lift: 0 1px 2px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.35);
+  --shadow-raised: 0 2px 4px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.5);
+  --focus-ring: 0 0 0 2px var(--surface-page), 0 0 0 4px var(--pink-400);
+}
+
+a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--link-hover); }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--web-radius-sm); }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 1ms !important; animation-duration: 1ms !important; } }

@@ -3,13 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>mew cards</title>
+    <title>Mew Catalog</title>
     <link rel="icon" type="image/png" href="https://mew.cards/img/logo.png" />
-    <!-- Warm up connections used on the critical path (config fetch + lock screen logo) -->
+    <!-- Warm up connections on the critical path (config fetch + fonts) -->
     <link rel="preconnect" href="https://script.google.com" crossorigin />
     <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin />
     <link rel="preconnect" href="https://mew.cards" />
-    <link rel="preload" as="image" href="https://mew.cards/img/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="image" href="/assets/mew-logo.png" />
+    <!-- Mew Catalog webfonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" />
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7XHLHGMDE7"></script>
     <script>
@@ -18,35 +22,14 @@
       gtag('js', new Date());
       gtag('config', 'G-7XHLHGMDE7');
     </script>
-    <!-- Font Awesome is only used by the cursor sparkles (which have an emoji
-         fallback), so load it without blocking first paint -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer"
-      />
-    </noscript>
-
-</head>
-  <body class="bg-[#101010] text-gray-100">
+  </head>
+  <body>
     <div id="root"></div>
     <!-- Vite entry -->
     <script type="module" src="/src/main.tsx"></script>
 
-<!-- Cursor Sparkle Effect -->
-<link rel="stylesheet" href="/cursor.css">
-<div id="cursor-layer" aria-hidden="true"></div>
-<script src="/cursor.js"></script>
-
+    <!-- Cursor Sparkle Effect -->
+    <div id="cursor-layer" aria-hidden="true"></div>
+    <script src="/cursor.js"></script>
   </body>
 </html>

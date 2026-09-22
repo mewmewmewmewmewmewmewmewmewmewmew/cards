@@ -1,0 +1,32 @@
+/* Mew Catalog — Spacing, page geometry, radii, shadows */
+:root {
+  /* 4px scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* B5 page (182 × 257 mm trim at ~3.65px/mm) — ring-bound, 3mm bleed (11px) */
+  --page-w: 665px;
+  --page-h: 939px;
+  --page-margin: 36px;      /* outer / bottom ~10mm */
+  --page-margin-inner: 52px; /* binding side ~14mm (ring-hole zone) */
+
+  /* Sheet grids */
+  --grid-gap: 11px;
+
+  /* Card image aspect (63 × 88 mm TCG card) */
+  --card-aspect: 63 / 88; /* @kind other */
+
+  /* Radii — printed catalog: nearly square */
+  --radius-card: 3px;
+  --radius-image: 4px;
+  --radius-badge: 2px;
+
+  /* Lines & shadows — flat, print-first */
+  --shadow-card: none;
+  --shadow-lift: 0 1px 4px rgba(33, 31, 34, 0.08);
+}

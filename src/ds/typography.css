@@ -1,0 +1,29 @@
+/* Mew Catalog — Type tokens
+   Display: Outfit (EN titles, headers, numerics)
+   Body: Zen Kaku Gothic New (bilingual EN/JP)
+   Data: IBM Plex Mono (card numbers, dates, populations) */
+:root {
+  --font-display: "Outfit", "Zen Kaku Gothic New", sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Sizes (B5 page @ ~96dpi) */
+  --text-folio: 9px;      /* page numbers, running feet */
+  --text-label: 9px;      /* uppercase field labels */
+  --text-data: 10.5px;    /* mono values */
+  --text-caption: 11px;   /* notes, JP names */
+  --text-body-size: 12.5px;
+  --text-card-title: 15px;
+  --text-section: 24px;
+  --text-title-size: 38px;
+
+  --tracking-label: 0.08em;
+  --tracking-caps: 0.14em;
+
+  --leading-tight: 1.15;
+  --leading-body: 1.55;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-bold: 700;
+}

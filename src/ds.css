@@ -1,0 +1,7 @@
+/* Mew Catalog design system — imported in the same order as the handoff's
+   styles.css (colors → typography → spacing → web) so web.css overrides win.
+   Fonts are loaded via a <link> in index.html; the body font rule lives in app.css. */
+@import "./ds/colors.css";
+@import "./ds/typography.css";
+@import "./ds/spacing.css";
+@import "./ds/web.css";
