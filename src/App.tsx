@@ -64,7 +64,7 @@ class MewCatalog extends React.Component<Any, Any> {
   _ro: Any; _barRo: Any; _mq: Any; _theme: Any; _themePinned = false;
   _resize: Any; _key: Any; _hash: Any; _away: Any; _pageScroll: Any;
   _wallProg: Any; _wallWheel: Any; _wallMove: Any; _wallOut: Any;
-  _wallTouchStart: Any; _wallTouchMove: Any; _swirlDelay: Any; _wallRefFn: Any; _touch: Any;
+  _wallTouchStart: Any; _wallTouchMove: Any; _swirlDelay: Any; _wallRefFn: Any; _touch: Any; _blurReset: Any;
 
   state: Any = {
     D: null, cards: [], status: "loading", progress: 0, imagesLoaded: false,
@@ -80,6 +80,7 @@ class MewCatalog extends React.Component<Any, Any> {
   componentWillUnmount() {
     if (this._ro) this._ro.disconnect();
     document.removeEventListener("pointerdown", this._away);
+    document.removeEventListener("focusout", this._blurReset);
     window.removeEventListener("hashchange", this._hash);
     window.removeEventListener("scroll", this._pageScroll);
     if (this._mq && this._mq.removeEventListener && this._theme) this._mq.removeEventListener("change", this._theme);
@@ -90,6 +91,10 @@ class MewCatalog extends React.Component<Any, Any> {
   async componentDidMount() {
     document.title = "Mew Catalog";
     this._resize = () => {
+      // While a text field is focused on a phone the keyboard shrinks and scrolls the
+      // viewport; measuring then would bake those temporary numbers into the wall.
+      const ae = document.activeElement;
+      if (this.state.narrow && ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
       const el = this._rootEl;
       const w = el ? el.getBoundingClientRect().width : window.innerWidth;
       const narrow = w > 0 && w <= 760;
@@ -105,7 +110,7 @@ class MewCatalog extends React.Component<Any, Any> {
       }
       const wEl = this._wallEl;
       if (wEl) {
-        const top = wEl.getBoundingClientRect().top;
+        const top = wEl.getBoundingClientRect().top + (window.scrollY || 0);
         const avail = Math.round(vh - top - (this.state.narrow ? (this.state.barH || 52) : 0));
         if (avail > 200 && Math.abs(avail - (this.state.wallAvail || 0)) > 2) this.setState({ wallAvail: avail });
       }
@@ -151,6 +156,13 @@ class MewCatalog extends React.Component<Any, Any> {
       if (this.state.searchOpen && !this.state.q && !(this._searchPanelEl && this._searchPanelEl.contains(e.target))) this.setState({ searchOpen: false });
     };
     document.addEventListener("pointerdown", this._away);
+    this._blurReset = (e: Any) => {
+      if (!this.state.narrow) return;
+      const t = e.target;
+      if (!t || (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA")) return;
+      setTimeout(() => { window.scrollTo(0, 0); if (this._resize) this._resize(); }, 60);
+    };
+    document.addEventListener("focusout", this._blurReset);
 
     const D = MewData;
     this.setState({ D });
