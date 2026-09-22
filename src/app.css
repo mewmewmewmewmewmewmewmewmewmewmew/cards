@@ -52,9 +52,6 @@ aside button:focus-visible { outline: 2px solid var(--pink-700); outline-offset:
 
 [data-card-face] { position: relative; z-index: 0; transform-origin: 50% 100%; transform-style: preserve-3d; transition: box-shadow var(--dur) var(--ease); }
 [data-wall-card]:hover [data-card-face] { box-shadow: var(--shadow-raised); }
-@media (hover: none) {
-  [data-wall-card]:active [data-card-face] { transform: scale(0.97); transition: transform 90ms var(--ease); }
-}
 
 /* Cursor star trail */
 @media (prefers-reduced-motion: reduce) { .cursor-star { display: none !important; } }

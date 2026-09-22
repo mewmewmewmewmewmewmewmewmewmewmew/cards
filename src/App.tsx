@@ -650,8 +650,9 @@ class MewCatalog extends React.Component<Any, Any> {
       showSubtitle: !(s.compact),
       compactSidebar: s.compact,
       sectionStyle: s.narrow ? { display: "contents" } : { display: "flex", flexDirection: "column", gap: 10 },
-      showSearchField: !s.compact || s.narrow,
-      showSearchIcon: s.compact && !s.narrow,
+      // Mobile uses the icon too (a full field overlapped the centred scope toggles).
+      showSearchField: !s.compact,
+      showSearchIcon: s.compact,
       searchFieldStyle: {
         display: "flex", alignItems: "center", gap: 8, boxSizing: "border-box",
         height: 40, padding: "0 12px",
@@ -694,6 +695,8 @@ class MewCatalog extends React.Component<Any, Any> {
         height: 36, padding: "0 12px", boxSizing: "border-box", maxHeight: "none",
         background: "var(--surface-card)", border: "1px solid var(--line-strong)",
         borderRadius: "var(--web-radius-sm)", boxShadow: "var(--shadow-raised)",
+        // Mobile: pop up above the bottom bar, full width minus the 10px gutters.
+        ...(s.narrow ? { position: "fixed", top: "auto", bottom: (s.barH || 53) + 8, left: 10, right: 10, width: "auto", minWidth: 0, zIndex: 160 } : null),
       },
       mewIconStyle: { ...this.scopeIcon(s.mew), background: "transparent", ...(s.narrow ? {} : { height: 56, minHeight: 56 }) },
       cameoIconStyle: this.scopeIcon(s.cameo),
