@@ -77,6 +77,20 @@ class MewCatalog extends React.Component<Any, Any> {
     tab: "all", catMew: true, catCameo: true, catIntl: true, listId: null, gridMode: false, narrow: false, compact: true, rootH: 0, rootW: 0, barH: 0, wallAvail: 0, wallProgress: 0, pageProgress: 0, eras: [], eraMenuOpen: false, filtersOpen: false, mobileFilters: false,
   };
 
+  componentDidUpdate(prev: Any) {
+    if (prev.ownerMode !== this.props.ownerMode && this._hash) this._hash();
+    this.syncTopCtrls();
+  }
+
+  // Mobile list view: the top-left controls are fixed (their parent is the fixed bottom bar),
+  // so shift them by the shell's scroll offset to make them scroll away with the list.
+  syncTopCtrls() {
+    const r = this._rootEl;
+    if (!r) return;
+    const y = this.state.narrow && this.state.listView ? r.scrollTop : 0;
+    r.querySelectorAll("[data-top-ctrl]").forEach((el: Any) => { el.style.transform = y ? `translateY(${-y}px)` : ""; });
+  }
+
   stopAutoScroll() {
     if (this._autoRaf) cancelAnimationFrame(this._autoRaf);
     this._autoRaf = null;
@@ -180,6 +194,7 @@ class MewCatalog extends React.Component<Any, Any> {
       const top = r ? r.scrollTop : (window.scrollY || de.scrollTop || 0);
       const p = max > 4 ? Math.min(1, Math.max(0, top / max)) : 0;
       if (Math.abs(p - (this.state.pageProgress || 0)) > 0.002) this.setState({ pageProgress: p });
+      this.syncTopCtrls();
     };
     window.addEventListener("scroll", this._pageScroll, { passive: true, capture: true });
     this._pageScroll();
@@ -579,7 +594,7 @@ class MewCatalog extends React.Component<Any, Any> {
     for (; wallRows >= 1; wallRows--) {
       wallRowH = (wallH - wallLift * 2 - wallGap * (wallRows - 1)) / wallRows;
       wallColW = (wallRowH - wallCaption) * 63 / 88;
-      if (wallColW >= (narrow ? 132 : 150) || wallRows === 1) break;
+      if (wallColW >= (narrow ? 132 : 150) || wallRows === (narrow ? 2 : 1)) break;
     }
     wallRowH = Math.floor(wallRowH); wallColW = Math.floor(wallColW);
     const listW = (s.rootW || 1200) - (narrow ? 32 : (s.compact ? 72 : 268) + 64);
@@ -1248,7 +1263,7 @@ class MewCatalog extends React.Component<Any, Any> {
           </div>
         )}
 
-        <div ref={v.rootRef} style={v.shellStyle}>
+        <div ref={v.rootRef} className="mew-scroll" style={v.shellStyle}>
           <aside ref={v.asideRef} style={v.asideStyle}>
             <div style={v.eyebrowStyle}></div>
 
@@ -1310,7 +1325,7 @@ class MewCatalog extends React.Component<Any, Any> {
                   </div>
 
                   {v.hasEras && (
-                    <div ref={v.eraRef} style={v.eraWrapStyle}>
+                    <div ref={v.eraRef} data-top-ctrl="1" style={v.eraWrapStyle}>
                       {v.wideSidebar && (
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>{v.tEra}</span>
                       )}
@@ -1344,7 +1359,7 @@ class MewCatalog extends React.Component<Any, Any> {
                     {v.wideSidebar && (
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>{v.tSortBy}</span>
                     )}
-                    <div ref={v.sortRef} style={v.dropWrapStyle}>
+                    <div ref={v.sortRef} data-top-ctrl="1" style={v.dropWrapStyle}>
                       <button type="button" data-rail-tip="1" onClick={v.toggleSortMenu} aria-haspopup="listbox" aria-label={v.tSortBy} style={v.sortTriggerStyle}>
                         <span style={v.triggerTextStyle}>{v.sortLabel}</span>
                         {v.compactSidebar && (
@@ -1368,7 +1383,7 @@ class MewCatalog extends React.Component<Any, Any> {
                 </div>
 
                 {v.ownerMode && (
-                  <div style={v.footerRowStyle}>
+                  <div data-top-ctrl="1" style={v.footerRowStyle}>
                     <button type="button" data-rail-tip="1" onClick={v.toggleCollection} aria-label={v.tCollection} style={v.collIconStyle}>
                       <svg width="18" height="16" viewBox="0 0 24 22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 9a9 9 0 0 1 18 0v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9Z"></path><path d="M3 12h18"></path><path d="M10.5 11h3v4h-3z"></path></svg>
                       <span data-rail-label="1" style={v.railLabelStyle}>{v.tCollection}</span>
