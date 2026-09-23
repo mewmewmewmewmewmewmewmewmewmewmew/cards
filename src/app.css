@@ -15,7 +15,7 @@ html, body { overscroll-behavior: none; }
 .mew-scroll::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
 .mew-scroll::-webkit-scrollbar-track { background: transparent; }
 .mew-scroll::-webkit-scrollbar-thumb:hover, html::-webkit-scrollbar-thumb:hover { background: var(--pink-700); }
-html { scrollbar-width: thin; scrollbar-color: var(--line-strong) var(--surface-page); }
+@supports not selector(::-webkit-scrollbar) { html { scrollbar-width: thin; scrollbar-color: var(--line-strong) var(--surface-page); } }
 html::-webkit-scrollbar { width: 8px; height: 8px; background: var(--surface-page); }
 html::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; border: 2px solid var(--surface-page); }
 html::-webkit-scrollbar-track { background: var(--surface-page); }

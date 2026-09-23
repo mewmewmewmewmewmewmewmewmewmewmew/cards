@@ -138,6 +138,8 @@ class MewCatalog extends React.Component<Any, Any> {
     window.removeEventListener("scroll", this._pageScroll, { capture: true });
     if (this._mq && this._mq.removeEventListener && this._theme) this._mq.removeEventListener("change", this._theme);
     window.removeEventListener("resize", this._resize);
+    window.removeEventListener("orientationchange", this._resize);
+    if (window.visualViewport) window.visualViewport.removeEventListener("resize", this._resize);
     document.removeEventListener("keydown", this._key);
   }
 
@@ -153,18 +155,20 @@ class MewCatalog extends React.Component<Any, Any> {
       const narrow = w > 0 && w <= 760;
       const rootW = Math.round(w || 0);
       if (rootW !== this.state.rootW) this.setState({ rootW });
-      const vh = (typeof window !== "undefined" && window.innerHeight) || 900;
+      // On mobile the shell is fixed to the viewport, so its own height is the truth.
+      const vh = (narrow && el && el.clientHeight) || (typeof window !== "undefined" && window.innerHeight) || 900;
       const hh = el ? el.getBoundingClientRect().height : vh;
       const rootH = Math.round(Math.min(hh > 0 ? hh : vh, vh));
       const bar = this._asideEl || (el && el.querySelector("aside"));
-      if (bar) {
-        const bh = narrow ? Math.round(bar.getBoundingClientRect().height) : 0;
-        if (Math.abs(bh - (this.state.barH || 0)) > 1) this.setState({ barH: bh });
-      }
+      const bh = bar && narrow ? Math.round(bar.getBoundingClientRect().height) : 0;
+      if (bar && Math.abs(bh - (this.state.barH || 0)) > 1) this.setState({ barH: bh });
       const wEl = this._wallEl;
       if (wEl) {
-        const top = wEl.getBoundingClientRect().top + (window.scrollY || 0);
-        const avail = Math.round(vh - top - (this.state.narrow ? (this.state.barH || 52) : 0));
+        // Layout offset (ignores transforms and the shell's scroll position), not the painted rect.
+        let top = 0, n: Any = wEl;
+        while (n && n !== el && n !== document.body) { top += n.offsetTop; n = n.offsetParent; }
+        if (!el || n !== el) top = wEl.getBoundingClientRect().top + (window.scrollY || 0);
+        const avail = Math.round(vh - top - (narrow ? (bh || 52) : 0));
         if (avail > 200 && Math.abs(avail - (this.state.wallAvail || 0)) > 2) this.setState({ wallAvail: avail });
       }
       if (narrow !== this.state.narrow || Math.abs(rootH - (this.state.rootH || 0)) > 4) this.setState({ narrow, rootH });
@@ -177,6 +181,9 @@ class MewCatalog extends React.Component<Any, Any> {
       if (this._rootEl) this._ro.observe(this._rootEl);
     }
     window.addEventListener("resize", this._resize);
+    window.addEventListener("orientationchange", this._resize);
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", this._resize);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this._resize && this._resize());
     this._key = (e: Any) => {
       if (e.key !== "Escape") return;
       if (this.state.eraMenuOpen) this.setState({ eraMenuOpen: false });
@@ -867,6 +874,8 @@ class MewCatalog extends React.Component<Any, Any> {
         if (this._wallEl && this._wallTouchStart) { this._wallEl.removeEventListener("touchstart", this._wallTouchStart); this._wallEl.removeEventListener("touchmove", this._wallTouchMove); }
         this._wallEl = el;
         if (!el) return;
+        requestAnimationFrame(() => this._resize && this._resize());
+        setTimeout(() => this._resize && this._resize(), 400);
         this._wallProg = () => {
           const max = el.scrollWidth - el.clientWidth;
           const p = max > 4 ? Math.min(1, Math.max(0, el.scrollLeft / max)) : 0;
