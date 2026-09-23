@@ -121,7 +121,7 @@ class MewCatalog extends React.Component<Any, Any> {
     document.removeEventListener("pointerdown", this._away);
     document.removeEventListener("focusout", this._blurReset);
     window.removeEventListener("hashchange", this._hash);
-    window.removeEventListener("scroll", this._pageScroll);
+    window.removeEventListener("scroll", this._pageScroll, { capture: true });
     if (this._mq && this._mq.removeEventListener && this._theme) this._mq.removeEventListener("change", this._theme);
     window.removeEventListener("resize", this._resize);
     document.removeEventListener("keydown", this._key);
@@ -172,13 +172,16 @@ class MewCatalog extends React.Component<Any, Any> {
       const owner = (location.hash || "").replace("#", "").toLowerCase() === "mew" || this.props.ownerMode === true;
       if (owner !== this.state.ownerMode) this.setState({ ownerMode: owner, view: owner ? this.state.view : "browse" });
     };
+    // On mobile the shell is its own scroller (see shellStyle), so read progress from it.
     this._pageScroll = () => {
+      const r = this.state.narrow && this._rootEl;
       const de = document.documentElement;
-      const max = de.scrollHeight - de.clientHeight;
-      const p = max > 4 ? Math.min(1, Math.max(0, (window.scrollY || de.scrollTop || 0) / max)) : 0;
+      const max = r ? r.scrollHeight - r.clientHeight : de.scrollHeight - de.clientHeight;
+      const top = r ? r.scrollTop : (window.scrollY || de.scrollTop || 0);
+      const p = max > 4 ? Math.min(1, Math.max(0, top / max)) : 0;
       if (Math.abs(p - (this.state.pageProgress || 0)) > 0.002) this.setState({ pageProgress: p });
     };
-    window.addEventListener("scroll", this._pageScroll, { passive: true });
+    window.addEventListener("scroll", this._pageScroll, { passive: true, capture: true });
     this._pageScroll();
     const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
     if (mq) {
@@ -696,8 +699,11 @@ class MewCatalog extends React.Component<Any, Any> {
 
     return {
       isSample: false,
+      // Mobile: the shell fills the viewport and scrolls internally, so the document never
+      // scrolls and the browser toolbar never collapses out from under the fixed bottom bar.
       shellStyle: {
         display: "grid", alignItems: "start", minHeight: "100vh",
+        ...(s.narrow ? { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, minHeight: 0, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" } : null),
         gridTemplateColumns: s.narrow ? "minmax(0,1fr)" : (s.compact ? "72px minmax(0,1fr)" : "minmax(0,268px) minmax(0,1fr)"),
       },
       isNarrow: s.narrow,
@@ -774,12 +780,6 @@ class MewCatalog extends React.Component<Any, Any> {
             WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
             boxSizing: "border-box", background: "var(--surface-sunken)",
             borderTop: "1px solid var(--line-strong)",
-            // Not in the prototype: extend the bar's colour 200px below its bottom
-            // edge (offset = spread, so the shadow starts exactly at the bar's top
-            // and never covers anything above it). When a mobile browser hides its
-            // toolbar on scroll and leaves the fixed bar where it was, the strip
-            // underneath shows the bar colour instead of the page scrolling behind.
-            boxShadow: "0 200px 0 200px var(--surface-sunken)",
           }
         : { position: "sticky", top: 0, zIndex: 130, alignSelf: "start", height: "100vh", overflowY: s.compact ? "visible" : "auto", display: "flex", flexDirection: "column", gap: s.compact ? 16 : 26, padding: s.compact ? "22px 16px 16px" : "28px 24px 24px", alignItems: s.compact ? "center" : "stretch", overflowX: "visible", boxSizing: "border-box", background: "var(--surface-sunken)", borderRight: "1px solid var(--line-strong)" },
       asideRef: (el: Any) => {
