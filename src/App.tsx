@@ -64,7 +64,7 @@ class MewCatalog extends React.Component<Any, Any> {
   _ro: Any; _barRo: Any; _mq: Any; _theme: Any; _themePinned = false;
   _resize: Any; _key: Any; _hash: Any; _away: Any; _pageScroll: Any;
   _wallProg: Any; _wallWheel: Any; _wallMove: Any; _wallOut: Any;
-  _wallTouchStart: Any; _wallTouchMove: Any; _swirlDelay: Any; _wallRefFn: Any; _touch: Any; _blurReset: Any;
+  _wallTouchStart: Any; _wallTouchMove: Any; _swirlDelay: Any; _wallRefFn: Any; _touch: Any; _blurReset: Any; _autoRaf: Any; _autoStopEvt: Any; _toggleAutoFn: Any;
 
   state: Any = {
     D: null, cards: [], status: "loading", progress: 0, imagesLoaded: false,
@@ -77,7 +77,46 @@ class MewCatalog extends React.Component<Any, Any> {
     tab: "all", catMew: true, catCameo: true, catIntl: true, listId: null, gridMode: false, narrow: false, compact: true, rootH: 0, rootW: 0, barH: 0, wallAvail: 0, wallProgress: 0, pageProgress: 0, eras: [], eraMenuOpen: false, filtersOpen: false, mobileFilters: false,
   };
 
+  stopAutoScroll() {
+    if (this._autoRaf) cancelAnimationFrame(this._autoRaf);
+    this._autoRaf = null;
+    if (this._autoStopEvt) {
+      window.removeEventListener("wheel", this._autoStopEvt);
+      window.removeEventListener("touchstart", this._autoStopEvt);
+      window.removeEventListener("keydown", this._autoStopEvt);
+      this._autoStopEvt = null;
+    }
+  }
+
+  toggleAutoScroll() {
+    if (this._autoRaf) { this.stopAutoScroll(); return; }
+    const start = () => {
+      const el = this._wallEl;
+      if (!el) return;
+      const max = () => el.scrollWidth - el.clientWidth;
+      if (el.scrollLeft >= max() - 1) return;
+      const SPEED = 240; // px per second
+      let pos = el.scrollLeft, last = performance.now();
+      const step = (now: number) => {
+        const dt = Math.min(64, now - last); last = now;
+        if (Math.abs(el.scrollLeft - pos) > 2) pos = el.scrollLeft;
+        pos = Math.min(max(), pos + SPEED * dt / 1000);
+        el.scrollLeft = pos;
+        if (pos >= max() - 0.5) { this.stopAutoScroll(); return; }
+        this._autoRaf = requestAnimationFrame(step);
+      };
+      this._autoStopEvt = () => this.stopAutoScroll();
+      window.addEventListener("wheel", this._autoStopEvt, { passive: true });
+      window.addEventListener("touchstart", this._autoStopEvt, { passive: true });
+      window.addEventListener("keydown", this._autoStopEvt);
+      this._autoRaf = requestAnimationFrame(step);
+    };
+    if (this.state.listView) this.setState({ listView: false }, () => requestAnimationFrame(start));
+    else start();
+  }
+
   componentWillUnmount() {
+    this.stopAutoScroll();
     if (this._ro) this._ro.disconnect();
     document.removeEventListener("pointerdown", this._away);
     document.removeEventListener("focusout", this._blurReset);
@@ -89,7 +128,7 @@ class MewCatalog extends React.Component<Any, Any> {
   }
 
   async componentDidMount() {
-    document.title = "Mew Catalog";
+    document.title = "mew cards";
     this._resize = () => {
       // While a text field is focused on a phone the keyboard shrinks and scrolls the
       // viewport; measuring then would bake those temporary numbers into the wall.
@@ -772,7 +811,7 @@ class MewCatalog extends React.Component<Any, Any> {
         padding: s.narrow ? "0 16px 48px" : "0 32px 64px",
       },
       browseBarStyle: {
-        display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12,
+        position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12,
         paddingLeft: s.listView ? 0 : (s.narrow ? 16 : 32),
         paddingRight: s.listView ? 0 : (s.narrow ? 16 : 32),
       },
@@ -782,6 +821,13 @@ class MewCatalog extends React.Component<Any, Any> {
       showListView: () => this.setState({ listView: true }),
       gridViewBtnStyle: this.viewIconStyle(!s.listView),
       listViewBtnStyle: this.viewIconStyle(s.listView),
+      toggleAutoScroll: this._toggleAutoFn || (this._toggleAutoFn = () => this.toggleAutoScroll()),
+      ownerEdgeBarStyle: {
+        position: "absolute", top: "50%", transform: "translateY(-50%)",
+        right: s.listView ? (s.narrow ? -16 : -32) : 0,
+        display: "block", width: 4, height: 14, padding: 0, border: "none", borderRadius: 0,
+        background: "var(--pink-700)", cursor: "pointer",
+      },
       listHeadStyle: {
         display: "grid", gridTemplateColumns: listCols, gap: s.narrow ? 10 : 14,
         padding: s.narrow ? "0 6px 8px" : "0 8px 8px", borderBottom: "1px solid var(--line-strong)",
@@ -1344,6 +1390,9 @@ class MewCatalog extends React.Component<Any, Any> {
                   <HoverEl onClick={v.showListView} aria-label="List view" title={v.tList} style={v.listViewBtnStyle} hoverStyle={HOVER_PINK}>
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="1" width="16" height="2"></rect><rect x="0" y="7" width="16" height="2"></rect><rect x="0" y="13" width="16" height="2"></rect></svg>
                   </HoverEl>
+                  {v.ownerMode && (
+                    <button type="button" aria-label="Auto-scroll" onClick={v.toggleAutoScroll} style={v.ownerEdgeBarStyle}></button>
+                  )}
                 </div>
 
                 {v.browseList && (
