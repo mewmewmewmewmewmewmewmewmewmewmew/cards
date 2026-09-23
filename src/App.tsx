@@ -273,7 +273,7 @@ class MewCatalog extends React.Component<Any, Any> {
   viewIconStyle(on: Any): Any {
     return {
       display: "inline-flex", alignItems: "center", justifyContent: "center",
-      width: this.state.narrow ? 44 : 24, height: this.state.narrow ? 44 : 24,
+      width: this.state.narrow ? 36 : 24, height: this.state.narrow ? 44 : 24,
       padding: 0, cursor: "pointer", background: "transparent", border: "none",
       color: on ? "var(--pink-700)" : "var(--text-faint)",
       transition: "color var(--dur-fast) var(--ease)",
@@ -725,10 +725,10 @@ class MewCatalog extends React.Component<Any, Any> {
       wideSidebar: !s.compact,
       searchOpen: s.searchOpen,
       dropWrapStyle: s.narrow
-        ? { position: "fixed", top: 10, left: 56, zIndex: 60, display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 40 }
+        ? { position: "fixed", top: 22, left: 46, zIndex: 60, display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 36, justifyContent: "center" }
         : (s.compact ? { position: "relative", width: "100%", display: "flex", justifyContent: "center" } : { position: "relative" }),
       eraWrapStyle: s.narrow
-        ? { position: "fixed", top: 10, left: 10, zIndex: 60, display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 40 }
+        ? { position: "fixed", top: 22, left: 10, zIndex: 60, display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 36, justifyContent: "center" }
         : (s.compact
             ? { position: "relative", width: "100%", display: "flex", justifyContent: "center" }
             : { position: "relative", display: "flex", flexDirection: "column", gap: 10 }),
@@ -811,7 +811,7 @@ class MewCatalog extends React.Component<Any, Any> {
         padding: s.narrow ? "0 16px 48px" : "0 32px 64px",
       },
       browseBarStyle: {
-        position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12,
+        position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: s.narrow ? 0 : 12,
         paddingLeft: s.listView ? 0 : (s.narrow ? 16 : 32),
         paddingRight: s.listView ? 0 : (s.narrow ? 16 : 32),
       },
@@ -978,7 +978,7 @@ class MewCatalog extends React.Component<Any, Any> {
             gap: s.compact ? 2 : 8,
             flexWrap: s.compact ? "wrap" : "nowrap",
           },
-      footerRowStyle: s.narrow ? { display: "flex", alignItems: "center", gap: 2, flexShrink: 0, marginLeft: "auto" } : {
+      footerRowStyle: s.narrow ? { position: "fixed", top: 22, left: 82, zIndex: 60, height: 40, display: (s.selectedId || s.view === "collection") ? "none" : "flex", alignItems: "center", gap: 0 } : {
         flexShrink: 0, minWidth: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
         gap: s.compact ? 2 : 8,
@@ -1010,7 +1010,7 @@ class MewCatalog extends React.Component<Any, Any> {
       bulbStroke: theme === "dark" ? "var(--pink-700)" : "var(--text-faint)",
       iconBtnStyle: {
         display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        width: s.narrow ? 44 : 28, height: s.narrow ? 44 : 28, padding: 0, cursor: "pointer",
+        width: s.narrow ? 36 : 28, height: s.narrow ? 44 : 28, padding: 0, cursor: "pointer",
         background: "transparent", border: "none",
         color: theme === "dark" ? "var(--pink-700)" : "var(--text-muted)",
         transition: "color var(--dur-fast) var(--ease)",
@@ -1024,14 +1024,14 @@ class MewCatalog extends React.Component<Any, Any> {
       },
       collIconStyle: {
         display: "inline-flex", alignItems: "center", justifyContent: "center",
-        width: s.narrow ? 44 : 28, height: s.narrow ? 44 : 28, padding: 0, cursor: "pointer",
+        width: s.narrow ? 36 : 28, height: s.narrow ? 44 : 28, padding: 0, cursor: "pointer",
         background: "transparent", border: "none",
         color: s.view === "collection" ? "var(--pink-700)" : "var(--text-muted)",
         transition: "color var(--dur-fast) var(--ease)",
       },
       desatIconStyle: {
         display: "inline-flex", alignItems: "center", justifyContent: "center",
-        width: s.narrow ? 44 : 28, height: s.narrow ? 44 : 28, padding: 0, cursor: "pointer",
+        width: s.narrow ? 36 : 28, height: s.narrow ? 44 : 28, padding: 0, cursor: "pointer",
         background: "transparent", border: "none",
         color: s.desaturate ? "var(--pink-700)" : "var(--text-muted)",
         transition: "color var(--dur-fast) var(--ease)",
