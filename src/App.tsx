@@ -682,6 +682,11 @@ class MewCatalog extends React.Component<Any, Any> {
           background: "transparent", border: "none",
           transition: "transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease)",
         },
+        faceStyle: {
+          position: "relative", display: "block", containerType: "inline-size",
+          width: wallColW, height: Math.round(wallColW * 88 / 63), flexShrink: 0,
+          background: "var(--surface-image)", borderRadius: "4.72% / 3.37%", overflow: "hidden",
+        },
         onClick: () => {
           this.setState({ selectedId: c.id, flipped: false });
           if (D) D.trackEvent("card_click", { card_name: c.nameEN, card_set: c.set, card_number: c.number });
@@ -1440,7 +1445,7 @@ class MewCatalog extends React.Component<Any, Any> {
                           </div>
                         )}
                         <button type="button" data-wall-card="1" onClick={tl.onClick} style={tl.wallStyle}>
-                          <span data-card-face="1" style={{ position: "relative", display: "block", containerType: "inline-size", aspectRatio: "63 / 88", background: "var(--surface-image)", borderRadius: "4.72% / 3.37%", overflow: "hidden" }}>
+                          <span data-card-face="1" style={tl.faceStyle}>
                             <span data-card-glare="1" style={{ position: "absolute", inset: 0, zIndex: 2, opacity: 0, mixBlendMode: "screen", pointerEvents: "none", transition: "opacity 150ms var(--ease)" }}></span>
                             <span role="img" aria-label={tl.title} style={tl.imgStyle}>{tl.noImage && (<span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>SCAN</span>)}</span>
                           </span>
