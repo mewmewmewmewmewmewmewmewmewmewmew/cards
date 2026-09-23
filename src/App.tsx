@@ -1349,7 +1349,7 @@ class MewCatalog extends React.Component<Any, Any> {
                       <button type="button" data-rail-tip="1" onClick={v.toggleEraMenu} aria-haspopup="listbox" aria-label={v.tEra} style={v.eraTriggerStyle}>
                         <span style={v.triggerTextStyle}>{v.eraTriggerLabel}</span>
                         {v.compactSidebar && (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3v5h5"></path><path d="M3.05 13a9 9 0 1 0 2.5-6.36L3 8"></path><path d="M12 7v5l3.5 2"></path></svg>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 4.5h17l-6.5 7.8v6.2l-4 2v-8.2z"></path></svg>
                         )}
                         <span style={v.eraCaretStyle}>▾</span>
                         {v.compactSidebar && (<span data-rail-label="1" style={v.railLabelStyle}>{v.eraTriggerLabel}</span>)}
