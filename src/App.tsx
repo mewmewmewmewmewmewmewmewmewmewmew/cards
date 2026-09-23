@@ -751,10 +751,10 @@ class MewCatalog extends React.Component<Any, Any> {
       wideSidebar: !s.compact,
       searchOpen: s.searchOpen,
       dropWrapStyle: s.narrow
-        ? { position: "fixed", top: 22, left: 46, zIndex: 60, display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 36, justifyContent: "center" }
+        ? { position: "fixed", top: 22, left: 46, zIndex: 60, touchAction: "none", display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 36, justifyContent: "center" }
         : (s.compact ? { position: "relative", width: "100%", display: "flex", justifyContent: "center" } : { position: "relative" }),
       eraWrapStyle: s.narrow
-        ? { position: "fixed", top: 22, left: 10, zIndex: 60, display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 36, justifyContent: "center" }
+        ? { position: "fixed", top: 22, left: 10, zIndex: 60, touchAction: "none", display: (s.selectedId || s.view === "collection") ? "none" : "flex", width: 36, justifyContent: "center" }
         : (s.compact
             ? { position: "relative", width: "100%", display: "flex", justifyContent: "center" }
             : { position: "relative", display: "flex", flexDirection: "column", gap: 10 }),
@@ -792,7 +792,7 @@ class MewCatalog extends React.Component<Any, Any> {
             display: "flex", flexDirection: "row", alignItems: "center", gap: 2,
             padding: "4px 6px calc(4px + env(safe-area-inset-bottom, 0px))",
             overflowX: "visible", overflowY: "visible", flexWrap: "nowrap",
-            WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+            WebkitOverflowScrolling: "touch", scrollbarWidth: "none", touchAction: "none", overscrollBehavior: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none",
             boxSizing: "border-box", background: "var(--surface-sunken)",
             borderTop: "1px solid var(--line-strong)",
           }
@@ -1004,7 +1004,7 @@ class MewCatalog extends React.Component<Any, Any> {
             gap: s.compact ? 2 : 8,
             flexWrap: s.compact ? "wrap" : "nowrap",
           },
-      footerRowStyle: s.narrow ? { position: "fixed", top: 22, left: 82, zIndex: 60, height: 40, display: (s.selectedId || s.view === "collection") ? "none" : "flex", alignItems: "center", gap: 0 } : {
+      footerRowStyle: s.narrow ? { position: "fixed", top: 22, left: 82, zIndex: 60, touchAction: "none", height: 40, display: (s.selectedId || s.view === "collection") ? "none" : "flex", alignItems: "center", gap: 0 } : {
         flexShrink: 0, minWidth: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
         gap: s.compact ? 2 : 8,
