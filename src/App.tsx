@@ -1390,9 +1390,7 @@ class MewCatalog extends React.Component<Any, Any> {
                   <HoverEl onClick={v.showListView} aria-label="List view" title={v.tList} style={v.listViewBtnStyle} hoverStyle={HOVER_PINK}>
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="1" width="16" height="2"></rect><rect x="0" y="7" width="16" height="2"></rect><rect x="0" y="13" width="16" height="2"></rect></svg>
                   </HoverEl>
-                  {v.ownerMode && (
-                    <button type="button" aria-label="Auto-scroll" onClick={v.toggleAutoScroll} style={v.ownerEdgeBarStyle}></button>
-                  )}
+                  <button type="button" aria-label="Auto-scroll" onClick={v.toggleAutoScroll} style={v.ownerEdgeBarStyle}></button>
                 </div>
 
                 {v.browseList && (
