@@ -774,6 +774,12 @@ class MewCatalog extends React.Component<Any, Any> {
             WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
             boxSizing: "border-box", background: "var(--surface-sunken)",
             borderTop: "1px solid var(--line-strong)",
+            // Not in the prototype: extend the bar's colour 200px below its bottom
+            // edge (offset = spread, so the shadow starts exactly at the bar's top
+            // and never covers anything above it). When a mobile browser hides its
+            // toolbar on scroll and leaves the fixed bar where it was, the strip
+            // underneath shows the bar colour instead of the page scrolling behind.
+            boxShadow: "0 200px 0 200px var(--surface-sunken)",
           }
         : { position: "sticky", top: 0, zIndex: 130, alignSelf: "start", height: "100vh", overflowY: s.compact ? "visible" : "auto", display: "flex", flexDirection: "column", gap: s.compact ? 16 : 26, padding: s.compact ? "22px 16px 16px" : "28px 24px 24px", alignItems: s.compact ? "center" : "stretch", overflowX: "visible", boxSizing: "border-box", background: "var(--surface-sunken)", borderRight: "1px solid var(--line-strong)" },
       asideRef: (el: Any) => {
