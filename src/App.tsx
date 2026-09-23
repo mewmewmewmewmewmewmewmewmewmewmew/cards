@@ -80,6 +80,13 @@ class MewCatalog extends React.Component<Any, Any> {
   componentDidUpdate(prev: Any) {
     if (prev.ownerMode !== this.props.ownerMode && this._hash) this._hash();
     this.syncTopCtrls();
+    this.syncHtmlTheme();
+  }
+
+  // The page scrollbar belongs to <html>, outside the themed wrapper; mirror the theme so its colors match.
+  syncHtmlTheme() {
+    const de = document.documentElement;
+    if (de.getAttribute("data-theme") !== this.state.theme) de.setAttribute("data-theme", this.state.theme);
   }
 
   // Mobile list view: the top-left controls are fixed (their parent is the fixed bottom bar),
@@ -145,6 +152,7 @@ class MewCatalog extends React.Component<Any, Any> {
 
   async componentDidMount() {
     document.title = "mew cards";
+    this.syncHtmlTheme();
     this._resize = () => {
       // While a text field is focused on a phone the keyboard shrinks and scrolls the
       // viewport; measuring then would bake those temporary numbers into the wall.
