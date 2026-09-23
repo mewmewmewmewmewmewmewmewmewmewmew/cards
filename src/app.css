@@ -25,6 +25,8 @@ aside button:focus-visible { outline: 2px solid var(--pink-700); outline-offset:
 [data-camo][data-on="1"], [data-rail-tip]:hover [data-camo] { filter: none; }
 
 [data-rail-label] { display: none !important; }
+/* Hover captions: desktop rail only, and only the centre five (Intl, Cameo, Mew, SET, SORT). */
+@media (hover: hover) and (min-width: 700px) { [data-rail-center] [data-rail-label] { display: block !important; } }
 [data-rail-tip] > [data-rail-label] { opacity: 0; transform: translateX(-4px); pointer-events: none; transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
 [data-rail-tip]:hover > [data-rail-label], [data-rail-tip]:focus-visible > [data-rail-label] { opacity: 1; transform: translateX(0); }
 @media (hover: none) { [data-rail-label] { display: none; } }

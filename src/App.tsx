@@ -712,9 +712,11 @@ class MewCatalog extends React.Component<Any, Any> {
         background: "var(--surface-card)", border: "1px solid var(--line-strong)",
         borderRadius: "var(--web-radius-sm)", boxShadow: "var(--shadow-raised)",
       },
-      mewIconStyle: { ...this.scopeIcon(s.mew), background: "transparent", ...(s.narrow ? {} : { height: 56, minHeight: 56 }) },
-      cameoIconStyle: this.scopeIcon(s.cameo),
-      intlIconStyle: this.scopeIcon(s.intl),
+      // Mobile: Cameo · Mew · Intl. Desktop rail: Intl, Cameo, Mew, then SET, SORT —
+      // 88px above Mew and 88px below it, so the centred group puts Mew at mid-viewport.
+      mewIconStyle: { ...this.scopeIcon(s.mew), background: "transparent", ...(s.narrow ? { order: 2 } : { height: 56, minHeight: 56, order: 3 }) },
+      cameoIconStyle: { ...this.scopeIcon(s.cameo), order: s.narrow ? 1 : 2 },
+      intlIconStyle: { ...this.scopeIcon(s.intl), order: s.narrow ? 3 : 1 },
       eyebrowStyle: {
         display: "none",
       },
@@ -914,7 +916,10 @@ class MewCatalog extends React.Component<Any, Any> {
       filterGroupStyle: s.narrow
         ? { display: "contents" }
         : {
-            position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)",
+            // Keep Mew (not the group) on the midline: 88px sits above it, and
+            // 44px (SORT) or 88px (SET + SORT) below, so shift by the imbalance.
+            position: "absolute", left: 0, right: 0, top: "50%",
+            transform: s.compact ? `translateY(calc(-50% - ${(88 - (eraNames.length > 1 ? 88 : 44)) / 2}px))` : "translateY(-50%)",
             boxSizing: "border-box", padding: s.compact ? "0 16px" : "0 24px",
             display: "flex", flexDirection: "column", gap: 0,
             alignItems: s.compact ? "center" : "stretch",
@@ -1091,8 +1096,13 @@ class MewCatalog extends React.Component<Any, Any> {
           style: {
             display: hidden[k] ? "none" : "block", padding: 0, textAlign: "left", cursor: "pointer",
             background: "none", border: "none", whiteSpace: "nowrap",
-            minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
-            fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em",
+            // PSA 10 / BGS BL sit in 48px columns: with the arrow they overflow, and an
+            // ellipsis there reads as an underscore. Let them spill into the column gap.
+            minWidth: 0,
+            ...((k === "psa10" || k === "bgsBL")
+              ? { overflow: "visible", letterSpacing: "0.04em", position: "relative", zIndex: 1 }
+              : { overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "0.12em" }),
+            fontFamily: "var(--font-data)", fontSize: "var(--web-label)",
             color: on ? "var(--text-accent)" : "var(--text-faint)",
             transition: "color var(--dur-fast) var(--ease)",
           },
@@ -1130,6 +1140,7 @@ class MewCatalog extends React.Component<Any, Any> {
         fontFamily: "var(--font-data)", fontSize: "var(--web-small)",
         ...this.railCell(),
         ...(s.compact ? { background: "transparent" } : null),
+        ...(s.compact && !s.narrow ? { borderBottom: "none" } : null),
         ...(s.narrow ? { width: 40, height: 40, minHeight: 40, flex: "0 0 40px", background: "transparent", border: "none", borderRadius: 0, padding: 0, justifyContent: "center" } : null),
       },
       sortCaretStyle: {
@@ -1211,7 +1222,7 @@ class MewCatalog extends React.Component<Any, Any> {
 
             {v.showFilters && (
               <div style={v.filterStackStyle}>
-                <div style={v.filterGroupStyle}>
+                <div data-rail-center="1" style={v.filterGroupStyle}>
                   <div style={v.sectionStyle}>
                     {v.wideSidebar && (
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>{v.tScope}</span>
