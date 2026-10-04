@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "23.6";
+export const APP_VERSION = "23.7";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -125,6 +125,7 @@ export function parseCSV(csv) {
     psa10: findIdx("psa10"),
     bgsBL: findIdx("bgsBL", ["bgs bl", "bgs_black_label"]),
     pc: findIdx("pc"),
+    certs: findIdx("all cert", ["all certs", "cert", "certs", "cert number", "cert #", "cert no"]),
   };
 
   const out = [];
@@ -169,6 +170,7 @@ export function parseCSV(csv) {
       edition: get(I.edition) || undefined,
       population: hasPop ? pop : undefined,
       pc: normalizePC(get(I.pc)),
+      certs: get(I.certs) || undefined,
     });
   }
   return out;
@@ -291,3 +293,49 @@ export const SAMPLE_CARDS = [
   { id: "s5", nameJP: "ミュウ (幻)", nameEN: "Mew (Phantom)", number: "029/072", set: "Shining Fates", year: 2021, release: "2021-02-19", rarity: "SR", era: "Sword & Shield", illustrator: "Mitsuhiro Arita", image: "", population: { psa8: 22, psa9: 410, psa10: 1180, bgsBL: 5 }, pc: "PSA10", isMew: true },
   { id: "s6", nameJP: "ミュウツー & ミュウ", nameEN: "Mewtwo & Mew", number: "071/095", set: "Tag All Stars", year: 2019, release: "2019-10-04", rarity: "TAG TEAM GX", era: "Sun & Moon", illustrator: "Mitsuhiro Arita", notesEN: "Cameo appearance alongside Mewtwo", image: "", population: { psa8: 31, psa9: 520, psa10: 1440, bgsBL: 3 }, isCameo: true },
 ];
+
+// --- PSA 10 value history (ALT valuation, via the cryptjapan Worker) --------------
+
+export const ALT_BASE = "https://cryptjapan-proxy.mew-860.workers.dev";
+
+/** First usable cert number in a card's "all cert" cell (cells may list several). */
+export function certOf(card) {
+  const tokens = String((card && card.certs) || "").split(/[^A-Za-z0-9-]+/);
+  return tokens.find((t) => /^[A-Za-z0-9-]{4,20}$/.test(t) && /\d/.test(t)) || null;
+}
+
+/**
+ * PSA 10 history for each cert, 20 per request (the API's limit), one request at a time.
+ * grade/grader are forced to PSA 10 so any cert of a card returns that card's PSA 10 series.
+ * Certs that come back with a call-budget error (or not at all) are retried up to twice.
+ * Resolves to a Map cert -> { cert, assetId, subject, grade, grader, currentValue, history, error }.
+ */
+export async function fetchAltHistories(certs, onBatch) {
+  const unique = [...new Set(certs.filter(Boolean))];
+  const results = new Map();
+  let pending = unique;
+  for (let attempt = 0; attempt < 3 && pending.length; attempt++) {
+    const retry = [];
+    for (let i = 0; i < pending.length; i += 20) {
+      const batch = pending.slice(i, i + 20);
+      try {
+        const res = await fetch(`${ALT_BASE}/alt-history?certs=${batch.join(",")}&grade=10&grader=PSA`);
+        const json = await res.json();
+        const seen = new Set();
+        for (const r of (json && json.results) || []) {
+          seen.add(String(r.cert));
+          if (r.history || !/budget|limit|ceiling|again/i.test(String(r.error || ""))) results.set(String(r.cert), r);
+          else retry.push(String(r.cert));
+        }
+        batch.forEach((c) => { if (!seen.has(c)) retry.push(c); });
+      } catch (e) {
+        retry.push(...batch);
+      }
+      if (onBatch) onBatch(new Map(results));
+    }
+    pending = retry;
+  }
+  pending.forEach((c) => results.set(c, { cert: c, history: null, error: "Couldn't load, try again later" }));
+  if (onBatch) onBatch(new Map(results));
+  return results;
+}

@@ -18,3 +18,6 @@ export function fetchAllSheets(password: string): Promise<any[]>;
 export function scaleColor(year: any): string;
 export function ownedStatsOf(cards: any[]): any;
 export const SAMPLE_CARDS: any[];
+export const ALT_BASE: string;
+export function certOf(card: any): string | null;
+export function fetchAltHistories(certs: string[], onBatch?: (results: Map<string, any>) => void): Promise<Map<string, any>>;
