@@ -500,6 +500,7 @@ export default function StatsPage() {
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <a href="/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Catalog</a>
+          <a href="/weekly/" data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>This week ✦</a>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
             <button type="button" onClick={() => setLang(lang === "JP" ? "EN" : "JP")} data-hover-pink="1" style={iconBtn} aria-label="Toggle language">{lang === "JP" ? "JA" : "EN"}</button>
             <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">

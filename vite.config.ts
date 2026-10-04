@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // For a custom domain, base should be "/" (default). If you deploy under a subpath, set base: "/your-repo/"
-// Two pages: the catalog (index.html) and /stats (stats/index.html → dist/stats/index.html).
+// Pages: the catalog (index.html), /stats (stats/index.html → dist/stats/index.html) and /weekly.
 export default defineConfig({
   plugins: [react()],
   build: {
@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         main: new URL("./index.html", import.meta.url).pathname,
         stats: new URL("./stats/index.html", import.meta.url).pathname,
+        weekly: new URL("./weekly/index.html", import.meta.url).pathname,
       },
     },
   },
