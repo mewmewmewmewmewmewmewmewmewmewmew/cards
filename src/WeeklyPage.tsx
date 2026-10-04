@@ -358,17 +358,14 @@ export default function WeeklyPage() {
         @keyframes wkIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
         .wk-bar { animation: wkBar 900ms cubic-bezier(.2,.7,.2,1) both; transform-origin: left; }
         @keyframes wkBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-        .wk-star { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #fff; animation: wkTw 3.2s ease-in-out infinite; }
-        @keyframes wkTw { 0%,100% { opacity: .1; transform: scale(.6); } 50% { opacity: .9; transform: scale(1.3); } }
         .wk-float { animation: wkFl 6s ease-in-out infinite; }
         @keyframes wkFl { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(-2deg); } }
         .wk-nav { background: none; border: 1px solid ${C.line}; color: ${C.text}; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 14px; }
         .wk-nav:disabled { opacity: .25; cursor: default; }
         .wk-nav:not(:disabled):hover { border-color: ${C.up}; color: ${C.up}; }
-        .wk-shot .wk-in, .wk-shot .wk-bar, .wk-shot .wk-star, .wk-shot .wk-float, .wk-still .wk-in, .wk-still .wk-bar { animation: none !important; }
-        .wk-shot .wk-star { opacity: .45; }
+        .wk-shot .wk-in, .wk-shot .wk-bar, .wk-shot .wk-float, .wk-still .wk-in, .wk-still .wk-bar { animation: none !important; }
         .wk-shot .wk-float { transform: rotate(-4deg); }
-        @media (prefers-reduced-motion: reduce) { .wk-in, .wk-bar, .wk-star, .wk-float { animation: none !important; } }
+        @media (prefers-reduced-motion: reduce) { .wk-in, .wk-bar, .wk-float { animation: none !important; } }
       `}</style>
 
       {/* controls (outside the square, so screenshots of the square stay clean) */}
@@ -398,11 +395,6 @@ export default function WeeklyPage() {
        <div ref={shotRef} style={{ width: SHOT, height: SHOT, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
         <div key={`${end}-${mode}`} style={{ width: SIZE, height: SIZE, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% 50% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% 45% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
-          <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            {Array.from({ length: 28 }, (_, i) => (
-              <span key={i} className="wk-star" style={{ left: `${(i * 37.7) % 100}%`, top: `${(i * 53.3) % 100}%`, animationDelay: `${(i * 0.41) % 3.2}s` }} />
-            ))}
-          </div>
 
           {/* title */}
           <div className="wk-in" style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}>
