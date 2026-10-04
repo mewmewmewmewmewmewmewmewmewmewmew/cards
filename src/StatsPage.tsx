@@ -72,12 +72,13 @@ function bounds(pts: Pt[]) {
   return { lo: Math.max(0, lo - pad), hi: hi + pad };
 }
 /**
- * lead: an optional point at the range's left edge, so the line continues in from the last
- * sale/value before the range (drawn as part of the line, but no dot and no hover).
+ * lead / tail: optional points at the range's edges, drawn as part of the line but with no dot
+ * and no hover. lead continues the line in from the last sale/value before the range; with no
+ * sale in the range, lead + tail draw it flat across at that last value.
  */
-function geometry(pts: Pt[], domain: [string, string], W: number, H: number, step: boolean, lead?: Pt | null) {
+function geometry(pts: Pt[], domain: [string, string], W: number, H: number, step: boolean, lead?: Pt | null, tail?: Pt | null) {
   const t0 = tsOf(domain[0]), t1 = tsOf(domain[1]), span = t1 - t0;
-  const drawn = lead ? [lead, ...pts] : pts;
+  const drawn = [...(lead ? [lead] : []), ...pts, ...(tail ? [tail] : [])];
   const { lo, hi } = bounds(drawn);
   const xOf = (d: string) => (span > 0 ? Math.min(1, Math.max(0, (tsOf(d) - t0) / span)) : 0.5) * W;
   const yOf = (v: number) => H - ((v - lo) / (hi - lo || 1)) * H;
@@ -95,9 +96,12 @@ function geometry(pts: Pt[], domain: [string, string], W: number, H: number, ste
   return { lo, hi, xOf, yOf, line, area, dots, t0, span, drawn: drawn.length };
 }
 
-const Sparkline: React.FC<{ pts: Pt[]; domain: [string, string]; dots?: boolean; height?: number; lead?: Pt | null }> = ({ pts, domain, dots, height = 40, lead }) => {
-  if (!pts.length || (!dots && pts.length + (lead ? 1 : 0) < 2)) return <div style={{ height }} />;
-  const W = 100, H = 40, g = geometry(pts, domain, W, H, false, lead);
+const drawnCount = (pts: Pt[], lead?: Pt | null, tail?: Pt | null) => pts.length + (lead ? 1 : 0) + (tail ? 1 : 0);
+
+const Sparkline: React.FC<{ pts: Pt[]; domain: [string, string]; dots?: boolean; height?: number; lead?: Pt | null; tail?: Pt | null }> = ({ pts, domain, dots, height = 40, lead, tail }) => {
+  const n = drawnCount(pts, lead, tail);
+  if (!n || (!dots && n < 2)) return <div style={{ height }} />;
+  const W = 100, H = 40, g = geometry(pts, domain, W, H, false, lead, tail);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" overflow="visible" style={{ display: "block", width: "100%", height }} aria-hidden="true">
       {g.area && <path d={g.area} fill="var(--pink-700)" fillOpacity="0.08" />}
@@ -107,14 +111,16 @@ const Sparkline: React.FC<{ pts: Pt[]; domain: [string, string]; dots?: boolean;
   );
 };
 
-const LineChart: React.FC<{ pts: Pt[]; domain: [string, string]; height: number; step?: boolean; dots?: boolean; empty: string; lead?: Pt | null }> = ({ pts, domain, height, step = false, dots = false, empty, lead }) => {
+const LineChart: React.FC<{ pts: Pt[]; domain: [string, string]; height: number; step?: boolean; dots?: boolean; empty: string; lead?: Pt | null; tail?: Pt | null }> = ({ pts, domain, height, step = false, dots = false, empty, lead, tail }) => {
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  if (!pts.length || (!dots && pts.length + (lead ? 1 : 0) < 2)) {
+  const n = drawnCount(pts, lead, tail);
+  if (!n || (!dots && n < 2)) {
     return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed var(--line-strong)", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>{empty}</div>;
   }
-  const W = 1000, H = 300, g = geometry(pts, domain, W, H, step, lead);
+  const W = 1000, H = 300, g = geometry(pts, domain, W, H, step, lead, tail);
   const onMove = (e: React.PointerEvent) => {
+    if (!pts.length) return;
     const r = ref.current!.getBoundingClientRect();
     const t = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const target = g.t0 + t * g.span;
@@ -122,7 +128,7 @@ const LineChart: React.FC<{ pts: Pt[]; domain: [string, string]; height: number;
     pts.forEach((p, i) => { const d = Math.abs(tsOf(p.date) - target); if (d < bestD) { bestD = d; best = i; } });
     setHover(best);
   };
-  const hp = hover === null ? null : pts[hover];
+  const hp = hover === null ? null : pts[hover] ?? null;
   const hx = hp ? (g.xOf(hp.date) / W) * 100 : 0;
   const hy = hp ? (g.yOf(hp.value) / H) * 100 : 0;
   const label: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-faint)" };
@@ -348,11 +354,15 @@ export default function StatsPage() {
       const start = range ? shiftDate(today, range) : series[0].date;
       const pts = series.filter((p) => p.date >= start);
       // The last sale/value before the range: the change is measured from it, and the chart
-      // line comes in from the left edge toward the first point in the range.
+      // line comes in from the left edge toward the first point in the range. With nothing in
+      // the range, the line runs flat across at that last value.
       let before: Pt | null = null;
       for (const p of series) { if (p.date < start) before = p; else break; }
-      let lead: Pt | null = null;
-      if (before && pts.length) {
+      let lead: Pt | null = null, tail: Pt | null = null;
+      if (before && !pts.length) {
+        lead = { date: start, value: before.value };
+        tail = { date: today, value: before.value };
+      } else if (before) {
         const f = pts[0], ta = tsOf(before.date), tf = tsOf(f.date), ts = tsOf(start);
         lead = { date: start, value: tf > ta ? before.value + ((f.value - before.value) * (ts - ta)) / (tf - ta) : f.value };
       }
@@ -360,7 +370,7 @@ export default function StatsPage() {
       // (however old), or from the range's first point when nothing comes before it.
       const base = before ? before.value : pts.length > 1 ? pts[0].value : null;
       const change = pts.length && base && base > 0 ? ((pts[pts.length - 1].value - base) / base) * 100 : null;
-      charted.push({ card, cert, grade, r, series, pts, lead, last, value, change, domain: [start, today] as [string, string] });
+      charted.push({ card, cert, grade, r, series, pts, lead, tail, last, value, change, domain: [start, today] as [string, string] });
     });
     const cmp: Record<SortKey, (a: Any, b: Any) => number> = {
       value: (a, b) => b.value - a.value,
@@ -519,7 +529,7 @@ export default function StatsPage() {
             </div>
             <div style={{ marginTop: 20 }}>
               {sel
-                ? <LineChart pts={sel.pts} lead={sel.lead} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={chartEmpty} />
+                ? <LineChart pts={sel.pts} lead={sel.lead} tail={sel.tail} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={chartEmpty} />
                 : <LineChart pts={total.pts} domain={[total.start, today]} height={narrow ? 180 : 260} step={sales} empty={chartEmpty} />}
             </div>
             {salesList.length > 0 && (
@@ -575,7 +585,7 @@ export default function StatsPage() {
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}</span>
                       </span>
                     </span>
-                    <Sparkline pts={x.pts} lead={x.lead} domain={x.domain} dots={sales} />
+                    <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} />
                     <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)" }}>{fmtUSD(x.value)}</span>
                       <Change pct={x.change} size="var(--web-label)" />
@@ -620,7 +630,7 @@ export default function StatsPage() {
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}</span>
                       </span>
-                      {!narrow && <Sparkline pts={x.pts} lead={x.lead} domain={x.domain} dots={sales} height={28} />}
+                      {!narrow && <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} height={28} />}
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{fmtUSD(x.value)}</span>
                       <span style={{ textAlign: "right", whiteSpace: "nowrap" }}><Change pct={x.change} size="var(--web-label)" /></span>
                       {sales && !narrow && <span style={{ ...faint, textAlign: "right", whiteSpace: "nowrap" }}>{fmtDate(x.last.date)}</span>}
