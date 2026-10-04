@@ -17,7 +17,10 @@ type Mode = "sales" | "alt";
 
 const RANGES: Array<[string, number]> = [["1D", 1], ["1W", 7], ["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["3Y", 1096], ["5Y", 1826], ["All", 0]];
 const STATS_CONFIG_KEY = "mew_stats_config_v1";
-const SORTS = ["value", "change", "name", "release"] as const;
+const SORTS = ["value", "change", "release"] as const;
+type SortDir = "asc" | "desc";
+// Direction a sort starts in when picked: highest value/change first, oldest release first.
+const SORT_START: Record<string, SortDir> = { value: "desc", change: "desc", release: "asc" };
 type SortKey = typeof SORTS[number];
 const MODE_KEY = "mew_stats_mode";
 
@@ -175,6 +178,14 @@ const eyebrow: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize:
 const viewBtn = (on: boolean): React.CSSProperties => ({ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, padding: 0, cursor: "pointer", background: "transparent", border: "none", color: on ? "var(--pink-700)" : "var(--text-faint)", transition: "color var(--dur-fast) var(--ease)" });
 const faint: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-faint)" };
 
+/** Sort direction: one arrow for the active sort, a faint up/down pair for the others. */
+const SortArrow: React.FC<{ dir: SortDir | null }> = ({ dir }) => (
+  <svg width="8" height="11" viewBox="0 0 8 11" fill="currentColor" aria-hidden="true" style={{ opacity: dir ? 1 : 0.45 }}>
+    {dir !== "asc" && <path d={dir ? "M4 11L0 6.5h3V0h2v6.5h3z" : "M4 11L1 7.5h6z"} />}
+    {dir !== "desc" && <path d={dir ? "M4 0L8 4.5H5V11H3V4.5H0z" : "M4 0L7 3.5H1z"} />}
+  </svg>
+);
+
 const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "var(--web-small)" }) => (
   <span style={{ fontFamily: "var(--font-data)", fontSize: size, fontWeight: 600, color: pct !== null && pct > 0 ? "var(--text-accent)" : "var(--text-muted)" }}>
     {pct !== null && pct > 0 ? "▲ " : pct !== null && pct < 0 ? "▼ " : ""}{fmtPct(pct)}
@@ -211,7 +222,15 @@ export default function StatsPage() {
   const [view, setView] = useState<"grid" | "list">(() => readPref("mew_stats_view", "grid" as "grid" | "list", (v) => v === "grid" || v === "list"));
   useEffect(() => { savePref("mew_stats_view", view); }, [view]);
   useEffect(() => { savePref("mew_stats_range", range); }, [range]);
+  const [dir, setDir] = useState<SortDir>(() => readPref("mew_stats_dir", SORT_START[sort], (v) => v === "asc" || v === "desc"));
+  const [q, setQ] = useState("");
   useEffect(() => { savePref("mew_stats_sort", sort); }, [sort]);
+  useEffect(() => { savePref("mew_stats_dir", dir); }, [dir]);
+  // Click the active sort to flip its direction; a new sort starts in its natural direction.
+  const pickSort = (k: SortKey) => {
+    if (k === sort) setDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSort(k); setDir(SORT_START[k]); }
+  };
   useEffect(() => { savePref("mew_stats_scope", scope); }, [scope]);
 
   // Hidden cards: saved in the sheet's "Hidden" tab (shared across devices), left out of the
@@ -374,17 +393,32 @@ export default function StatsPage() {
       const change = pts.length && base && base > 0 ? ((pts[pts.length - 1].value - base) / base) * 100 : null;
       charted.push({ card, cert, grade, r, series, pts, lead, tail, last, value, change, domain: [start, today] as [string, string] });
     });
+    // Ascending comparators; cards with no change ("—") always go last.
     const cmp: Record<SortKey, (a: Any, b: Any) => number> = {
-      value: (a, b) => b.value - a.value,
-      change: (a, b) => (b.change ?? -Infinity) - (a.change ?? -Infinity),
-      name: (a, b) => name(a.card).localeCompare(name(b.card), "ja"),
+      value: (a, b) => a.value - b.value,
+      change: (a, b) => (a.change ?? 0) - (b.change ?? 0),
       release: (a, b) => D.releaseTs(a.card) - D.releaseTs(b.card),
     };
-    charted.sort(cmp[sort]);
-    hiddenRows.sort(cmp.name);
+    const sign = dir === "asc" ? 1 : -1;
+    charted.sort((a, b) => {
+      if (sort === "change" && (a.change === null) !== (b.change === null)) return a.change === null ? 1 : -1;
+      return sign * cmp[sort](a, b);
+    });
+    hiddenRows.sort((a, b) => name(a.card).localeCompare(name(b.card), "ja"));
     return { charted, failed, pending, noCert, hidden: hiddenRows };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, hist, histP, list, range, sort, lang, mode, today, scope, hiddenSet]);
+  }, [cards, hist, histP, list, range, sort, dir, lang, mode, today, scope, hiddenSet]);
+
+  // Search box: filters the cards listed below (not the total).
+  const matches = (x: Any) => {
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return true;
+    const c = x.card;
+    const hay = [c.nameEN, c.nameJP, c.number, c.set, c.year, c.rarity, x.cert, x.grade ? `PSA ${x.grade}` : ""].filter(Boolean).join(" ").toLowerCase();
+    return words.every((w) => hay.includes(w));
+  };
+  const shown = useMemo(() => rows.charted.filter(matches), [rows, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shownPending = rows.pending.filter(matches);
 
   // Collection total: each card's value as of each day (its last sale, or ALT value), summed
   // over every charted card. Before a card's first data point it counts at that first value,
@@ -438,6 +472,9 @@ export default function StatsPage() {
 
   const pad = narrow ? 16 : 32;
   const listCols = narrow ? "24px minmax(0,1fr) auto 64px" : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}`;
+  const noMatch = q.trim() && rows.charted.length > 0 && shown.length === 0 ? (
+    <div style={{ gridColumn: "1 / -1", padding: "32px 16px", textAlign: "center", border: "1px dashed var(--line-strong)", ...eyebrow }}>No cards match "{q.trim()}"</div>
+  ) : null;
   const emptyState = histDone && rows.charted.length === 0 ? (
     <div style={{ gridColumn: "1 / -1", padding: "40px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
       <div style={eyebrow}>{noScope ? "No scope selected" : "No cards to chart"}</div>
@@ -569,9 +606,18 @@ export default function StatsPage() {
             <div style={{ marginTop: narrow ? 24 : 36, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 12, borderBottom: "1px solid var(--line-hairline)" }}>
               <span style={{ ...eyebrow, marginRight: 4 }}>Sort</span>
               {SORTS.map((k) => (
-                <button key={k} type="button" onClick={() => setSort(k)} style={pill(sort === k)}>{k[0].toUpperCase() + k.slice(1)}</button>
+                <button key={k} type="button" onClick={() => pickSort(k)} aria-pressed={sort === k}
+                  aria-label={`Sort by ${k}${sort === k ? (dir === "asc" ? ", ascending" : ", descending") : ""}`} style={pill(sort === k)}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{k[0].toUpperCase() + k.slice(1)}<SortArrow dir={sort === k ? dir : null} /></span>
+                </button>
               ))}
-              <span style={{ marginLeft: "auto", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>{rows.charted.length} card{rows.charted.length === 1 ? "" : "s"}</span>
+              <label data-search-field="1" style={{ display: "flex", alignItems: "center", gap: 6, boxSizing: "border-box", height: 28, padding: "0 8px", flex: narrow ? "1 1 100%" : "0 1 220px", minWidth: 0, order: narrow ? 10 : 0, background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: "var(--web-radius-sm)", transition: "background var(--dur) var(--ease), border-color var(--dur) var(--ease)" }}>
+                <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>Q</span>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search cards" aria-label="Search cards"
+                  style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-body)", fontSize: "var(--web-small)", color: "var(--text-title)" }} />
+                {q && <button type="button" onClick={() => setQ("")} aria-label="Clear search" data-hover-pink="1" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-data)", fontSize: "var(--web-small)" }}>×</button>}
+              </label>
+              <span style={{ marginLeft: "auto", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>{q.trim() ? `${shown.length} of ${rows.charted.length}` : rows.charted.length} card{rows.charted.length === 1 ? "" : "s"}</span>
               <span style={{ display: "flex", gap: 2 }}>
                 <button type="button" onClick={() => setView("grid")} aria-label="Grid view" aria-pressed={view === "grid"} title="Grid" style={viewBtn(view === "grid")}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="7" height="7" /><rect x="9" y="0" width="7" height="7" /><rect x="0" y="9" width="7" height="7" /><rect x="9" y="9" width="7" height="7" /></svg>
@@ -584,7 +630,7 @@ export default function StatsPage() {
             {saveErr && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>{saveErr}</div>}
             {view === "grid" ? (
             <div style={{ marginTop: 16, display: "grid", gap: narrow ? 10 : 14, gridTemplateColumns: `repeat(auto-fill, minmax(${narrow ? 150 : 220}px, 1fr))` }}>
-              {rows.charted.map((x: Any) => {
+              {shown.map((x: Any) => {
                 const on = x.cert === selected;
                 return (
                   <div key={x.cert} style={{ position: "relative", minWidth: 0 }}>
@@ -614,7 +660,8 @@ export default function StatsPage() {
                 );
               })}
               {emptyState}
-              {rows.pending.map((x: Any) => (
+              {noMatch}
+              {shownPending.map((x: Any) => (
                 <div key={x.cert} style={{ padding: 10, minHeight: 116, border: "1px dashed var(--line-hairline)", borderRadius: "var(--web-radius)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                   <span style={eyebrow}>Loading…</span>
@@ -623,7 +670,7 @@ export default function StatsPage() {
             </div>
             ) : (
             <div style={{ marginTop: 12 }}>
-              {rows.charted.length > 0 && (
+              {shown.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `0 ${hiddenSet ? 36 : 8}px 8px 8px`, borderBottom: "1px solid var(--line-strong)", ...eyebrow }}>
                   <span /><span>Card</span>{!narrow && <span />}
                   <span style={{ textAlign: "right" }}>{sales ? "Last sale" : "Value"}</span>
@@ -631,7 +678,7 @@ export default function StatsPage() {
                   {sales && !narrow && <span style={{ textAlign: "right" }}>Sold</span>}
                 </div>
               )}
-              {rows.charted.map((x: Any) => {
+              {shown.map((x: Any) => {
                 const on = x.cert === selected;
                 return (
                   <div key={x.cert} style={{ position: "relative" }}>
@@ -657,7 +704,8 @@ export default function StatsPage() {
                 );
               })}
               {emptyState && <div style={{ marginTop: 4 }}>{emptyState}</div>}
-              {rows.pending.map((x: Any) => (
+              {noMatch}
+              {shownPending.map((x: Any) => (
                 <div key={x.cert} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 8px", borderBottom: "1px dashed var(--line-hairline)" }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                   <span style={eyebrow}>Loading…</span>
