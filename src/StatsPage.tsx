@@ -15,7 +15,8 @@ type Any = any;
 type Pt = { date: string; value: number; house?: string };
 type Mode = "sales" | "alt";
 
-const RANGES: Array<[string, number]> = [["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["All", 0]];
+const RANGES: Array<[string, number]> = [["1D", 1], ["1W", 7], ["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["All", 0]];
+const STATS_CONFIG_KEY = "mew_stats_config_v1";
 const SORTS = ["value", "change", "name", "release"] as const;
 type SortKey = typeof SORTS[number];
 const MODE_KEY = "mew_stats_mode";
@@ -160,6 +161,7 @@ const pill = (on: boolean): React.CSSProperties => ({
 });
 const iconBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", height: 28, minWidth: 28, padding: 0, cursor: "pointer", background: "transparent", border: "none", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em" };
 const eyebrow: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)", textTransform: "uppercase" };
+const viewBtn = (on: boolean): React.CSSProperties => ({ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, padding: 0, cursor: "pointer", background: "transparent", border: "none", color: on ? "var(--pink-700)" : "var(--text-faint)", transition: "color var(--dur-fast) var(--ease)" });
 const faint: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-faint)" };
 
 const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "var(--web-small)" }) => (
@@ -188,6 +190,8 @@ export default function StatsPage() {
   const [allSales, setAllSales] = useState(false);
   // Same scopes and defaults as the catalog: Japanese Mew on, Cameo and Intl (Unique tab) off.
   const [scope, setScope] = useState(() => readPref("mew_stats_scope", { mew: true, cameo: false, intl: false }, (v) => !!v && ["mew", "cameo", "intl"].every((k) => typeof v[k] === "boolean")));
+  const [view, setView] = useState<"grid" | "list">(() => readPref("mew_stats_view", "grid" as "grid" | "list", (v) => v === "grid" || v === "list"));
+  useEffect(() => { savePref("mew_stats_view", view); }, [view]);
   useEffect(() => { savePref("mew_stats_range", range); }, [range]);
   useEffect(() => { savePref("mew_stats_sort", sort); }, [sort]);
   useEffect(() => { savePref("mew_stats_scope", scope); }, [scope]);
@@ -244,7 +248,7 @@ export default function StatsPage() {
   const load = async (password: string) => {
     setPhase("loading");
     try {
-      const all = await D.fetchAllSheets(password);
+      const all = await D.fetchAllSheets(password, { forStats: true });
       pwRef.current = password;
       setCards(all);
       setSheets({ ...D.sheetDiag });
@@ -262,11 +266,13 @@ export default function StatsPage() {
 
   useEffect(() => {
     let cached: Any = null;
-    try { cached = localStorage.getItem(D.CONFIG_CACHE_KEY); } catch (e) {}
+    try { cached = localStorage.getItem(STATS_CONFIG_KEY); } catch (e) {}
     if (cached === "private") setPhase("password");
     D.fetchConfig().then((cfg) => {
-      const need = !!(cfg && cfg.passwordEnabled);
-      try { localStorage.setItem(D.CONFIG_CACHE_KEY, need ? "private" : "public"); } catch (e) {}
+      // /stats needs a password when its own (StatsPasswordEnabled) or the catalog's is on;
+      // the Apps Script checks the right one because stats requests carry for=stats.
+      const need = !!(cfg && (cfg.statsPasswordEnabled || cfg.passwordEnabled));
+      try { localStorage.setItem(STATS_CONFIG_KEY, need ? "private" : "public"); } catch (e) {}
       if (need) setPhase((p) => (p === "checking" ? "password" : p));
       else load("");
     }).catch(() => { if (cached !== "private") load(""); else setPhase("password"); });
@@ -376,6 +382,15 @@ export default function StatsPage() {
   }
 
   const pad = narrow ? 16 : 32;
+  const listCols = narrow ? "24px minmax(0,1fr) auto 64px" : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}`;
+  const emptyState = histDone && rows.charted.length === 0 ? (
+    <div style={{ gridColumn: "1 / -1", padding: "40px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
+      <div style={eyebrow}>{noScope ? "No scope selected" : "No cards to chart"}</div>
+      <div style={{ marginTop: 8, fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
+        {noScope ? "Turn on Mew, Cameo or Intl above." : mode === "sales" ? "None of these cards has a recorded PSA 10 sale. Try ALT value, or another scope." : "None of these cards has ALT value history."}
+      </div>
+    </div>
+  ) : null;
   const headTitle = sel ? name(sel.card) : "Collection at PSA 10";
   const headValue = sel ? sel.value : total.value;
   const headChange = sel ? sel.change : pctOf(total.pts);
@@ -486,8 +501,17 @@ export default function StatsPage() {
                 <button key={k} type="button" onClick={() => setSort(k)} style={pill(sort === k)}>{k[0].toUpperCase() + k.slice(1)}</button>
               ))}
               <span style={{ marginLeft: "auto", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>{rows.charted.length} cards</span>
+              <span style={{ display: "flex", gap: 2 }}>
+                <button type="button" onClick={() => setView("grid")} aria-label="Grid view" aria-pressed={view === "grid"} title="Grid" style={viewBtn(view === "grid")}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="7" height="7" /><rect x="9" y="0" width="7" height="7" /><rect x="0" y="9" width="7" height="7" /><rect x="9" y="9" width="7" height="7" /></svg>
+                </button>
+                <button type="button" onClick={() => setView("list")} aria-label="List view" aria-pressed={view === "list"} title="List" style={viewBtn(view === "list")}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="1" width="16" height="2" /><rect x="0" y="7" width="16" height="2" /><rect x="0" y="13" width="16" height="2" /></svg>
+                </button>
+              </span>
             </div>
             {saveErr && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>{saveErr}</div>}
+            {view === "grid" ? (
             <div style={{ marginTop: 16, display: "grid", gap: narrow ? 10 : 14, gridTemplateColumns: `repeat(auto-fill, minmax(${narrow ? 150 : 220}px, 1fr))` }}>
               {rows.charted.map((x: Any) => {
                 const on = x.cert === selected;
@@ -518,14 +542,7 @@ export default function StatsPage() {
                   </div>
                 );
               })}
-              {histDone && rows.charted.length === 0 && (
-                <div style={{ gridColumn: "1 / -1", padding: "40px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
-                  <div style={eyebrow}>{noScope ? "No scope selected" : "No cards to chart"}</div>
-                  <div style={{ marginTop: 8, fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
-                    {noScope ? "Turn on Mew, Cameo or Intl above." : sales ? "None of these cards has a recorded PSA 10 sale. Try ALT value, or another scope." : "None of these cards has ALT value history."}
-                  </div>
-                </div>
-              )}
+              {emptyState}
               {rows.pending.map((x: Any) => (
                 <div key={x.cert} style={{ padding: 10, minHeight: 116, border: "1px dashed var(--line-hairline)", borderRadius: "var(--web-radius)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
@@ -533,6 +550,50 @@ export default function StatsPage() {
                 </div>
               ))}
             </div>
+            ) : (
+            <div style={{ marginTop: 12 }}>
+              {rows.charted.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `0 ${hiddenSet ? 36 : 8}px 8px 8px`, borderBottom: "1px solid var(--line-strong)", ...eyebrow }}>
+                  <span /><span>Card</span>{!narrow && <span />}
+                  <span style={{ textAlign: "right" }}>{sales ? "Last sale" : "Value"}</span>
+                  <span style={{ textAlign: "right" }}>Change</span>
+                  {sales && !narrow && <span style={{ textAlign: "right" }}>Sold</span>}
+                </div>
+              )}
+              {rows.charted.map((x: Any) => {
+                const on = x.cert === selected;
+                return (
+                  <div key={x.cert} style={{ position: "relative" }}>
+                    <button type="button" onClick={() => { setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      style={{ width: "100%", boxSizing: "border-box", display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `7px ${hiddenSet ? 36 : 8}px 7px 8px`, textAlign: "left", cursor: "pointer", background: on ? "var(--surface-tint)" : "transparent", border: "none", borderBottom: "1px solid var(--line-hairline)", transition: "background var(--dur-fast) var(--ease)" }}>
+                      <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
+                      <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                        <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || ""].filter(Boolean).join(" · ")}</span>
+                      </span>
+                      {!narrow && <Sparkline pts={x.pts} domain={x.domain} dots={sales} height={28} />}
+                      <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{fmtUSD(x.value)}</span>
+                      <span style={{ textAlign: "right", whiteSpace: "nowrap" }}><Change pct={x.change} size="var(--web-label)" /></span>
+                      {sales && !narrow && <span style={{ ...faint, textAlign: "right", whiteSpace: "nowrap" }}>{fmtDate(x.last.date)}</span>}
+                    </button>
+                    {hiddenSet && (
+                      <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), true)} aria-label={`Hide ${name(x.card)} from totals`} title="Hide from totals" data-hover-pink="1"
+                        style={{ position: "absolute", top: "50%", right: 6, transform: "translateY(-50%)", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, border: "none", background: "transparent", cursor: "pointer" }}>
+                        <EyeOff />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {emptyState && <div style={{ marginTop: 4 }}>{emptyState}</div>}
+              {rows.pending.map((x: Any) => (
+                <div key={x.cert} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 8px", borderBottom: "1px dashed var(--line-hairline)" }}>
+                  <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
+                  <span style={eyebrow}>Loading…</span>
+                </div>
+              ))}
+            </div>
+            )}
 
             {hiddenSet && rows.hidden.length > 0 && (
               <details style={{ marginTop: 32, borderTop: "1px solid var(--line-hairline)", paddingTop: 14 }}>

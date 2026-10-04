@@ -14,7 +14,7 @@ export function parseCSV(csv: string): any[];
 export function mergeCardsNoDedupe(groups: any[]): any[];
 export function applyFilters(cards: any[], f: any): any[];
 export function fetchConfig(): Promise<any>;
-export function fetchAllSheets(password: string): Promise<any[]>;
+export function fetchAllSheets(password: string, opts?: { forStats?: boolean }): Promise<any[]>;
 export function scaleColor(year: any): string;
 export function ownedStatsOf(cards: any[]): any;
 export const SAMPLE_CARDS: any[];

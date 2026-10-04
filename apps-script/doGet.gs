@@ -6,15 +6,18 @@
  * Deploy ▸ Manage deployments ▸ ✏️ ▸ Version: New version ▸ Deploy (same URL).
  *
  * Actions (all GET, so the browser can call them without a CORS preflight):
- *   ?action=getConfig                 → { passwordEnabled }
+ *   ?action=getConfig                 → { passwordEnabled, statsPasswordEnabled }
  *   ?action=getAll&sheets=A,B,C       → { sheets: { A: csv, ... }, hidden: [cert, ...] }
  *   ?action=getHidden                 → { hidden: [cert, ...] }
  *   ?action=setHidden&cert=…&hidden=1|0&name=…   → { ok, hidden: [cert, ...] }
  *   ?sheet=Name                       → that tab as CSV
- * Reads need the password when PasswordEnabled is TRUE. setHidden ALWAYS needs the password,
- * even when the gallery is public, so nobody else can change what's hidden.
- *
- * Config tab: A1 "Key", B1 "Value"; A2 "PasswordEnabled" / B2 TRUE or FALSE; A3 "Password" / B3 the password.
+ * Passwords (Config tab, column A key / column B value):
+ *   PasswordEnabled / Password            — the catalog (mew.cards)
+ *   StatsPasswordEnabled / StatsPassword  — /stats (also accepts the key "StarsPassword")
+ * Requests from /stats carry for=stats. When StatsPasswordEnabled is TRUE they need the stats
+ * password (the catalog password doesn't open /stats); when it's FALSE, /stats follows the
+ * catalog's rule. setHidden ALWAYS needs the applicable password, even when that page is
+ * public, so nobody else can change what's hidden.
  * Hidden tab: created automatically on the first hide (Cert, Card, Hidden at).
  */
 function doGet(e) {
@@ -24,23 +27,31 @@ function doGet(e) {
     const configSheet = spreadsheet.getSheetByName("Config");
     let passwordEnabled = false;
     let correctPassword = null;
+    let statsPasswordEnabled = false;
+    let statsPassword = null;
 
     // --- Read Configuration ---
     if (configSheet) {
       const configData = configSheet.getDataRange().getValues();
       for (let i = 1; i < configData.length; i++) {
-        const key = configData[i][0];
+        const key = String(configData[i][0]).trim();
         const value = configData[i][1];
-        if (key === 'PasswordEnabled') passwordEnabled = String(value).toUpperCase() === 'TRUE';
+        if (key === 'PasswordEnabled') passwordEnabled = String(value).trim().toUpperCase() === 'TRUE';
         if (key === 'Password') correctPassword = String(value);
+        if (key === 'StatsPasswordEnabled') statsPasswordEnabled = String(value).trim().toUpperCase() === 'TRUE';
+        if (key === 'StatsPassword' || key === 'StarsPassword') statsPassword = String(value);
       }
     }
 
-    // Action: getConfig - whether password protection is active.
-    if (p.action === 'getConfig') return json_({ passwordEnabled: passwordEnabled });
+    // Action: getConfig - which password protection is active.
+    if (p.action === 'getConfig') return json_({ passwordEnabled: passwordEnabled, statsPasswordEnabled: statsPasswordEnabled });
 
+    // Which password applies: /stats has its own when StatsPasswordEnabled is on.
+    const useStats = p['for'] === 'stats' && statsPasswordEnabled;
+    const gateEnabled = useStats ? true : passwordEnabled;
+    const gatePassword = useStats ? statsPassword : correctPassword;
     const providedPassword = p.password;
-    const passwordOk = !!correctPassword && providedPassword === correctPassword;
+    const passwordOk = !!gatePassword && providedPassword === gatePassword;
 
     // --- Writes: always need the password ---
     if (p.action === 'setHidden') {
@@ -50,7 +61,7 @@ function doGet(e) {
     }
 
     // --- Reads: need the password when protection is on ---
-    if (passwordEnabled && !passwordOk) return text_("Error: Authentication Failed");
+    if (gateEnabled && !passwordOk) return text_("Error: Authentication Failed");
 
     // Action: getAll - several tabs in ONE request (plus the hidden list for /stats).
     // e.g. ?action=getAll&sheets=Japanese,Cameo,Unique

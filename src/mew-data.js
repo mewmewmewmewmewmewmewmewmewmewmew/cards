@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "24.4";
+export const APP_VERSION = "24.5";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -238,14 +238,18 @@ export async function fetchConfig() {
 }
 
 /** Returns merged cards, or throws Error("auth") on a bad password. */
-export async function fetchAllSheets(password) {
+/**
+ * opts.forStats marks requests from /stats (adds for=stats), so the Apps Script checks the
+ * stats password (StatsPassword) instead of the catalog's when StatsPasswordEnabled is on.
+ */
+export async function fetchAllSheets(password, opts) {
   sheetExtras.hidden = null;
   const sources = [
     { name: TAB_MAPPINGS.mew, flag: "isMew" },
     { name: TAB_MAPPINGS.cameo, flag: "isCameo" },
     { name: TAB_MAPPINGS.intl, flag: "isIntl" },
   ];
-  const pw = password ? `&password=${encodeURIComponent(password)}` : "";
+  const pw = (password ? `&password=${encodeURIComponent(password)}` : "") + (opts && opts.forStats ? "&for=stats" : "");
   try {
     const url = `${APPS_SCRIPT_URL}?action=getAll&sheets=${encodeURIComponent(sources.map((s) => s.name).join(","))}${pw}`;
     const text = await (await fetch(url)).text();
@@ -405,7 +409,7 @@ export async function fetchAltHistories(certs, onBatch) {
  */
 export async function setCardHidden(password, cert, hide, name) {
   const url = `${APPS_SCRIPT_URL}?action=setHidden&cert=${encodeURIComponent(cert)}&hidden=${hide ? 1 : 0}` +
-    `&name=${encodeURIComponent(name || "")}&password=${encodeURIComponent(password || "")}`;
+    `&name=${encodeURIComponent(name || "")}&password=${encodeURIComponent(password || "")}&for=stats`;
   const text = await (await fetch(url)).text();
   if (text.startsWith("Error: Authentication Failed")) throw new Error("auth");
   let json = null;
