@@ -20,4 +20,5 @@ export function ownedStatsOf(cards: any[]): any;
 export const SAMPLE_CARDS: any[];
 export const ALT_BASE: string;
 export function certOf(card: any): string | null;
-export function fetchAltHistories(certs: string[], onBatch?: (results: Map<string, any>) => void): Promise<Map<string, any>>;
+export function fetchAltHistories(certs: string[], onBatch?: (results: Map<string, any>, diag: { requests: number; ok: number; errors: string[] }) => void): Promise<Map<string, any>>;
+export const sheetDiag: Record<string, any>;

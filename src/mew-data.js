@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "23.7";
+export const APP_VERSION = "23.8";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -64,6 +64,8 @@ export function releaseTs(card) {
   return Number.POSITIVE_INFINITY;
 }
 
+const CERT_HEADERS = ["all cert", "all certs", "cert", "certs", "cert number", "cert #", "cert no"];
+
 export function parseCSV(csv) {
   csv = stripBOM(csv || "");
   const rows = [];
@@ -86,7 +88,12 @@ export function parseCSV(csv) {
   }
   row.push(field.trim());
   if (row.length > 1 || (row.length === 1 && row[0] !== "")) rows.push(row);
-  if (rows.length < 2) return [];
+  if (rows.length < 2) {
+    const empty = [];
+    empty.headers = rows[0] ? rows[0].map((h) => stripBOM(h).trim()) : [];
+    empty.certColumn = empty.headers.some((h) => CERT_HEADERS.includes(h.toLowerCase()));
+    return empty;
+  }
 
   const headers = rows[0].map((h) => stripBOM(h).trim());
   const lc = headers.map((h) => h.toLowerCase());
@@ -125,7 +132,7 @@ export function parseCSV(csv) {
     psa10: findIdx("psa10"),
     bgsBL: findIdx("bgsBL", ["bgs bl", "bgs_black_label"]),
     pc: findIdx("pc"),
-    certs: findIdx("all cert", ["all certs", "cert", "certs", "cert number", "cert #", "cert no"]),
+    certs: findIdx(CERT_HEADERS[0], CERT_HEADERS.slice(1)),
   };
 
   const out = [];
@@ -173,6 +180,8 @@ export function parseCSV(csv) {
       certs: get(I.certs) || undefined,
     });
   }
+  out.headers = headers;
+  out.certColumn = I.certs >= 0;
   return out;
 }
 
@@ -211,6 +220,13 @@ export function applyFilters(cards, f) {
   return items;
 }
 
+/** Per-tab parse info from the last fetchAllSheets call (used by /stats "Data check"). */
+export const sheetDiag = {};
+function noteSheet(name, cards) {
+  sheetDiag[name] = { headers: cards.headers || [], certColumn: !!cards.certColumn, rows: cards.length, withCert: cards.filter((c) => c.certs).length };
+  return cards;
+}
+
 export async function fetchConfig() {
   const res = await fetch(`${APPS_SCRIPT_URL}?action=getConfig`);
   return res.json();
@@ -231,7 +247,7 @@ export async function fetchAllSheets(password) {
     const json = JSON.parse(text);
     if (json && json.sheets) {
       const groups = sources
-        .map((s) => ({ cards: parseCSV(json.sheets[s.name] || ""), flag: s.flag }))
+        .map((s) => { if (!(s.name in json.sheets)) sheetDiag[s.name] = { missing: true }; return { cards: noteSheet(s.name, parseCSV(json.sheets[s.name] || "")), flag: s.flag }; })
         .filter((g) => g.cards.length > 0);
       return mergeCardsNoDedupe(groups);
     }
@@ -252,7 +268,7 @@ export async function fetchAllSheets(password) {
   if (results.some((r) => r.status === "rejected" && r.reason && r.reason.message === "auth")) throw new Error("auth");
   const groups = results.reduce((acc, r, i) => {
     if (r.status === "fulfilled" && r.value) {
-      const cards = parseCSV(r.value);
+      const cards = noteSheet(sources[i].name, parseCSV(r.value));
       if (cards.length) acc.push({ cards, flag: sources[i].flag });
     } else if (r.status === "rejected") {
       console.error(`Error fetching sheet "${sources[i].name}":`, r.reason);
@@ -304,38 +320,63 @@ export function certOf(card) {
   return tokens.find((t) => /^[A-Za-z0-9-]{4,20}$/.test(t) && /\d/.test(t)) || null;
 }
 
-/**
- * PSA 10 history for each cert, 20 per request (the API's limit), one request at a time.
- * grade/grader are forced to PSA 10 so any cert of a card returns that card's PSA 10 series.
- * Certs that come back with a call-budget error (or not at all) are retried up to twice.
- * Resolves to a Map cert -> { cert, assetId, subject, grade, grader, currentValue, history, error }.
- */
-export async function fetchAltHistories(certs, onBatch) {
-  const unique = [...new Set(certs.filter(Boolean))];
-  const results = new Map();
-  let pending = unique;
+async function altBatches(certs, extra, label, results, diag, onBatch) {
+  let pending = [...certs];
   for (let attempt = 0; attempt < 3 && pending.length; attempt++) {
     const retry = [];
     for (let i = 0; i < pending.length; i += 20) {
       const batch = pending.slice(i, i + 20);
+      diag.requests++;
       try {
-        const res = await fetch(`${ALT_BASE}/alt-history?certs=${batch.join(",")}&grade=10&grader=PSA`);
-        const json = await res.json();
+        const res = await fetch(`${ALT_BASE}/alt-history?certs=${batch.join(",")}${extra}`);
+        let json = null;
+        try { json = await res.json(); } catch (e) {}
+        if (!json || !Array.isArray(json.results)) {
+          diag.errors.push(`${label}HTTP ${res.status}${json && json.error ? `: ${json.error}` : ""}`);
+          retry.push(...batch);
+          continue;
+        }
+        diag.ok++;
         const seen = new Set();
-        for (const r of (json && json.results) || []) {
-          seen.add(String(r.cert));
-          if (r.history || !/budget|limit|ceiling|again/i.test(String(r.error || ""))) results.set(String(r.cert), r);
-          else retry.push(String(r.cert));
+        for (const r of json.results) {
+          const c = String(r.cert);
+          seen.add(c);
+          if (r.history || !/budget|limit|ceiling|again/i.test(String(r.error || ""))) results.set(c, r);
+          else retry.push(c);
         }
         batch.forEach((c) => { if (!seen.has(c)) retry.push(c); });
       } catch (e) {
+        diag.errors.push(`${label}network error: ${(e && e.message) || e}`);
         retry.push(...batch);
       }
-      if (onBatch) onBatch(new Map(results));
+      if (onBatch) onBatch(new Map(results), diag);
     }
     pending = retry;
   }
-  pending.forEach((c) => results.set(c, { cert: c, history: null, error: "Couldn't load, try again later" }));
-  if (onBatch) onBatch(new Map(results));
+  return pending;
+}
+
+const isPsa10 = (r) => String(r.grader || "").toUpperCase() === "PSA" && parseFloat(r.grade) === 10;
+
+/**
+ * PSA 10 history for each cert, 20 per request (the API's limit), one request at a time.
+ * First pass asks for each cert's own series, exactly as the API is used elsewhere. Certs whose
+ * own series isn't PSA 10 are asked again with grade=10&grader=PSA; if that override fails, the
+ * cert keeps its own grade's series. Call-budget errors are retried up to twice.
+ * onBatch(results, diag) reports progress; diag = { requests, ok, errors[] }.
+ */
+export async function fetchAltHistories(certs, onBatch) {
+  const unique = [...new Set(certs.filter(Boolean))];
+  const results = new Map();
+  const diag = { requests: 0, ok: 0, errors: [] };
+  const left = await altBatches(unique, "", "", results, diag, onBatch);
+  left.forEach((c) => results.set(c, { cert: c, history: null, error: "Couldn't load, try again later" }));
+  const notTen = unique.filter((c) => { const r = results.get(c); return r && r.history && r.history.length && !isPsa10(r); });
+  if (notTen.length) {
+    const ten = new Map();
+    await altBatches(notTen, "&grade=10&grader=PSA", "PSA 10 override: ", ten, diag, null);
+    ten.forEach((r, c) => { if (r.history && r.history.length) results.set(c, r); });
+  }
+  if (onBatch) onBatch(new Map(results), diag);
   return results;
 }

@@ -136,6 +136,8 @@ export default function StatsPage() {
   const [cards, setCards] = useState<Any[]>([]);
   const [hist, setHist] = useState<Map<string, Any>>(new Map());
   const [histDone, setHistDone] = useState(false);
+  const [diag, setDiag] = useState<Any>(null);
+  const [sheets, setSheets] = useState<Any>({});
   const [range, setRange] = useState(365);
   const [sort, setSort] = useState<SortKey>("value");
   const [selected, setSelected] = useState<string | null>(null);
@@ -153,9 +155,11 @@ export default function StatsPage() {
     try {
       const all = await D.fetchAllSheets(password);
       setCards(all);
+      setSheets({ ...D.sheetDiag });
       setPhase("ready");
       const certs = all.map((c: Any) => D.certOf(c)).filter(Boolean) as string[];
-      await D.fetchAltHistories(certs, (m) => setHist(m));
+      setDiag({ requests: 0, ok: 0, errors: [] });
+      await D.fetchAltHistories(certs, (m, d) => { setHist(m); setDiag({ ...d, errors: [...d.errors] }); });
       setHistDone(true);
     } catch (e: Any) {
       if (e && e.message === "auth") { setPw(""); setPhase("password"); }
@@ -356,8 +360,42 @@ export default function StatsPage() {
               ))}
             </div>
 
+            {histDone && (() => {
+              const empty = rows.charted.length === 0;
+              const tabs = Object.keys(sheets);
+              const anyCertCol = tabs.some((t) => sheets[t].certColumn);
+              const errs = diag ? Object.entries((diag.errors as string[]).reduce((m: Any, e) => { m[e] = (m[e] || 0) + 1; return m; }, {})) : [];
+              const netErr = diag && (diag.errors as string[]).some((e) => e.startsWith("network error"));
+              const line: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", lineHeight: 1.6, color: "var(--text-body)", overflowWrap: "anywhere" };
+              const hint: React.CSSProperties = { ...line, color: "var(--text-accent)" };
+              return (
+                <details key={String(empty)} open={empty} style={{ marginTop: 32, borderTop: "1px solid var(--line-hairline)", paddingTop: 14 }}>
+                  <summary style={{ ...eyebrow, cursor: "pointer" }}>Data check</summary>
+                  <div style={{ marginTop: 10, display: "grid", gap: 2 }}>
+                    <div style={line}>Sheet · {cards.length} rows</div>
+                    {tabs.map((t) => {
+                      const s = sheets[t];
+                      return (
+                        <div key={t} style={line}>
+                          {t}: {s.missing ? "tab not returned by the sheet script"
+                            : !s.headers.length ? "tab is empty"
+                            : s.certColumn ? `"All Cert" column found · ${s.withCert} of ${s.rows} rows have a cert`
+                            : `no "All Cert" column · columns are ${s.headers.join(", ") || "none"}`}
+                        </div>
+                      );
+                    })}
+                    <div style={line}>Certs to look up · {totalCerts}</div>
+                    {diag && <div style={line}>ALT API · {diag.requests} requests, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
+                    {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
+                    {!anyCertCol && tabs.length > 0 && <div style={hint}>The page looks for a column named "All Cert" (or "Cert", "Certs", "Cert Number") in the {tabs.join(", ")} tabs.</div>}
+                    {netErr && <div style={hint}>The browser couldn't reach the API. If it works from elsewhere, the Worker may be refusing requests from this site (CORS or an origin allowlist).</div>}
+                  </div>
+                </details>
+              );
+            })()}
+
             {(rows.failed.length > 0 || rows.noCert.length > 0) && histDone && (
-              <details style={{ marginTop: 32, borderTop: "1px solid var(--line-hairline)", paddingTop: 14 }}>
+              <details key={`nc-${rows.charted.length === 0}`} open={rows.charted.length === 0} style={{ marginTop: 16, borderTop: "1px solid var(--line-hairline)", paddingTop: 14 }}>
                 <summary style={{ ...eyebrow, cursor: "pointer" }}>Not charted · {rows.failed.length + rows.noCert.length}</summary>
                 <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
                   {rows.failed.map((x: Any) => (
