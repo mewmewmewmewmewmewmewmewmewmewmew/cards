@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { toBlob } from "html-to-image";
 import * as D from "./mew-data";
 
 /* ------------------------------------------------------------------ *
@@ -176,6 +177,8 @@ export default function WeeklyPage() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [hist, setHist] = useState<Map<string, Any>>(new Map());
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
+  const shotRef = useRef<HTMLDivElement>(null);
+  const [shot, setShot] = useState<"" | "busy" | "ok" | "saved" | "err">("");
   const [vw, setVw] = useState(() => [window.innerWidth, window.innerHeight]);
   const lang = /^ja\b/i.test(navigator.language || "") ? "JP" : "EN";
   const latest = sundayOf(todayISO());
@@ -265,6 +268,51 @@ export default function WeeklyPage() {
   }
 
   const sales = mode === "sales";
+  // Copy the square (plus its 4px edge) as a PNG. The image is made from the unscaled 1080px
+  // layout at 2x, with animations frozen in their end state. Falls back to a download where
+  // the browser can't put images on the clipboard.
+  const copyShot = async () => {
+    const node = shotRef.current;
+    if (!node || shot === "busy") return;
+    setShot("busy");
+    const SHOT_PX = 1080 + 8;
+    const make = async () => {
+      node.classList.add("wk-shot");
+      try {
+        const opts = { pixelRatio: 2, width: SHOT_PX, height: SHOT_PX, style: { transform: "none" }, backgroundColor: "#060506" };
+        await toBlob(node, opts); // first pass warms up fonts and images (Safari often drops them otherwise)
+        const b = await toBlob(node, opts);
+        if (!b) throw new Error("no image");
+        return b;
+      } finally {
+        node.classList.remove("wk-shot");
+        node.classList.add("wk-still");
+      }
+    };
+    const done = (st: "ok" | "saved" | "err") => { setShot(st); window.setTimeout(() => setShot(""), 1800); };
+    const fileName = `jp-mews-week-${weekNo(end)}-${end}.png`;
+    const download = (b: Blob) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(b); a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    };
+    try {
+      const CI = (window as Any).ClipboardItem;
+      if (navigator.clipboard && navigator.clipboard.write && CI) {
+        // Hand the clipboard a promise so Safari keeps the click's permission while the image renders.
+        await navigator.clipboard.write([new CI({ "image/png": make() })]);
+        D.trackEvent("weekly_copy", { week: end, mode });
+        done("ok");
+      } else {
+        download(await make());
+        done("saved");
+      }
+    } catch (e) {
+      console.error(e);
+      try { download(await make()); done("saved"); } catch (e2) { done("err"); }
+    }
+  };
   const hero = week.up[0] || null;
   const climbers = week.up.slice(hero ? 1 : 0, hero ? 5 : 4);
   const fallers = week.down.slice(0, 4);
@@ -272,8 +320,8 @@ export default function WeeklyPage() {
   const idxUp = week.idxPct >= 0;
   const nothing = !week.up.length && !week.down.length;
   // The poster is laid out at 1080×1080 and scaled to fit the window (controls sit above it).
-  const SIZE = 1080;
-  const scale = Math.min(1, (vw[0] - 24) / SIZE, Math.max(320, vw[1] - 76) / SIZE);
+  const SIZE = 1080, EDGE = 4, SHOT = SIZE + EDGE * 2; // the copied image: the square plus a 4px edge
+  const scale = Math.min(1, (vw[0] - 24) / SHOT, Math.max(320, vw[1] - 76) / SHOT);
   const big: React.CSSProperties = { fontFamily: "var(--font-display)", fontWeight: 700, lineHeight: 1 };
 
   const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number }> = ({ m, i, up, delay }) => (
@@ -317,11 +365,14 @@ export default function WeeklyPage() {
         .wk-nav { background: none; border: 1px solid ${C.line}; color: ${C.text}; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 14px; }
         .wk-nav:disabled { opacity: .25; cursor: default; }
         .wk-nav:not(:disabled):hover { border-color: ${C.up}; color: ${C.up}; }
+        .wk-shot .wk-in, .wk-shot .wk-bar, .wk-shot .wk-star, .wk-shot .wk-float, .wk-still .wk-in, .wk-still .wk-bar { animation: none !important; }
+        .wk-shot .wk-star { opacity: .45; }
+        .wk-shot .wk-float { transform: rotate(-4deg); }
         @media (prefers-reduced-motion: reduce) { .wk-in, .wk-bar, .wk-star, .wk-float { animation: none !important; } }
       `}</style>
 
       {/* controls (outside the square, so screenshots of the square stay clean) */}
-      <div style={{ width: SIZE * scale, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+      <div style={{ width: SHOT * scale, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <a href="/stats/" style={{ ...mono, color: C.muted, textDecoration: "none" }}>← Stats</a>
         <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           <button type="button" className="wk-nav" onClick={() => setEnd(addDays(end, -7))} aria-label="Previous week">‹</button>
@@ -332,11 +383,20 @@ export default function WeeklyPage() {
             <button key={m} type="button" onClick={() => setMode(m)} style={{ ...mono, fontSize: 10, cursor: "pointer", padding: "7px 10px", borderRadius: 6, border: `1px solid ${mode === m ? C.up : C.line}`, background: mode === m ? C.up : "transparent", color: mode === m ? "#1a0a12" : C.muted, fontWeight: 700 }}>{m === "sales" ? "Sales" : "ALT value"}</button>
           ))}
         </span>
+        <button type="button" className="wk-nav" onClick={copyShot} disabled={shot === "busy"} aria-label="Copy image to clipboard" title={shot === "saved" ? "Saved as a PNG" : shot === "err" ? "Couldn't copy" : "Copy image"}
+          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", color: shot === "ok" || shot === "saved" ? GREEN : shot === "err" ? RED : C.text }}>
+          {shot === "ok" || shot === "saved" ? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          ) : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: shot === "busy" ? 0.4 : 1 }}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
+          )}
+        </button>
       </div>
 
-      {/* the square */}
-      <div style={{ width: SIZE * scale, height: SIZE * scale, flex: "0 0 auto" }}>
-        <div key={`${end}-${mode}`} style={{ width: SIZE, height: SIZE, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* the square (inside a 4px edge, which is what gets copied) */}
+      <div style={{ width: SHOT * scale, height: SHOT * scale, flex: "0 0 auto" }}>
+       <div ref={shotRef} style={{ width: SHOT, height: SHOT, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
+        <div key={`${end}-${mode}`} style={{ width: SIZE, height: SIZE, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% 50% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% 45% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
             {Array.from({ length: 28 }, (_, i) => (
@@ -426,6 +486,7 @@ export default function WeeklyPage() {
             </div>
           )}
         </div>
+       </div>
       </div>
     </div>
   );
