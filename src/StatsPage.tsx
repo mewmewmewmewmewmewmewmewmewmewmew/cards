@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as D from "./mew-data";
+import { MewIcon, CameoIcon, IntlIcon } from "./icons";
 
 /* ------------------------------------------------------------------ *
  * /stats — PSA 10 prices for every card in the sheet.
@@ -172,6 +173,12 @@ export default function StatsPage() {
   const [sort, setSort] = useState<SortKey>("value");
   const [selected, setSelected] = useState<string | null>(null);
   const [allSales, setAllSales] = useState(false);
+  // Same scopes and defaults as the catalog: Japanese Mew on, Cameo and Intl (Unique tab) off.
+  const [scope, setScope] = useState({ mew: true, cameo: false, intl: false });
+  const toggleScope = (k: "mew" | "cameo" | "intl") => {
+    D.trackEvent("filter_toggle", { filter: k, active: !scope[k], page: "stats" });
+    setScope({ ...scope, [k]: !scope[k] });
+  };
 
   const setMode = (m: Mode) => {
     setModeState(m);
@@ -223,15 +230,20 @@ export default function StatsPage() {
 
   // One row per cert (the sheet can list the same card in more than one tab).
   const rows = useMemo(() => {
+    // A cert listed in more than one tab keeps every tab's scope flag.
     const byCert = new Map<string, Any>();
     const noCert: Any[] = [];
+    const inScope = (c: Any) => (scope.mew && c.isMew) || (scope.cameo && c.isCameo) || (scope.intl && c.isIntl);
     for (const c of cards) {
       const cert = D.certOf(c);
-      if (!cert) { noCert.push(c); continue; }
-      if (!byCert.has(cert)) byCert.set(cert, c);
+      if (!cert) { if (inScope(c)) noCert.push(c); continue; }
+      const prev = byCert.get(cert);
+      if (!prev) byCert.set(cert, { ...c });
+      else { if (c.isMew) prev.isMew = true; if (c.isCameo) prev.isCameo = true; if (c.isIntl) prev.isIntl = true; }
     }
     const charted: Any[] = [], failed: Any[] = [], pending: Any[] = [];
     byCert.forEach((card, cert) => {
+      if (!inScope(card)) return;
       const r = hist.get(cert);
       if (!r) { pending.push({ card, cert }); return; }
       const series = seriesOf(r, mode);
@@ -257,7 +269,7 @@ export default function StatsPage() {
     charted.sort(cmp[sort]);
     return { charted, failed, pending, noCert };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, hist, range, sort, lang, mode, today]);
+  }, [cards, hist, range, sort, lang, mode, today, scope]);
 
   // Collection total: each card's value as of each day (its last sale, or ALT value), summed
   // over every charted card. Before a card's first data point it counts at that first value,
@@ -283,8 +295,11 @@ export default function StatsPage() {
   }, [rows, range, today]);
 
   const sel = selected ? rows.charted.find((x: Any) => x.cert === selected) : null;
-  const totalCerts = rows.charted.length + rows.failed.length + rows.pending.length;
-  const loadedCerts = rows.charted.length + rows.failed.length;
+  // Loading progress and the Data check count every cert, whatever the scope toggles show.
+  const allCerts = useMemo(() => new Set(cards.map((c: Any) => D.certOf(c)).filter(Boolean)), [cards]);
+  const totalCerts = allCerts.size;
+  const loadedCerts = [...allCerts].filter((c) => hist.has(c as string)).length;
+  const noScope = !scope.mew && !scope.cameo && !scope.intl;
   const sales = mode === "sales";
 
   /* ---------- gate ---------- */
@@ -334,6 +349,14 @@ export default function StatsPage() {
           <div role="group" aria-label="Price source" style={{ display: "flex", gap: 4 }}>
             <button type="button" aria-pressed={sales} onClick={() => setMode("sales")} style={pill(sales)}>Sales</button>
             <button type="button" aria-pressed={!sales} onClick={() => setMode("alt")} style={pill(!sales)}>ALT value</button>
+          </div>
+          <div role="group" aria-label="Scope" style={{ display: "flex", alignItems: "center", gap: 2, paddingLeft: 8, borderLeft: "1px solid var(--line-hairline)" }}>
+            {([["mew", "Mew", <MewIcon key="m" w={22} h={20} />], ["cameo", "Cameo", <CameoIcon key="c" w={18} h={18} />], ["intl", "Intl", <IntlIcon key="i" w={17} h={17} />]] as Array<["mew" | "cameo" | "intl", string, React.ReactNode]>).map(([k, label, icon]) => (
+              <button key={k} type="button" onClick={() => toggleScope(k)} aria-pressed={scope[k]} aria-label={label} title={label}
+                style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, padding: 0, cursor: "pointer", background: "transparent", border: "none", color: scope[k] ? "var(--pink-700)" : "var(--text-muted)", transition: "color var(--dur-fast) var(--ease)" }}>
+                {icon}
+              </button>
+            ))}
           </div>
           <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
             {sales ? "recorded PSA 10 sales" : "ALT's daily valuation"} · USD{histDone ? "" : ` · loading ${loadedCerts}/${totalCerts}`}
@@ -432,6 +455,14 @@ export default function StatsPage() {
                   </button>
                 );
               })}
+              {histDone && rows.charted.length === 0 && (
+                <div style={{ gridColumn: "1 / -1", padding: "40px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
+                  <div style={eyebrow}>{noScope ? "No scope selected" : "No cards to chart"}</div>
+                  <div style={{ marginTop: 8, fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
+                    {noScope ? "Turn on Mew, Cameo or Intl above." : sales ? "None of these cards has a recorded PSA 10 sale. Try ALT value, or another scope." : "None of these cards has ALT value history."}
+                  </div>
+                </div>
+              )}
               {rows.pending.map((x: Any) => (
                 <div key={x.cert} style={{ padding: 10, minHeight: 116, border: "1px dashed var(--line-hairline)", borderRadius: "var(--web-radius)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
@@ -441,7 +472,8 @@ export default function StatsPage() {
             </div>
 
             {histDone && (() => {
-              const empty = rows.charted.length === 0;
+              // Opens by itself only when no cert has data in this mode at all (not because of the scope toggles).
+              const empty = ![...hist.values()].some((r: Any) => seriesOf(r, mode).length > 0);
               const tabs = Object.keys(sheets);
               const anyCertCol = tabs.some((t) => sheets[t].certColumn);
               const errs = diag ? Object.entries((diag.errors as string[]).reduce((m: Any, e) => { m[e] = (m[e] || 0) + 1; return m; }, {})) : [];
