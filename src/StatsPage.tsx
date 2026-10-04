@@ -248,7 +248,7 @@ export default function StatsPage() {
       if (!r) { pending.push({ card, cert }); return; }
       const series = seriesOf(r, mode);
       if (!series.length) {
-        failed.push({ card, cert, error: r.error || (mode === "sales" ? "no PSA 10 sales on ALT" : "no value history") });
+        failed.push({ card, cert, error: mode === "sales" ? (r.salesError || r.error || "no PSA 10 sales on ALT") : (r.error || "no value history") });
         return;
       }
       const last = series[series.length - 1];
@@ -480,6 +480,7 @@ export default function StatsPage() {
               const netErr = diag && (diag.errors as string[]).some((e) => e.startsWith("network error"));
               const withSales = [...hist.values()].filter((r: Any) => r && Array.isArray(r.sales) && r.sales.length).length;
               const withHist = [...hist.values()].filter((r: Any) => r && Array.isArray(r.history) && r.history.length).length;
+              const mismatch = [...hist.values()].filter((r: Any) => r && /filtered as/.test(String(r.salesError || ""))).length;
               const line: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", lineHeight: 1.6, color: "var(--text-body)", overflowWrap: "anywhere" };
               const hint: React.CSSProperties = { ...line, color: "var(--text-accent)" };
               return (
@@ -502,6 +503,7 @@ export default function StatsPage() {
                     {diag && <div style={line}>ALT API · {diag.requests} requests, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
+                    {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out)</div>}
                     {!anyCertCol && tabs.length > 0 && <div style={hint}>The page looks for a column named "All Cert" (or "Cert", "Certs", "Cert Number") in the {tabs.join(", ")} tabs.</div>}
                     {netErr && <div style={hint}>The browser couldn't reach the API. If it works from elsewhere, the Worker may be refusing requests from this site (CORS or an origin allowlist).</div>}
                   </div>
