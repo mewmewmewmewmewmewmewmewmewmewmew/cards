@@ -500,7 +500,7 @@ export default function StatsPage() {
                       );
                     })}
                     <div style={line}>Certs to look up · {totalCerts}</div>
-                    {diag && <div style={line}>ALT API · {diag.requests} requests, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
+                    {diag && <div style={line}>ALT API · {diag.requests} request{diag.requests === 1 ? "" : "s"}, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
                     {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out)</div>}

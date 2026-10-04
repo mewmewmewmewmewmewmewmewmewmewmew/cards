@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "24.1";
+export const APP_VERSION = "24.2";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -357,49 +357,36 @@ async function altBatches(certs, extra, label, results, diag, onBatch) {
 }
 
 const isPsa10Filter = (f) => !!f && parseFloat(f.gradeNumber) === 10 && String(f.gradingCompany || "").toUpperCase() === "PSA";
-const hasHistory = (r) => !!r && Array.isArray(r.history) && r.history.length > 0;
-/** Sales are only trusted when the API says it filtered them as PSA 10. */
-const hasPsa10Sales = (r) => !!r && Array.isArray(r.sales) && (!r.salesFilter || isPsa10Filter(r.salesFilter));
+
+/** Validate one API result: sales are only kept when the API says it filtered them as PSA 10. */
+function checkResult(r) {
+  const out = { ...r };
+  if (!Array.isArray(out.history) || !out.history.length) out.history = null;
+  const sales = Array.isArray(out.sales) ? out.sales : [];
+  if (out.salesFilter && !isPsa10Filter(out.salesFilter)) {
+    out.sales = [];
+    out.salesError = `sales came back filtered as ${out.salesFilter.gradingCompany || "?"} ${out.salesFilter.gradeNumber || "?"}`;
+  } else {
+    out.sales = sales;
+    if (!sales.length) out.salesError = out.error || "no PSA 10 sales on ALT";
+  }
+  out.salesCount = out.sales.length;
+  return out;
+}
 
 /**
- * PSA 10 value series and sales for each cert, 20 per request (the API's limit).
- *
- * Works around two Worker bugs seen on cert 89428555 (Oct 2026):
- *   - a plain request returns the right value series, but can filter sales by the wrong
- *     grade (salesFilter PSA 3.0 on a PSA 10 cert), so the sales come back empty or wrong;
- *   - a request naming grade=10&grader=PSA returns the right PSA 10 sales, but an empty series.
- * So both are requested and merged per cert: the series from whichever has one (the PSA 10
- * request first, for certs that aren't PSA 10), and sales only from a response whose
- * salesFilter is PSA 10. Call-budget errors are retried up to twice.
+ * PSA 10 value series and sales for each cert, 20 per request (the API's limit), in one request
+ * per batch: grade=10&grader=PSA makes any cert return its card's PSA 10 series and sales.
+ * Call-budget errors are retried up to twice.
  * onBatch(results, diag) reports progress; diag = { requests, ok, errors[] }.
  */
 export async function fetchAltHistories(certs, onBatch) {
   const unique = [...new Set(certs.filter(Boolean))];
-  const plain = new Map(), ten = new Map(), merged = new Map();
+  const results = new Map();
   const diag = { requests: 0, ok: 0, errors: [] };
-  const merge = (c) => {
-    const ra = plain.get(c), rb = ten.get(c);
-    if (!ra && !rb) return;
-    const hr = hasHistory(rb) ? rb : hasHistory(ra) ? ra : (ra || rb);
-    const sr = hasPsa10Sales(rb) && rb.sales.length ? rb : hasPsa10Sales(ra) && ra.sales.length ? ra : hasPsa10Sales(rb) ? rb : hasPsa10Sales(ra) ? ra : null;
-    const out = { ...hr };
-    out.sales = sr ? sr.sales : [];
-    out.salesCount = out.sales.length;
-    out.salesFilter = (sr || rb || ra || {}).salesFilter;
-    if (!sr) {
-      const f = (rb || ra || {}).salesFilter;
-      out.salesError = f && !isPsa10Filter(f) ? `sales came back filtered as ${f.gradingCompany || "?"} ${f.gradeNumber || "?"}` : (rb && rb.error) || (ra && ra.error) || "no PSA 10 sales on ALT";
-    } else if (!out.sales.length) {
-      out.salesError = "no PSA 10 sales on ALT";
-    }
-    if (!hasHistory(hr)) out.history = null;
-    merged.set(c, out);
-  };
-  const report = (src) => (m) => { m.forEach((r, c) => { src.set(c, r); merge(c); }); if (onBatch) onBatch(new Map(merged), diag); };
-  const leftA = await altBatches(unique, "&sales=1", "", new Map(), diag, report(plain));
-  leftA.forEach((c) => { if (!plain.has(c)) plain.set(c, { cert: c, history: null, sales: [], error: "Couldn't load, try again later" }); merge(c); });
-  await altBatches(unique, "&sales=1&grade=10&grader=PSA", "PSA 10 sales: ", new Map(), diag, report(ten));
-  unique.forEach(merge);
-  if (onBatch) onBatch(new Map(merged), diag);
-  return merged;
+  const publish = (raw) => { raw.forEach((r, c) => results.set(c, checkResult(r))); if (onBatch) onBatch(new Map(results), diag); };
+  const left = await altBatches(unique, "&sales=1&grade=10&grader=PSA", "", new Map(), diag, publish);
+  left.forEach((c) => { if (!results.has(c)) results.set(c, checkResult({ cert: c, history: null, sales: [], error: "Couldn't load, try again later" })); });
+  if (onBatch) onBatch(new Map(results), diag);
+  return results;
 }
