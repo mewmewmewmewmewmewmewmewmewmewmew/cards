@@ -255,9 +255,9 @@ export default function StatsPage() {
       const value = last.value;
       const start = range ? shiftDate(today, range) : series[0].date;
       const pts = series.filter((p) => p.date >= start);
-      const anchor = valueAt(series, start);
-      const base = anchor !== null ? anchor : pts.length > 1 ? pts[0].value : null;
-      const change = base && base > 0 ? ((value - base) / base) * 100 : null;
+      // Change within the selected range only: first point in the range to the last
+      // (null when the range holds fewer than two sales/values, e.g. no sales that month).
+      const change = pctOf(pts);
       charted.push({ card, cert, r, series, pts, last, value, change, domain: [start, today] as [string, string] });
     });
     const cmp: Record<SortKey, (a: Any, b: Any) => number> = {
