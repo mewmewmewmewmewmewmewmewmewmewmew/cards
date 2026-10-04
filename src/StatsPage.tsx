@@ -793,12 +793,6 @@ export default function StatsPage() {
                 </div>
               </details>
             )}
-
-            <p style={{ marginTop: 32, maxWidth: "62ch", fontSize: "var(--web-small)", lineHeight: "var(--web-leading)", color: "var(--text-muted)" }}>
-              {sales
-                ? (list === "personal" ? "Sales are recorded by ALT at the grade you own (from the pc column)." : "Sales are PSA 10 sales recorded by ALT.") + " A card's value is its most recent sale, and the total adds up each card's latest sale as of each day. Rarer cards can go months between sales, so their value can lag the market."
-                : (list === "personal" ? "ALT value is ALT's modelled valuation for each card at the grade you own" : "ALT value is ALT's modelled valuation for each card at PSA 10") + ", not individual sales. ALT keeps about 13 months of daily history, and the last few days often repeat while ALT carries its latest value forward."}
-            </p>
           </>
         )}
       </div>
