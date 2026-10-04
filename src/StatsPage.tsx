@@ -15,7 +15,7 @@ type Any = any;
 type Pt = { date: string; value: number; house?: string };
 type Mode = "sales" | "alt";
 
-const RANGES: Array<[string, number]> = [["1D", 1], ["1W", 7], ["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["All", 0]];
+const RANGES: Array<[string, number]> = [["1D", 1], ["1W", 7], ["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["3Y", 1096], ["5Y", 1826], ["All", 0]];
 const STATS_CONFIG_KEY = "mew_stats_config_v1";
 const SORTS = ["value", "change", "name", "release"] as const;
 type SortKey = typeof SORTS[number];
