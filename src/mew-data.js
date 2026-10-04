@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "24.5";
+export const APP_VERSION = "24.6";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -223,10 +223,17 @@ export function applyFilters(cards, f) {
 /** Per-tab parse info from the last fetchAllSheets call (used by /stats "Data check"). */
 export const sheetDiag = {};
 /**
- * Extra data from the last getAll response. hidden is the list of certs hidden on /stats
- * (the sheet's "Hidden" tab), or null when the deployed Apps Script doesn't support it yet.
+ * Extra data from the last getAll response. hidden holds the certs hidden on /stats, one list
+ * per view ({ all, personal }, from the sheet's "Hidden" tab), or null when the deployed
+ * Apps Script doesn't support hiding yet.
  */
 export const sheetExtras = { hidden: null };
+const cleanList = (l) => (Array.isArray(l) ? l.map((c) => String(c).trim()).filter(Boolean) : []);
+function parseHidden(h) {
+  if (Array.isArray(h)) return { all: cleanList(h), personal: [] };
+  if (h && typeof h === "object") return { all: cleanList(h.all), personal: cleanList(h.personal) };
+  return null;
+}
 function noteSheet(name, cards) {
   sheetDiag[name] = { headers: cards.headers || [], certColumn: !!cards.certColumn, rows: cards.length, withCert: cards.filter((c) => c.certs).length };
   return cards;
@@ -255,7 +262,7 @@ export async function fetchAllSheets(password, opts) {
     const text = await (await fetch(url)).text();
     if (text.startsWith("Error: Authentication Failed")) throw new Error("auth");
     const json = JSON.parse(text);
-    sheetExtras.hidden = json && Array.isArray(json.hidden) ? json.hidden.map((c) => String(c).trim()).filter(Boolean) : null;
+    sheetExtras.hidden = json ? parseHidden(json.hidden) : null;
     if (json && json.sheets) {
       const groups = sources
         .map((s) => { if (!(s.name in json.sheets)) sheetDiag[s.name] = { missing: true }; return { cards: noteSheet(s.name, parseCSV(json.sheets[s.name] || "")), flag: s.flag }; })
@@ -367,53 +374,77 @@ async function altBatches(certs, extra, label, results, diag, onBatch) {
   return pending;
 }
 
-const isPsa10Filter = (f) => !!f && parseFloat(f.gradeNumber) === 10 && String(f.gradingCompany || "").toUpperCase() === "PSA";
+const isGradeFilter = (f, grade) => !!f && parseFloat(f.gradeNumber) === grade && String(f.gradingCompany || "").toUpperCase() === "PSA";
 
-/** Validate one API result: sales are only kept when the API says it filtered them as PSA 10. */
-function checkResult(r) {
+/** Validate one API result: sales are only kept when the API says it filtered them at `grade` (PSA). */
+function checkResult(r, grade) {
   const out = { ...r };
   if (!Array.isArray(out.history) || !out.history.length) out.history = null;
   const sales = Array.isArray(out.sales) ? out.sales : [];
-  if (out.salesFilter && !isPsa10Filter(out.salesFilter)) {
+  if (out.salesFilter && !isGradeFilter(out.salesFilter, grade)) {
     out.sales = [];
     out.salesError = `sales came back filtered as ${out.salesFilter.gradingCompany || "?"} ${out.salesFilter.gradeNumber || "?"}`;
   } else {
     out.sales = sales;
-    if (!sales.length) out.salesError = out.error || "no PSA 10 sales on ALT";
+    if (!sales.length) out.salesError = out.error || `no PSA ${grade} sales on ALT`;
   }
   out.salesCount = out.sales.length;
+  out.requestedGrade = grade;
   return out;
 }
 
 /**
- * PSA 10 value series and sales for each cert, 20 per request (the API's limit), in one request
- * per batch: grade=10&grader=PSA makes any cert return its card's PSA 10 series and sales.
- * Call-budget errors are retried up to twice.
- * onBatch(results, diag) reports progress; diag = { requests, ok, errors[] }.
+ * Value series and sales for certs at given PSA grades, 20 per request (the API's limit).
+ * grade/grader apply to a whole request, so certs are grouped by grade. Any cert of a card
+ * returns that card's series and sales at the requested grade. Budget errors retry up to twice.
+ * pairs: [{ cert, grade }]. onBatch(results, diag); diag = { requests, ok, errors[] }.
  */
-export async function fetchAltHistories(certs, onBatch) {
-  const unique = [...new Set(certs.filter(Boolean))];
+export async function fetchAltByGrade(pairs, onBatch) {
+  const byGrade = new Map();
+  for (const { cert, grade } of pairs) {
+    if (!cert || !grade) continue;
+    if (!byGrade.has(grade)) byGrade.set(grade, new Set());
+    byGrade.get(grade).add(cert);
+  }
   const results = new Map();
   const diag = { requests: 0, ok: 0, errors: [] };
-  const publish = (raw) => { raw.forEach((r, c) => results.set(c, checkResult(r))); if (onBatch) onBatch(new Map(results), diag); };
-  const left = await altBatches(unique, "&sales=1&grade=10&grader=PSA", "", new Map(), diag, publish);
-  left.forEach((c) => { if (!results.has(c)) results.set(c, checkResult({ cert: c, history: null, sales: [], error: "Couldn't load, try again later" })); });
+  for (const [grade, set] of byGrade) {
+    const certs = [...set];
+    const publish = (raw) => { raw.forEach((r, c) => results.set(c, checkResult(r, grade))); if (onBatch) onBatch(new Map(results), diag); };
+    const left = await altBatches(certs, `&sales=1&grade=${grade}&grader=PSA`, grade === 10 ? "" : `PSA ${grade}: `, new Map(), diag, publish);
+    left.forEach((c) => { if (!results.has(c)) results.set(c, checkResult({ cert: c, history: null, sales: [], error: "Couldn't load, try again later" }, grade)); });
+  }
   if (onBatch) onBatch(new Map(results), diag);
   return results;
 }
 
+/** Every cert at PSA 10 (the "All" view). */
+export function fetchAltHistories(certs, onBatch) {
+  return fetchAltByGrade([...new Set(certs.filter(Boolean))].map((cert) => ({ cert, grade: 10 })), onBatch);
+}
+
+/** The PSA grade you own (from the sheet's pc column), 1–10, or null (blank, N/A, RAW). */
+export function pcGrade(card) {
+  const m = /^PSA(\d{1,2})$/.exec(String((card && card.pc) || ""));
+  const g = m ? Number(m[1]) : NaN;
+  return g >= 1 && g <= 10 ? g : null;
+}
+
 /**
- * Hide or unhide a cert on /stats. Saved in the sheet's "Hidden" tab by the Apps Script
- * (action=setHidden), which always requires the site password for writes.
- * Resolves to the full hidden list after the change; throws Error("auth") on a wrong password.
+ * Hide or unhide a cert on /stats, separately per view (list = "all" or "personal"). Saved in
+ * the sheet's "Hidden" tab by the Apps Script (action=setHidden), which always requires the
+ * applicable password for writes. Resolves to the hidden lists after the change ({ all,
+ * personal }); throws Error("auth") on a wrong password.
  */
-export async function setCardHidden(password, cert, hide, name) {
+export async function setCardHidden(password, cert, hide, name, list) {
   const url = `${APPS_SCRIPT_URL}?action=setHidden&cert=${encodeURIComponent(cert)}&hidden=${hide ? 1 : 0}` +
+    `&list=${list === "personal" ? "personal" : "all"}` +
     `&name=${encodeURIComponent(name || "")}&password=${encodeURIComponent(password || "")}&for=stats`;
   const text = await (await fetch(url)).text();
   if (text.startsWith("Error: Authentication Failed")) throw new Error("auth");
   let json = null;
   try { json = JSON.parse(text); } catch (e) { throw new Error(text.slice(0, 120) || "save failed"); }
-  if (!json || !Array.isArray(json.hidden)) throw new Error("save failed");
-  return json.hidden.map((c) => String(c).trim()).filter(Boolean);
+  const lists = json ? parseHidden(json.hidden) : null;
+  if (!lists) throw new Error("save failed");
+  return lists;
 }

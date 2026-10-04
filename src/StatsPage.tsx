@@ -190,6 +190,13 @@ export default function StatsPage() {
   const [allSales, setAllSales] = useState(false);
   // Same scopes and defaults as the catalog: Japanese Mew on, Cameo and Intl (Unique tab) off.
   const [scope, setScope] = useState(() => readPref("mew_stats_scope", { mew: true, cameo: false, intl: false }, (v) => !!v && ["mew", "cameo", "intl"].every((k) => typeof v[k] === "boolean")));
+  // "all" = every card at PSA 10; "personal" = cards with a PSA grade in the sheet's pc column,
+  // each valued at the grade you own.
+  const [list, setList] = useState<"all" | "personal">(() => readPref("mew_stats_list", "all" as "all" | "personal", (v) => v === "all" || v === "personal"));
+  useEffect(() => { savePref("mew_stats_list", list); setSelected(null); }, [list]);
+  const [histP, setHistP] = useState<Map<string, Any>>(new Map());
+  const [histPDone, setHistPDone] = useState(false);
+  const [diagP, setDiagP] = useState<Any>(null);
   const [view, setView] = useState<"grid" | "list">(() => readPref("mew_stats_view", "grid" as "grid" | "list", (v) => v === "grid" || v === "list"));
   useEffect(() => { savePref("mew_stats_view", view); }, [view]);
   useEffect(() => { savePref("mew_stats_range", range); }, [range]);
@@ -198,7 +205,8 @@ export default function StatsPage() {
 
   // Hidden cards: saved in the sheet's "Hidden" tab (shared across devices), left out of the
   // grid and totals. null = the deployed Apps Script doesn't support hiding yet.
-  const [hiddenSet, setHiddenSet] = useState<Set<string> | null>(null);
+  const [hiddenLists, setHiddenLists] = useState<{ all: Set<string>; personal: Set<string> } | null>(null);
+  const hiddenSet = hiddenLists ? hiddenLists[list] : null;
   const [saveErr, setSaveErr] = useState("");
   const pwRef = useRef("");
   const toggleHidden = async (cert: string, label: string, hide: boolean) => {
@@ -211,14 +219,19 @@ export default function StatsPage() {
     }
     // Optimistic: flip just this cert now, and only undo this cert if the save fails, so quick
     // successive changes can't overwrite each other.
-    const flip = (on: boolean) => setHiddenSet((cur) => { const n = new Set(cur || []); if (on) n.add(cert); else n.delete(cert); return n; });
+    const which = list;
+    const flip = (on: boolean) => setHiddenLists((cur) => {
+      if (!cur) return cur;
+      const n = new Set(cur[which]); if (on) n.add(cert); else n.delete(cert);
+      return { ...cur, [which]: n };
+    });
     flip(hide);
     setSaveErr("");
     if (hide && selected === cert) setSelected(null);
     try {
-      await D.setCardHidden(password, cert, hide, label);
+      await D.setCardHidden(password, cert, hide, label, which);
       pwRef.current = password;
-      D.trackEvent("stats_hide", { hide });
+      D.trackEvent("stats_hide", { hide, list: which });
     } catch (e: Any) {
       flip(!hide);
       if (e && e.message === "auth") { pwRef.current = ""; setSaveErr("Wrong password, so that change wasn't saved."); }
@@ -252,12 +265,24 @@ export default function StatsPage() {
       pwRef.current = password;
       setCards(all);
       setSheets({ ...D.sheetDiag });
-      setHiddenSet(D.sheetExtras.hidden ? new Set(D.sheetExtras.hidden) : null);
+      const hl = D.sheetExtras.hidden;
+      setHiddenLists(hl ? { all: new Set(hl.all), personal: new Set(hl.personal) } : null);
       setPhase("ready");
       const certs = all.map((c: Any) => D.certOf(c)).filter(Boolean) as string[];
       setDiag({ requests: 0, ok: 0, errors: [] });
       await D.fetchAltHistories(certs, (m, d) => { setHist(m); setDiag({ ...d, errors: [...d.errors] }); });
       setHistDone(true);
+      // Personal: owned PSA 10s reuse the data above; other owned grades are fetched at that grade.
+      const pairs: Array<{ cert: string; grade: number }> = [];
+      const seen = new Set<string>();
+      for (const c of all) {
+        const cert = D.certOf(c), g = D.pcGrade(c);
+        if (!cert || !g || g === 10 || seen.has(cert)) continue;
+        seen.add(cert); pairs.push({ cert, grade: g });
+      }
+      setDiagP({ requests: 0, ok: 0, errors: [] });
+      await D.fetchAltByGrade(pairs, (m, d) => { setHistP(m); setDiagP({ ...d, errors: [...d.errors] }); });
+      setHistPDone(true);
     } catch (e: Any) {
       if (e && e.message === "auth") { setPw(""); setPhase("password"); }
       else { console.error(e); setPhase("error"); }
@@ -287,27 +312,30 @@ export default function StatsPage() {
     // A cert listed in more than one tab keeps every tab's scope flag.
     const byCert = new Map<string, Any>();
     const noCert: Any[] = [];
-    const inScope = (c: Any) => (scope.mew && c.isMew) || (scope.cameo && c.isCameo) || (scope.intl && c.isIntl);
+    const personal = list === "personal";
+    const inScope = (c: Any) => ((scope.mew && c.isMew) || (scope.cameo && c.isCameo) || (scope.intl && c.isIntl)) && (!personal || D.pcGrade(c) !== null);
     for (const c of cards) {
       const cert = D.certOf(c);
       if (!cert) { if (inScope(c)) noCert.push(c); continue; }
       const prev = byCert.get(cert);
       if (!prev) byCert.set(cert, { ...c });
+      else if (!D.pcGrade(prev) && D.pcGrade(c)) prev.pc = c.pc;
       else { if (c.isMew) prev.isMew = true; if (c.isCameo) prev.isCameo = true; if (c.isIntl) prev.isIntl = true; }
     }
     const charted: Any[] = [], failed: Any[] = [], pending: Any[] = [], hiddenRows: Any[] = [];
     byCert.forEach((card, cert) => {
       if (!inScope(card)) return;
-      const r = hist.get(cert);
+      const grade = personal ? (D.pcGrade(card) as number) : 10;
+      const r = grade === 10 ? hist.get(cert) : histP.get(cert);
       if (hiddenSet && hiddenSet.has(cert)) {
         const s = r ? seriesOf(r, mode) : [];
-        hiddenRows.push({ card, cert, value: s.length ? s[s.length - 1].value : null });
+        hiddenRows.push({ card, cert, grade, value: s.length ? s[s.length - 1].value : null });
         return;
       }
-      if (!r) { pending.push({ card, cert }); return; }
+      if (!r) { pending.push({ card, cert, grade }); return; }
       const series = seriesOf(r, mode);
       if (!series.length) {
-        failed.push({ card, cert, error: mode === "sales" ? (r.salesError || r.error || "no PSA 10 sales on ALT") : (r.error || "no value history") });
+        failed.push({ card, cert, grade, error: mode === "sales" ? (r.salesError || r.error || `no PSA ${grade} sales on ALT`) : (r.error || "no value history") });
         return;
       }
       const last = series[series.length - 1];
@@ -317,7 +345,7 @@ export default function StatsPage() {
       // Change within the selected range only: first point in the range to the last
       // (null when the range holds fewer than two sales/values, e.g. no sales that month).
       const change = pctOf(pts);
-      charted.push({ card, cert, r, series, pts, last, value, change, domain: [start, today] as [string, string] });
+      charted.push({ card, cert, grade, r, series, pts, last, value, change, domain: [start, today] as [string, string] });
     });
     const cmp: Record<SortKey, (a: Any, b: Any) => number> = {
       value: (a, b) => b.value - a.value,
@@ -329,7 +357,7 @@ export default function StatsPage() {
     hiddenRows.sort(cmp.name);
     return { charted, failed, pending, noCert, hidden: hiddenRows };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, hist, range, sort, lang, mode, today, scope, hiddenSet]);
+  }, [cards, hist, histP, list, range, sort, lang, mode, today, scope, hiddenSet]);
 
   // Collection total: each card's value as of each day (its last sale, or ALT value), summed
   // over every charted card. Before a card's first data point it counts at that first value,
@@ -387,11 +415,13 @@ export default function StatsPage() {
     <div style={{ gridColumn: "1 / -1", padding: "40px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
       <div style={eyebrow}>{noScope ? "No scope selected" : "No cards to chart"}</div>
       <div style={{ marginTop: 8, fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
-        {noScope ? "Turn on Mew, Cameo or Intl above." : mode === "sales" ? "None of these cards has a recorded PSA 10 sale. Try ALT value, or another scope." : "None of these cards has ALT value history."}
+        {noScope ? "Turn on Mew, Cameo or Intl above."
+          : list === "personal" && !cards.some((c: Any) => D.pcGrade(c) !== null) ? "No card in the sheet has a PSA grade in its pc column yet."
+          : mode === "sales" ? `None of these cards has a recorded ${list === "personal" ? "" : "PSA 10 "}sale. Try ALT value, or another scope.` : "None of these cards has ALT value history."}
       </div>
     </div>
   ) : null;
-  const headTitle = sel ? name(sel.card) : "Collection at PSA 10";
+  const headTitle = sel ? name(sel.card) : list === "personal" ? "My collection" : "Collection at PSA 10";
   const headValue = sel ? sel.value : total.value;
   const headChange = sel ? sel.change : pctOf(total.pts);
   const chartEmpty = sales ? "NO SALES IN THIS RANGE" : "NOT ENOUGH DATA";
@@ -413,8 +443,12 @@ export default function StatsPage() {
             </button>
           </div>
         </div>
-        <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: narrow ? "var(--web-h2)" : "var(--web-h1)", lineHeight: "var(--web-leading-tight)", color: "var(--text-title)" }}>PSA 10 value</h1>
+        <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: narrow ? "var(--web-h2)" : "var(--web-h1)", lineHeight: "var(--web-leading-tight)", color: "var(--text-title)" }}>{list === "personal" ? "My collection" : "PSA 10 value"}</h1>
         <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div role="group" aria-label="Cards" style={{ display: "flex", gap: 4, paddingRight: 10, borderRight: "1px solid var(--line-hairline)" }}>
+            <button type="button" aria-pressed={list === "all"} onClick={() => { setList("all"); D.trackEvent("stats_list", { list: "all" }); }} style={pill(list === "all")}>All</button>
+            <button type="button" aria-pressed={list === "personal"} onClick={() => { setList("personal"); D.trackEvent("stats_list", { list: "personal" }); }} style={pill(list === "personal")}>Personal</button>
+          </div>
           <div role="group" aria-label="Price source" style={{ display: "flex", gap: 4 }}>
             <button type="button" aria-pressed={sales} onClick={() => setMode("sales")} style={pill(sales)}>Sales</button>
             <button type="button" aria-pressed={!sales} onClick={() => setMode("alt")} style={pill(!sales)}>ALT value</button>
@@ -428,7 +462,7 @@ export default function StatsPage() {
             ))}
           </div>
           <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
-            {sales ? "recorded PSA 10 sales" : "ALT's daily valuation"} · USD{histDone ? "" : ` · loading ${loadedCerts}/${totalCerts}`}
+            {list === "personal" ? (sales ? "recorded sales at the grade you own" : "ALT's daily valuation at the grade you own") : (sales ? "recorded PSA 10 sales" : "ALT's daily valuation")} · USD{!histDone ? ` · loading ${loadedCerts}/${totalCerts}` : list === "personal" && !histPDone ? " · loading your grades" : ""}
           </span>
         </div>
 
@@ -458,7 +492,7 @@ export default function StatsPage() {
                       {sel.r.assetId && <> · <a href={`https://alt.xyz/itm/${sel.r.assetId}/research`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-accent)" }}>ALT ↗</a></>}
                     </>
                   ) : (
-                    `${rows.charted.length} cards · ${sales ? "each counts at its latest sale" : "sum of ALT values"}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} count at their first ${sales ? "sale" : "value"} until then` : ""}`
+                    `${rows.charted.length} card${rows.charted.length === 1 ? "" : "s"} · ${sales ? "each counts at its latest sale" : "sum of ALT values"}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} ${total.backfilled === 1 ? "counts at its" : "count at their"} first ${sales ? "sale" : "value"} until then` : ""}`
                   )}
                 </div>
               </div>
@@ -500,7 +534,7 @@ export default function StatsPage() {
               {SORTS.map((k) => (
                 <button key={k} type="button" onClick={() => setSort(k)} style={pill(sort === k)}>{k[0].toUpperCase() + k.slice(1)}</button>
               ))}
-              <span style={{ marginLeft: "auto", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>{rows.charted.length} cards</span>
+              <span style={{ marginLeft: "auto", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>{rows.charted.length} card{rows.charted.length === 1 ? "" : "s"}</span>
               <span style={{ display: "flex", gap: 2 }}>
                 <button type="button" onClick={() => setView("grid")} aria-label="Grid view" aria-pressed={view === "grid"} title="Grid" style={viewBtn(view === "grid")}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="7" height="7" /><rect x="9" y="0" width="7" height="7" /><rect x="0" y="9" width="7" height="7" /><rect x="9" y="9" width="7" height="7" /></svg>
@@ -523,7 +557,7 @@ export default function StatsPage() {
                       <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || ""].filter(Boolean).join(" · ")}</span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}</span>
                       </span>
                     </span>
                     <Sparkline pts={x.pts} domain={x.domain} dots={sales} />
@@ -569,7 +603,7 @@ export default function StatsPage() {
                       <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || ""].filter(Boolean).join(" · ")}</span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}</span>
                       </span>
                       {!narrow && <Sparkline pts={x.pts} domain={x.domain} dots={sales} height={28} />}
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{fmtUSD(x.value)}</span>
@@ -643,6 +677,8 @@ export default function StatsPage() {
                     {hiddenSet ? <div style={line}>Hidden · {hiddenSet.size} (saved in the sheet's Hidden tab)</div>
                       : <div style={hint}>Hiding cards needs the updated Apps Script: the sheet response has no hidden list yet.</div>}
                     {diag && <div style={line}>ALT API · {diag.requests} request{diag.requests === 1 ? "" : "s"}, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
+                    {diagP && <div style={line}>Personal (owned grades below PSA 10) · {diagP.requests} request{diagP.requests === 1 ? "" : "s"}, {diagP.ok} answered{diagP.errors.length ? ` · ${diagP.errors.length} error${diagP.errors.length === 1 ? "" : "s"}: ${[...new Set(diagP.errors as string[])].join("; ")}` : ""}</div>}
+                    <div style={line}>Personal · {cards.filter((c: Any) => D.pcGrade(c) !== null).length} sheet rows with a PSA grade in pc</div>
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
                     {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out)</div>}
@@ -675,8 +711,8 @@ export default function StatsPage() {
 
             <p style={{ marginTop: 32, maxWidth: "62ch", fontSize: "var(--web-small)", lineHeight: "var(--web-leading)", color: "var(--text-muted)" }}>
               {sales
-                ? "Sales are PSA 10 sales recorded by ALT. A card's value is its most recent sale, and the total adds up each card's latest sale as of each day. Rarer cards can go months between sales, so their value can lag the market."
-                : "ALT value is ALT's modelled valuation for each card at PSA 10, not individual sales. ALT keeps about 13 months of daily history, and the last few days often repeat while ALT carries its latest value forward."}
+                ? (list === "personal" ? "Sales are recorded by ALT at the grade you own (from the pc column)." : "Sales are PSA 10 sales recorded by ALT.") + " A card's value is its most recent sale, and the total adds up each card's latest sale as of each day. Rarer cards can go months between sales, so their value can lag the market."
+                : (list === "personal" ? "ALT value is ALT's modelled valuation for each card at the grade you own" : "ALT value is ALT's modelled valuation for each card at PSA 10") + ", not individual sales. ALT keeps about 13 months of daily history, and the last few days often repeat while ALT carries its latest value forward."}
             </p>
           </>
         )}

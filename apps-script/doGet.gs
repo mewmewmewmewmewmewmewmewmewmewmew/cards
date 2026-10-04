@@ -7,9 +7,9 @@
  *
  * Actions (all GET, so the browser can call them without a CORS preflight):
  *   ?action=getConfig                 → { passwordEnabled, statsPasswordEnabled }
- *   ?action=getAll&sheets=A,B,C       → { sheets: { A: csv, ... }, hidden: [cert, ...] }
- *   ?action=getHidden                 → { hidden: [cert, ...] }
- *   ?action=setHidden&cert=…&hidden=1|0&name=…   → { ok, hidden: [cert, ...] }
+ *   ?action=getAll&sheets=A,B,C       → { sheets: { A: csv, ... }, hidden: { all: [...], personal: [...] } }
+ *   ?action=getHidden                 → { hidden: { all: [...], personal: [...] } }
+ *   ?action=setHidden&cert=…&hidden=1|0&list=all|personal&name=…   → { ok, hidden: { all, personal } }
  *   ?sheet=Name                       → that tab as CSV
  * Passwords (Config tab, column A key / column B value):
  *   PasswordEnabled / Password            — the catalog (mew.cards)
@@ -18,7 +18,8 @@
  * password (the catalog password doesn't open /stats); when it's FALSE, /stats follows the
  * catalog's rule. setHidden ALWAYS needs the applicable password, even when that page is
  * public, so nobody else can change what's hidden.
- * Hidden tab: created automatically on the first hide (Cert, Card, Hidden at).
+ * Hidden tab: created automatically on the first hide (Cert, Card, Hidden at, List). Hiding is
+ * separate for /stats' two views: List is "all" or "personal" (blank counts as "all").
  */
 function doGet(e) {
   try {
@@ -56,7 +57,7 @@ function doGet(e) {
     // --- Writes: always need the password ---
     if (p.action === 'setHidden') {
       if (!passwordOk) return text_("Error: Authentication Failed");
-      const hidden = setHidden_(spreadsheet, p.cert, p.hidden === '1', p.name);
+      const hidden = setHidden_(spreadsheet, p.cert, p.hidden === '1', p.name, p.list);
       return json_({ ok: true, hidden: hidden });
     }
 
@@ -93,19 +94,26 @@ function doGet(e) {
 
 const HIDDEN_SHEET_ = "Hidden";
 
-/** Cert numbers in the Hidden tab, as strings. */
+const LISTS_ = ["all", "personal"];
+const listOf_ = function (v) { v = String(v || "").trim().toLowerCase(); return LISTS_.indexOf(v) >= 0 ? v : "all"; };
+
+/** Hidden certs per view, as strings: { all: [...], personal: [...] }. */
 function readHidden_(ss) {
+  const out = { all: [], personal: [] };
   const sh = ss.getSheetByName(HIDDEN_SHEET_);
-  if (!sh || sh.getLastRow() < 2) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues()
-    .map(function (r) { return String(r[0]).trim(); })
-    .filter(Boolean);
+  if (!sh || sh.getLastRow() < 2) return out;
+  sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues().forEach(function (r) {
+    const cert = String(r[0]).trim();
+    if (cert) out[listOf_(r[3])].push(cert);
+  });
+  return out;
 }
 
-/** Add (hide=true) or remove (hide=false) a cert; returns the full hidden list afterwards. */
-function setHidden_(ss, cert, hide, name) {
+/** Add (hide=true) or remove (hide=false) a cert in one view's list; returns all lists afterwards. */
+function setHidden_(ss, cert, hide, name, list) {
   cert = String(cert || "").trim();
   if (!/^[A-Za-z0-9-]{4,20}$/.test(cert)) throw new Error("bad cert");
+  list = listOf_(list);
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -113,13 +121,14 @@ function setHidden_(ss, cert, hide, name) {
     if (!sh) {
       sh = ss.insertSheet(HIDDEN_SHEET_);
       sh.getRange("A:A").setNumberFormat("@"); // keep certs as text
-      sh.appendRow(["Cert", "Card", "Hidden at"]);
+      sh.appendRow(["Cert", "Card", "Hidden at", "List"]);
     }
     const last = sh.getLastRow();
-    const certs = last >= 2 ? sh.getRange(2, 1, last - 1, 1).getValues().map(function (r) { return String(r[0]).trim(); }) : [];
-    const i = certs.indexOf(cert);
-    if (hide && i < 0) sh.appendRow([cert, String(name || "").slice(0, 200), new Date()]);
-    if (!hide && i >= 0) sh.deleteRow(i + 2);
+    const rows = last >= 2 ? sh.getRange(2, 1, last - 1, 4).getValues() : [];
+    let found = -1;
+    rows.forEach(function (r, i) { if (found < 0 && String(r[0]).trim() === cert && listOf_(r[3]) === list) found = i; });
+    if (hide && found < 0) sh.appendRow([cert, String(name || "").slice(0, 200), new Date(), list]);
+    if (!hide && found >= 0) sh.deleteRow(found + 2);
   } finally {
     lock.releaseLock();
   }
