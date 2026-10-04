@@ -2,106 +2,134 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as D from "./mew-data";
 
 /* ------------------------------------------------------------------ *
- * /stats — PSA 10 value history for every card in the sheet.
+ * /stats — PSA 10 prices for every card in the sheet.
  * Data: the sheet (same password gate as the catalog) gives each card's
- * cert numbers ("all cert" column); the ALT Worker turns a cert into
- * ~13 months of daily ALT valuations for that card at PSA 10.
+ * cert numbers ("all cert" column); the ALT Worker turns a cert into the
+ * card's PSA 10 sales (sales=1) and ALT's ~13-month daily valuation.
+ * A toggle switches the whole page between actual sales and ALT value.
  * Styling uses the Mew Catalog design tokens (src/ds/*.css).
  * ------------------------------------------------------------------ */
 
 type Any = any;
-type Pt = { date: string; value: number };
+type Pt = { date: string; value: number; house?: string };
+type Mode = "sales" | "alt";
 
 const RANGES: Array<[string, number]> = [["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["All", 0]];
 const SORTS = ["value", "change", "name", "release"] as const;
 type SortKey = typeof SORTS[number];
+const MODE_KEY = "mew_stats_mode";
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtUSD = (v: number) => (v < 100 ? usd2 : usd0).format(v);
 const fmtPct = (p: number | null) => (p === null || !isFinite(p) ? "—" : `${p > 0 ? "+" : p < 0 ? "−" : ""}${Math.abs(p).toFixed(1)}%`);
 const pctOf = (pts: Pt[]) => (pts.length > 1 && pts[0].value > 0 ? ((pts[pts.length - 1].value - pts[0].value) / pts[0].value) * 100 : null);
+const fmtDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const tsOf = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
 function shiftDate(iso: string, days: number) {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - days);
   return d.toISOString().slice(0, 10);
 }
-/** Points on or after `days` before the series' last date (all points when days = 0). */
-function inRange(h: Pt[], days: number) {
-  if (!days || !h.length) return h;
-  const cut = shiftDate(h[h.length - 1].date, days);
-  return h.filter((p) => p.date >= cut);
+/** Last value on or before `date` (series ascending), or null. */
+function valueAt(series: Pt[], date: string) {
+  let v: number | null = null;
+  for (const p of series) { if (p.date <= date) v = p.value; else break; }
+  return v;
 }
-const fmtDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-
-/* ---------- charts ---------- */
-
-function pathFor(pts: Pt[], w: number, h: number, lo: number, hi: number) {
-  const span = hi - lo || 1;
-  return pts.map((p, i) => {
-    const x = pts.length === 1 ? w / 2 : (i / (pts.length - 1)) * w;
-    const y = h - ((p.value - lo) / span) * h;
-    return `${i ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`;
-  }).join("");
+/** Ascending points for one API result in the chosen mode. */
+function seriesOf(r: Any, mode: Mode): Pt[] {
+  const raw = mode === "sales"
+    ? ((r && r.sales) || []).map((s: Any) => ({ date: String(s.date || "").slice(0, 10), value: Number(s.price), house: s.auctionHouse || undefined }))
+    : ((r && r.history) || []).map((p: Any) => ({ date: String(p.date || "").slice(0, 10), value: Number(p.value) }));
+  return raw.filter((p: Pt) => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && isFinite(p.value) && p.value > 0)
+    .sort((a: Pt, b: Pt) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
+
+/* ---------- charts (x is spaced by date, so irregular sales read correctly) ---------- */
+
 function bounds(pts: Pt[]) {
   let lo = Infinity, hi = -Infinity;
   for (const p of pts) { if (p.value < lo) lo = p.value; if (p.value > hi) hi = p.value; }
   const pad = (hi - lo) * 0.08 || hi * 0.05 || 1;
   return { lo: Math.max(0, lo - pad), hi: hi + pad };
 }
+function geometry(pts: Pt[], domain: [string, string], W: number, H: number, step: boolean) {
+  const t0 = tsOf(domain[0]), t1 = tsOf(domain[1]), span = t1 - t0;
+  const { lo, hi } = bounds(pts);
+  const xOf = (d: string) => (span > 0 ? Math.min(1, Math.max(0, (tsOf(d) - t0) / span)) : 0.5) * W;
+  const yOf = (v: number) => H - ((v - lo) / (hi - lo || 1)) * H;
+  const xy = pts.map((p) => [xOf(p.date), yOf(p.value)]);
+  let line = "";
+  xy.forEach(([x, y], i) => {
+    if (!i) line += `M${x.toFixed(2)},${y.toFixed(2)}`;
+    else if (step) line += `H${x.toFixed(2)}V${y.toFixed(2)}`;
+    else line += `L${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  if (step && xy.length) line += `H${W}`;
+  const x0 = xy.length ? xy[0][0] : 0, xN = step ? W : xy.length ? xy[xy.length - 1][0] : 0;
+  const area = xy.length > 1 ? `${line}L${xN.toFixed(2)},${H}L${x0.toFixed(2)},${H}Z` : "";
+  const dots = xy.map(([x, y]) => `M${x.toFixed(2)},${y.toFixed(2)}h0`).join("");
+  return { lo, hi, xOf, yOf, line, area, dots, t0, span };
+}
 
-const Sparkline: React.FC<{ pts: Pt[]; height?: number }> = ({ pts, height = 40 }) => {
-  if (pts.length < 2) return <div style={{ height }} />;
-  const W = 100, H = 40, { lo, hi } = bounds(pts), line = pathFor(pts, W, H, lo, hi);
+const Sparkline: React.FC<{ pts: Pt[]; domain: [string, string]; dots?: boolean; height?: number }> = ({ pts, domain, dots, height = 40 }) => {
+  if (!pts.length || (!dots && pts.length < 2)) return <div style={{ height }} />;
+  const W = 100, H = 40, g = geometry(pts, domain, W, H, false);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height }} aria-hidden="true">
-      <path d={`${line}L${W},${H}L0,${H}Z`} fill="var(--pink-700)" fillOpacity="0.08" />
-      <path d={line} fill="none" stroke="var(--pink-700)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" overflow="visible" style={{ display: "block", width: "100%", height }} aria-hidden="true">
+      {g.area && <path d={g.area} fill="var(--pink-700)" fillOpacity="0.08" />}
+      {pts.length > 1 && <path d={g.line} fill="none" stroke="var(--pink-700)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />}
+      {dots && <path d={g.dots} fill="none" stroke="var(--pink-700)" strokeWidth="4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
     </svg>
   );
 };
 
-const LineChart: React.FC<{ pts: Pt[]; height: number }> = ({ pts, height }) => {
+const LineChart: React.FC<{ pts: Pt[]; domain: [string, string]; height: number; step?: boolean; dots?: boolean; empty: string }> = ({ pts, domain, height, step = false, dots = false, empty }) => {
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  if (pts.length < 2) {
-    return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed var(--line-strong)", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>NOT ENOUGH DATA</div>;
+  if (!pts.length || (!dots && pts.length < 2)) {
+    return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed var(--line-strong)", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)" }}>{empty}</div>;
   }
-  const W = 1000, H = 300, { lo, hi } = bounds(pts), line = pathFor(pts, W, H, lo, hi);
+  const W = 1000, H = 300, g = geometry(pts, domain, W, H, step);
   const onMove = (e: React.PointerEvent) => {
     const r = ref.current!.getBoundingClientRect();
     const t = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    setHover(Math.round(t * (pts.length - 1)));
+    const target = g.t0 + t * g.span;
+    let best = 0, bestD = Infinity;
+    pts.forEach((p, i) => { const d = Math.abs(tsOf(p.date) - target); if (d < bestD) { bestD = d; best = i; } });
+    setHover(best);
   };
   const hp = hover === null ? null : pts[hover];
-  const hx = hover === null ? 0 : (hover / (pts.length - 1)) * 100;
-  const hy = hp ? (1 - (hp.value - lo) / (hi - lo || 1)) * 100 : 0;
+  const hx = hp ? (g.xOf(hp.date) / W) * 100 : 0;
+  const hy = hp ? (g.yOf(hp.value) / H) * 100 : 0;
   const label: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-faint)" };
   return (
     <div>
       <div ref={ref} onPointerMove={onMove} onPointerLeave={() => setHover(null)} onPointerDown={onMove}
         style={{ position: "relative", height, touchAction: "pan-y", cursor: "crosshair" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} aria-hidden="true">
-          <path d={`${line}L${W},${H}L0,${H}Z`} fill="var(--pink-700)" fillOpacity="0.07" />
-          <path d={line} fill="none" stroke="var(--pink-700)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" overflow="visible" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} aria-hidden="true">
+          {g.area && <path d={g.area} fill="var(--pink-700)" fillOpacity="0.07" />}
+          {pts.length > 1 && <path d={g.line} fill="none" stroke="var(--pink-700)" strokeWidth={dots ? 1.5 : 2} strokeOpacity={dots ? 0.6 : 1} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />}
+          {dots && <path d={g.dots} fill="none" stroke="var(--pink-700)" strokeWidth="7" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
         </svg>
-        <span style={{ ...label, position: "absolute", left: 0, top: 0 }}>{fmtUSD(hi)}</span>
-        <span style={{ ...label, position: "absolute", left: 0, bottom: 0 }}>{fmtUSD(lo)}</span>
+        <span style={{ ...label, position: "absolute", left: 0, top: 0 }}>{fmtUSD(g.hi)}</span>
+        <span style={{ ...label, position: "absolute", left: 0, bottom: 0 }}>{fmtUSD(g.lo)}</span>
         {hp && (
           <>
             <span style={{ position: "absolute", top: 0, bottom: 0, left: `${hx}%`, width: 1, background: "var(--line-strong)", pointerEvents: "none" }} />
             <span style={{ position: "absolute", left: `${hx}%`, top: `${hy}%`, width: 9, height: 9, margin: "-5px 0 0 -5px", borderRadius: "50%", background: "var(--pink-700)", border: "2px solid var(--surface-card)", pointerEvents: "none" }} />
             <span style={{ position: "absolute", top: -6, left: `${hx}%`, transform: `translate(${hx > 70 ? "-100%" : hx < 30 ? "0" : "-50%"}, -100%)`, padding: "4px 8px", whiteSpace: "nowrap", background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: "var(--web-radius-sm)", boxShadow: "var(--shadow-raised)", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-title)", pointerEvents: "none" }}>
-              {fmtUSD(hp.value)} <span style={{ color: "var(--text-faint)" }}>· {fmtDate(hp.date)}</span>
+              {fmtUSD(hp.value)} <span style={{ color: "var(--text-faint)" }}>· {fmtDate(hp.date)}{hp.house ? ` · ${hp.house}` : ""}</span>
             </span>
           </>
         )}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-        <span style={label}>{fmtDate(pts[0].date)}</span>
-        <span style={label}>{fmtDate(pts[pts.length - 1].date)}</span>
+        <span style={label}>{fmtDate(domain[0])}</span>
+        <span style={label}>{fmtDate(domain[1])}</span>
       </div>
     </div>
   );
@@ -118,6 +146,7 @@ const pill = (on: boolean): React.CSSProperties => ({
 });
 const iconBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", height: 28, minWidth: 28, padding: 0, cursor: "pointer", background: "transparent", border: "none", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em" };
 const eyebrow: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.12em", color: "var(--text-faint)", textTransform: "uppercase" };
+const faint: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-faint)" };
 
 const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "var(--web-small)" }) => (
   <span style={{ fontFamily: "var(--font-data)", fontSize: size, fontWeight: 600, color: pct !== null && pct > 0 ? "var(--text-accent)" : "var(--text-muted)" }}>
@@ -130,6 +159,7 @@ const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "
 export default function StatsPage() {
   const [theme, setTheme] = useState<string>(() => (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   const [lang, setLang] = useState<"EN" | "JP">(() => (/^ja\b/i.test(navigator.language || "") ? "JP" : "EN"));
+  const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
   const [narrow, setNarrow] = useState(() => window.innerWidth < 700);
   const [phase, setPhase] = useState<"checking" | "password" | "loading" | "ready" | "error">("checking");
   const [pw, setPw] = useState("");
@@ -141,9 +171,17 @@ export default function StatsPage() {
   const [range, setRange] = useState(365);
   const [sort, setSort] = useState<SortKey>("value");
   const [selected, setSelected] = useState<string | null>(null);
+  const [allSales, setAllSales] = useState(false);
+
+  const setMode = (m: Mode) => {
+    setModeState(m);
+    try { localStorage.setItem(MODE_KEY, m); } catch (e) {}
+    D.trackEvent("stats_mode", { mode: m });
+  };
 
   useEffect(() => { document.title = "mew cards · stats"; D.trackEvent("stats_page_view"); }, []);
   useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
+  useEffect(() => { setAllSales(false); }, [selected, mode]);
   useEffect(() => {
     const on = () => setNarrow(window.innerWidth < 700);
     window.addEventListener("resize", on);
@@ -181,6 +219,7 @@ export default function StatsPage() {
   }, []);
 
   const name = (c: Any) => (lang === "JP" ? (c.nameJP || c.nameEN) : (c.nameEN || c.nameJP));
+  const today = todayISO();
 
   // One row per cert (the sheet can list the same card in more than one tab).
   const rows = useMemo(() => {
@@ -194,12 +233,20 @@ export default function StatsPage() {
     const charted: Any[] = [], failed: Any[] = [], pending: Any[] = [];
     byCert.forEach((card, cert) => {
       const r = hist.get(cert);
-      if (!r) pending.push({ card, cert });
-      else if (!r.history || !r.history.length) failed.push({ card, cert, error: r.error || "No history" });
-      else {
-        const pts = inRange(r.history as Pt[], range);
-        charted.push({ card, cert, r, pts, value: r.currentValue ?? r.history[r.history.length - 1].value, change: pctOf(pts) });
+      if (!r) { pending.push({ card, cert }); return; }
+      const series = seriesOf(r, mode);
+      if (!series.length) {
+        failed.push({ card, cert, error: r.error || (mode === "sales" ? "no PSA 10 sales on ALT" : "no value history") });
+        return;
       }
+      const last = series[series.length - 1];
+      const value = last.value;
+      const start = range ? shiftDate(today, range) : series[0].date;
+      const pts = series.filter((p) => p.date >= start);
+      const anchor = valueAt(series, start);
+      const base = anchor !== null ? anchor : pts.length > 1 ? pts[0].value : null;
+      const change = base && base > 0 ? ((value - base) / base) * 100 : null;
+      charted.push({ card, cert, r, series, pts, last, value, change, domain: [start, today] as [string, string] });
     });
     const cmp: Record<SortKey, (a: Any, b: Any) => number> = {
       value: (a, b) => b.value - a.value,
@@ -210,35 +257,35 @@ export default function StatsPage() {
     charted.sort(cmp[sort]);
     return { charted, failed, pending, noCert };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, hist, range, sort, lang]);
+  }, [cards, hist, range, sort, lang, mode, today]);
 
-  // Collection total over the range, from the cards whose history covers the whole range,
-  // so a card whose series starts mid-range can't show up as a jump in the total.
+  // Collection total: each card's value as of each day (its last sale, or ALT value), summed
+  // over every charted card. Before a card's first data point it counts at that first value,
+  // so cards don't appear as jumps and the line always ends at the headline total.
   const total = useMemo(() => {
-    const series = rows.charted.map((x: Any) => x.r.history as Pt[]);
-    if (!series.length) return { pts: [] as Pt[], used: 0, value: 0 };
-    const lastDate = series.reduce((m: string, h: Pt[]) => (h[h.length - 1].date > m ? h[h.length - 1].date : m), "");
-    const start = range ? shiftDate(lastDate, range) : series.reduce((m: string, h: Pt[]) => (h[0].date < m ? h[0].date : m), lastDate);
-    const used = series.filter((h: Pt[]) => h[0].date <= start);
-    const dates = new Set<string>();
-    used.forEach((h: Pt[]) => h.forEach((p) => { if (p.date >= start) dates.add(p.date); }));
+    const series = rows.charted.map((x: Any) => x.series as Pt[]);
+    const value = rows.charted.reduce((s: number, x: Any) => s + (x.value || 0), 0);
+    if (!series.length) return { pts: [] as Pt[], backfilled: 0, value, start: today };
+    const start = range ? shiftDate(today, range) : series.reduce((m: string, h: Pt[]) => (h[0].date < m ? h[0].date : m), today);
+    const dates = new Set<string>([start, today]);
+    series.forEach((h: Pt[]) => h.forEach((p) => { if (p.date > start && p.date <= today) dates.add(p.date); }));
     const sorted = [...dates].sort();
-    const idx = used.map(() => 0), last = used.map(() => NaN);
+    const idx = series.map(() => 0), lastV = series.map((h: Pt[]) => h[0].value);
     const pts = sorted.map((date) => {
       let sum = 0;
-      used.forEach((h: Pt[], k: number) => {
-        while (idx[k] < h.length && h[idx[k]].date <= date) { last[k] = h[idx[k]].value; idx[k]++; }
-        sum += isNaN(last[k]) ? 0 : last[k];
+      series.forEach((h: Pt[], k: number) => {
+        while (idx[k] < h.length && h[idx[k]].date <= date) { lastV[k] = h[idx[k]].value; idx[k]++; }
+        sum += lastV[k];
       });
       return { date, value: sum };
     });
-    const value = rows.charted.reduce((s: number, x: Any) => s + (x.value || 0), 0);
-    return { pts, used: used.length, value };
-  }, [rows, range]);
+    return { pts, backfilled: series.filter((h: Pt[]) => h[0].date > start).length, value, start };
+  }, [rows, range, today]);
 
   const sel = selected ? rows.charted.find((x: Any) => x.cert === selected) : null;
   const totalCerts = rows.charted.length + rows.failed.length + rows.pending.length;
   const loadedCerts = rows.charted.length + rows.failed.length;
+  const sales = mode === "sales";
 
   /* ---------- gate ---------- */
   if (phase !== "ready" && phase !== "error") {
@@ -262,7 +309,9 @@ export default function StatsPage() {
   const pad = narrow ? 16 : 32;
   const headTitle = sel ? name(sel.card) : "Collection at PSA 10";
   const headValue = sel ? sel.value : total.value;
-  const headPts = sel ? sel.pts : total.pts;
+  const headChange = sel ? sel.change : pctOf(total.pts);
+  const chartEmpty = sales ? "NO SALES IN THIS RANGE" : "NOT ENOUGH DATA";
+  const salesList: Pt[] = sel && sales ? [...sel.series].reverse() : [];
 
   return (
     <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
@@ -281,8 +330,14 @@ export default function StatsPage() {
           </div>
         </div>
         <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: narrow ? "var(--web-h2)" : "var(--web-h1)", lineHeight: "var(--web-leading-tight)", color: "var(--text-title)" }}>PSA 10 value</h1>
-        <div style={{ marginTop: 6, fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
-          ALT valuation · daily · USD{histDone ? "" : ` · loading ${loadedCerts}/${totalCerts}`}
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div role="group" aria-label="Price source" style={{ display: "flex", gap: 4 }}>
+            <button type="button" aria-pressed={sales} onClick={() => setMode("sales")} style={pill(sales)}>Sales</button>
+            <button type="button" aria-pressed={!sales} onClick={() => setMode("alt")} style={pill(!sales)}>ALT value</button>
+          </div>
+          <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
+            {sales ? "recorded PSA 10 sales" : "ALT's daily valuation"} · USD{histDone ? "" : ` · loading ${loadedCerts}/${totalCerts}`}
+          </span>
         </div>
 
         {phase === "error" && (
@@ -301,12 +356,18 @@ export default function StatsPage() {
                 <div style={{ marginTop: 4, fontFamily: "var(--font-body)", fontWeight: 600, fontSize: "var(--web-h3)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{headTitle}</div>
                 <div style={{ marginTop: 6, display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "var(--web-h1)", lineHeight: 1, color: "var(--text-title)" }}>{fmtUSD(headValue || 0)}</span>
-                  <Change pct={pctOf(headPts)} />
+                  <Change pct={headChange} />
                 </div>
-                <div style={{ marginTop: 6, fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-faint)" }}>
-                  {sel
-                    ? <>cert {sel.cert}{sel.r.grade && sel.r.grade !== "10.0" ? ` · grade ${sel.r.grade} series` : ""}{sel.r.assetId && <> · <a href={`https://alt.xyz/itm/${sel.r.assetId}/research`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-accent)" }}>ALT ↗</a></>}</>
-                    : `${rows.charted.length} cards · line and change use the ${total.used} with history back to ${total.pts.length ? fmtDate(total.pts[0].date) : "the range start"}`}
+                <div style={{ ...faint, marginTop: 6 }}>
+                  {sel ? (
+                    <>
+                      {sales ? `last sale ${fmtDate(sel.last.date)}${sel.last.house ? ` · ${sel.last.house}` : ""} · ${sel.series.length} sale${sel.series.length === 1 ? "" : "s"} · ` : ""}
+                      cert {sel.cert}{sel.r.grade && parseFloat(sel.r.grade) !== 10 ? ` · grade ${sel.r.grade}` : ""}
+                      {sel.r.assetId && <> · <a href={`https://alt.xyz/itm/${sel.r.assetId}/research`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-accent)" }}>ALT ↗</a></>}
+                    </>
+                  ) : (
+                    `${rows.charted.length} cards · ${sales ? "each counts at its latest sale" : "sum of ALT values"}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} count at their first ${sales ? "sale" : "value"} until then` : ""}`
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -316,8 +377,26 @@ export default function StatsPage() {
               </div>
             </div>
             <div style={{ marginTop: 20 }}>
-              <LineChart pts={headPts} height={narrow ? 180 : 260} />
+              {sel
+                ? <LineChart pts={sel.pts} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={chartEmpty} />
+                : <LineChart pts={total.pts} domain={[total.start, today]} height={narrow ? 180 : 260} step={sales} empty={chartEmpty} />}
             </div>
+            {salesList.length > 0 && (
+              <div style={{ marginTop: 18, borderTop: "1px solid var(--line-hairline)", paddingTop: 10 }}>
+                {(allSales ? salesList : salesList.slice(0, 10)).map((s, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: narrow ? "92px 1fr auto" : "120px 110px 1fr", gap: 12, padding: "5px 0", borderBottom: "1px solid var(--line-hairline)", fontFamily: "var(--font-data)", fontSize: "var(--web-small)" }}>
+                    <span style={{ color: "var(--text-muted)" }}>{fmtDate(s.date)}</span>
+                    <span style={{ color: "var(--text-title)", fontWeight: 600, textAlign: narrow ? "right" : "left", order: narrow ? 3 : 0 }}>{fmtUSD(s.value)}</span>
+                    <span style={{ color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.house || ""}</span>
+                  </div>
+                ))}
+                {salesList.length > 10 && (
+                  <button type="button" onClick={() => setAllSales(!allSales)} style={{ ...eyebrow, marginTop: 10, cursor: "pointer", background: "none", border: "none", padding: 0, color: "var(--pink-700)" }}>
+                    {allSales ? "Show fewer" : `Show all ${salesList.length} sales`}
+                  </button>
+                )}
+              </div>
+            )}
           </section>
         )}
 
@@ -344,11 +423,12 @@ export default function StatsPage() {
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || ""].filter(Boolean).join(" · ")}</span>
                       </span>
                     </span>
-                    <Sparkline pts={x.pts} />
+                    <Sparkline pts={x.pts} domain={x.domain} dots={sales} />
                     <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)" }}>{fmtUSD(x.value)}</span>
                       <Change pct={x.change} size="var(--web-label)" />
                     </span>
+                    {sales && <span style={{ ...faint, marginTop: -4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>last sale {fmtDate(x.last.date)}</span>}
                   </button>
                 );
               })}
@@ -366,6 +446,8 @@ export default function StatsPage() {
               const anyCertCol = tabs.some((t) => sheets[t].certColumn);
               const errs = diag ? Object.entries((diag.errors as string[]).reduce((m: Any, e) => { m[e] = (m[e] || 0) + 1; return m; }, {})) : [];
               const netErr = diag && (diag.errors as string[]).some((e) => e.startsWith("network error"));
+              const withSales = [...hist.values()].filter((r: Any) => r && Array.isArray(r.sales) && r.sales.length).length;
+              const withHist = [...hist.values()].filter((r: Any) => r && Array.isArray(r.history) && r.history.length).length;
               const line: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", lineHeight: 1.6, color: "var(--text-body)", overflowWrap: "anywhere" };
               const hint: React.CSSProperties = { ...line, color: "var(--text-accent)" };
               return (
@@ -380,13 +462,14 @@ export default function StatsPage() {
                           {t}: {s.missing ? "tab not returned by the sheet script"
                             : !s.headers.length ? "tab is empty"
                             : s.certColumn ? `"All Cert" column found · ${s.withCert} of ${s.rows} rows have a cert`
-                            : `no "All Cert" column · columns are ${s.headers.join(", ") || "none"}`}
+                            : `no "All Cert" column · columns are ${s.headers.join(", ")}`}
                         </div>
                       );
                     })}
                     <div style={line}>Certs to look up · {totalCerts}</div>
                     {diag && <div style={line}>ALT API · {diag.requests} requests, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
+                    {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
                     {!anyCertCol && tabs.length > 0 && <div style={hint}>The page looks for a column named "All Cert" (or "Cert", "Certs", "Cert Number") in the {tabs.join(", ")} tabs.</div>}
                     {netErr && <div style={hint}>The browser couldn't reach the API. If it works from elsewhere, the Worker may be refusing requests from this site (CORS or an origin allowlist).</div>}
                   </div>
@@ -401,13 +484,13 @@ export default function StatsPage() {
                   {rows.failed.map((x: Any) => (
                     <div key={x.cert} style={{ display: "flex", gap: 12, fontSize: "var(--web-small)" }}>
                       <span style={{ color: "var(--text-title)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                      <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-faint)" }}>cert {x.cert} · {x.error}</span>
+                      <span style={faint}>cert {x.cert} · {x.error}</span>
                     </div>
                   ))}
                   {rows.noCert.map((c: Any) => (
                     <div key={c.id} style={{ display: "flex", gap: 12, fontSize: "var(--web-small)" }}>
                       <span style={{ color: "var(--text-title)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(c)}</span>
-                      <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--text-faint)" }}>no cert in sheet</span>
+                      <span style={faint}>no cert in sheet</span>
                     </div>
                   ))}
                 </div>
@@ -415,7 +498,9 @@ export default function StatsPage() {
             )}
 
             <p style={{ marginTop: 32, maxWidth: "62ch", fontSize: "var(--web-small)", lineHeight: "var(--web-leading)", color: "var(--text-muted)" }}>
-              Values are ALT's modelled valuation for each card at PSA 10, not individual sales. ALT keeps about 13 months of daily history, and the last few days often repeat while ALT carries its latest value forward.
+              {sales
+                ? "Sales are PSA 10 sales recorded by ALT. A card's value is its most recent sale, and the total adds up each card's latest sale as of each day. Rarer cards can go months between sales, so their value can lag the market."
+                : "ALT value is ALT's modelled valuation for each card at PSA 10, not individual sales. ALT keeps about 13 months of daily history, and the last few days often repeat while ALT carries its latest value forward."}
             </p>
           </>
         )}

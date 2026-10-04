@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "23.8";
+export const APP_VERSION = "23.9";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -359,7 +359,7 @@ async function altBatches(certs, extra, label, results, diag, onBatch) {
 const isPsa10 = (r) => String(r.grader || "").toUpperCase() === "PSA" && parseFloat(r.grade) === 10;
 
 /**
- * PSA 10 history for each cert, 20 per request (the API's limit), one request at a time.
+ * PSA 10 value series and sales for each cert, 20 per request (the API's limit), one request at a time.
  * First pass asks for each cert's own series, exactly as the API is used elsewhere. Certs whose
  * own series isn't PSA 10 are asked again with grade=10&grader=PSA; if that override fails, the
  * cert keeps its own grade's series. Call-budget errors are retried up to twice.
@@ -369,12 +369,13 @@ export async function fetchAltHistories(certs, onBatch) {
   const unique = [...new Set(certs.filter(Boolean))];
   const results = new Map();
   const diag = { requests: 0, ok: 0, errors: [] };
-  const left = await altBatches(unique, "", "", results, diag, onBatch);
+  // sales=1: the same upstream call also returns ALT's recorded sales (newest first).
+  const left = await altBatches(unique, "&sales=1", "", results, diag, onBatch);
   left.forEach((c) => results.set(c, { cert: c, history: null, error: "Couldn't load, try again later" }));
   const notTen = unique.filter((c) => { const r = results.get(c); return r && r.history && r.history.length && !isPsa10(r); });
   if (notTen.length) {
     const ten = new Map();
-    await altBatches(notTen, "&grade=10&grader=PSA", "PSA 10 override: ", ten, diag, null);
+    await altBatches(notTen, "&sales=1&grade=10&grader=PSA", "PSA 10 override: ", ten, diag, null);
     ten.forEach((r, c) => { if (r.history && r.history.length) results.set(c, r); });
   }
   if (onBatch) onBatch(new Map(results), diag);
