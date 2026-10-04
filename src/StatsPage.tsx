@@ -487,7 +487,7 @@ export default function StatsPage() {
             ))}
           </div>
           <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
-            {list === "personal" ? (sales ? "recorded sales at the grade you own" : "ALT's daily valuation at the grade you own") : (sales ? "recorded PSA 10 sales" : "ALT's daily valuation")} · USD{!histDone ? ` · loading ${loadedCerts}/${totalCerts}` : list === "personal" && !histPDone ? " · loading your grades" : ""}
+            {!histDone ? `loading ${loadedCerts}/${totalCerts}` : list === "personal" && !histPDone ? "loading your grades" : ""}
           </span>
         </div>
 
@@ -517,7 +517,7 @@ export default function StatsPage() {
                       {sel.r.assetId && <> · <a href={`https://alt.xyz/itm/${sel.r.assetId}/research`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-accent)" }}>ALT ↗</a></>}
                     </>
                   ) : (
-                    `${rows.charted.length} card${rows.charted.length === 1 ? "" : "s"} · ${sales ? "each counts at its latest sale" : "sum of ALT values"}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} ${total.backfilled === 1 ? "counts at its" : "count at their"} first ${sales ? "sale" : "value"} until then` : ""}`
+                    `${rows.charted.length} card${rows.charted.length === 1 ? "" : "s"}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} ${total.backfilled === 1 ? "counts at its" : "count at their"} first ${sales ? "sale" : "value"} until then` : ""}`
                   )}
                 </div>
               </div>
