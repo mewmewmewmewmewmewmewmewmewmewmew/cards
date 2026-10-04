@@ -20,6 +20,19 @@ const SORTS = ["value", "change", "name", "release"] as const;
 type SortKey = typeof SORTS[number];
 const MODE_KEY = "mew_stats_mode";
 
+// Per-browser display preferences (like the Alerts board's tab/sort): range, sort, scope.
+function readPref<T>(key: string, fallback: T, ok: (v: Any) => boolean): T {
+  try { const v = JSON.parse(localStorage.getItem(key) || "null"); return v !== null && ok(v) ? v : fallback; } catch (e) { return fallback; }
+}
+function savePref(key: string, v: Any) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+
+const EyeOff: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 3l18 18" /><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+    <path d="M9.4 5.2A9.6 9.6 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.4-2.3 3.6M6.2 6.6C4.3 7.9 3 9.8 2.5 12c1 2.8 4.5 7 9.5 7 1.7 0 3.2-.5 4.5-1.2" />
+  </svg>
+);
+
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtUSD = (v: number) => (v < 100 ? usd2 : usd0).format(v);
@@ -169,12 +182,45 @@ export default function StatsPage() {
   const [histDone, setHistDone] = useState(false);
   const [diag, setDiag] = useState<Any>(null);
   const [sheets, setSheets] = useState<Any>({});
-  const [range, setRange] = useState(365);
-  const [sort, setSort] = useState<SortKey>("value");
+  const [range, setRange] = useState<number>(() => readPref("mew_stats_range", 365, (v) => RANGES.some((r) => r[1] === v)));
+  const [sort, setSort] = useState<SortKey>(() => readPref("mew_stats_sort", "value" as SortKey, (v) => (SORTS as readonly string[]).includes(v)));
   const [selected, setSelected] = useState<string | null>(null);
   const [allSales, setAllSales] = useState(false);
   // Same scopes and defaults as the catalog: Japanese Mew on, Cameo and Intl (Unique tab) off.
-  const [scope, setScope] = useState({ mew: true, cameo: false, intl: false });
+  const [scope, setScope] = useState(() => readPref("mew_stats_scope", { mew: true, cameo: false, intl: false }, (v) => !!v && ["mew", "cameo", "intl"].every((k) => typeof v[k] === "boolean")));
+  useEffect(() => { savePref("mew_stats_range", range); }, [range]);
+  useEffect(() => { savePref("mew_stats_sort", sort); }, [sort]);
+  useEffect(() => { savePref("mew_stats_scope", scope); }, [scope]);
+
+  // Hidden cards: saved in the sheet's "Hidden" tab (shared across devices), left out of the
+  // grid and totals. null = the deployed Apps Script doesn't support hiding yet.
+  const [hiddenSet, setHiddenSet] = useState<Set<string> | null>(null);
+  const [saveErr, setSaveErr] = useState("");
+  const pwRef = useRef("");
+  const toggleHidden = async (cert: string, label: string, hide: boolean) => {
+    if (!hiddenSet) return;
+    let password = pwRef.current;
+    if (!password) {
+      const p = window.prompt("Site password, to save hidden cards:");
+      if (!p) return;
+      password = p;
+    }
+    // Optimistic: flip just this cert now, and only undo this cert if the save fails, so quick
+    // successive changes can't overwrite each other.
+    const flip = (on: boolean) => setHiddenSet((cur) => { const n = new Set(cur || []); if (on) n.add(cert); else n.delete(cert); return n; });
+    flip(hide);
+    setSaveErr("");
+    if (hide && selected === cert) setSelected(null);
+    try {
+      await D.setCardHidden(password, cert, hide, label);
+      pwRef.current = password;
+      D.trackEvent("stats_hide", { hide });
+    } catch (e: Any) {
+      flip(!hide);
+      if (e && e.message === "auth") { pwRef.current = ""; setSaveErr("Wrong password, so that change wasn't saved."); }
+      else setSaveErr(`Couldn't save that change: ${(e && e.message) || "error"}`);
+    }
+  };
   const toggleScope = (k: "mew" | "cameo" | "intl") => {
     D.trackEvent("filter_toggle", { filter: k, active: !scope[k], page: "stats" });
     setScope({ ...scope, [k]: !scope[k] });
@@ -199,8 +245,10 @@ export default function StatsPage() {
     setPhase("loading");
     try {
       const all = await D.fetchAllSheets(password);
+      pwRef.current = password;
       setCards(all);
       setSheets({ ...D.sheetDiag });
+      setHiddenSet(D.sheetExtras.hidden ? new Set(D.sheetExtras.hidden) : null);
       setPhase("ready");
       const certs = all.map((c: Any) => D.certOf(c)).filter(Boolean) as string[];
       setDiag({ requests: 0, ok: 0, errors: [] });
@@ -241,10 +289,15 @@ export default function StatsPage() {
       if (!prev) byCert.set(cert, { ...c });
       else { if (c.isMew) prev.isMew = true; if (c.isCameo) prev.isCameo = true; if (c.isIntl) prev.isIntl = true; }
     }
-    const charted: Any[] = [], failed: Any[] = [], pending: Any[] = [];
+    const charted: Any[] = [], failed: Any[] = [], pending: Any[] = [], hiddenRows: Any[] = [];
     byCert.forEach((card, cert) => {
       if (!inScope(card)) return;
       const r = hist.get(cert);
+      if (hiddenSet && hiddenSet.has(cert)) {
+        const s = r ? seriesOf(r, mode) : [];
+        hiddenRows.push({ card, cert, value: s.length ? s[s.length - 1].value : null });
+        return;
+      }
       if (!r) { pending.push({ card, cert }); return; }
       const series = seriesOf(r, mode);
       if (!series.length) {
@@ -267,9 +320,10 @@ export default function StatsPage() {
       release: (a, b) => D.releaseTs(a.card) - D.releaseTs(b.card),
     };
     charted.sort(cmp[sort]);
-    return { charted, failed, pending, noCert };
+    hiddenRows.sort(cmp.name);
+    return { charted, failed, pending, noCert, hidden: hiddenRows };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, hist, range, sort, lang, mode, today, scope]);
+  }, [cards, hist, range, sort, lang, mode, today, scope, hiddenSet]);
 
   // Collection total: each card's value as of each day (its last sale, or ALT value), summed
   // over every charted card. Before a card's first data point it counts at that first value,
@@ -433,13 +487,15 @@ export default function StatsPage() {
               ))}
               <span style={{ marginLeft: "auto", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>{rows.charted.length} cards</span>
             </div>
+            {saveErr && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>{saveErr}</div>}
             <div style={{ marginTop: 16, display: "grid", gap: narrow ? 10 : 14, gridTemplateColumns: `repeat(auto-fill, minmax(${narrow ? 150 : 220}px, 1fr))` }}>
               {rows.charted.map((x: Any) => {
                 const on = x.cert === selected;
                 return (
-                  <button key={x.cert} type="button" onClick={() => { setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, textAlign: "left", cursor: "pointer", minWidth: 0, background: on ? "var(--surface-tint)" : "var(--surface-card)", border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, borderRadius: "var(--web-radius)", transition: "border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)" }}>
-                    <span style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
+                  <div key={x.cert} style={{ position: "relative", minWidth: 0 }}>
+                  <button type="button" onClick={() => { setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8, padding: 10, textAlign: "left", cursor: "pointer", minWidth: 0, background: on ? "var(--surface-tint)" : "var(--surface-card)", border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, borderRadius: "var(--web-radius)", transition: "border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)" }}>
+                    <span style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, paddingRight: hiddenSet ? 20 : 0 }}>
                       <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
@@ -453,6 +509,13 @@ export default function StatsPage() {
                     </span>
                     {sales && <span style={{ ...faint, marginTop: -4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>last sale {fmtDate(x.last.date)}</span>}
                   </button>
+                  {hiddenSet && (
+                    <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), true)} aria-label={`Hide ${name(x.card)} from totals`} title="Hide from totals" data-hover-pink="1"
+                      style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, border: "none", background: "transparent", cursor: "pointer" }}>
+                      <EyeOff />
+                    </button>
+                  )}
+                  </div>
                 );
               })}
               {histDone && rows.charted.length === 0 && (
@@ -470,6 +533,22 @@ export default function StatsPage() {
                 </div>
               ))}
             </div>
+
+            {hiddenSet && rows.hidden.length > 0 && (
+              <details style={{ marginTop: 32, borderTop: "1px solid var(--line-hairline)", paddingTop: 14 }}>
+                <summary style={{ ...eyebrow, cursor: "pointer" }}>Hidden · {rows.hidden.length} · left out of the total</summary>
+                <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                  {rows.hidden.map((x: Any) => (
+                    <div key={x.cert} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "var(--web-small)" }}>
+                      <span style={{ flex: "0 0 auto", width: 22, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%", opacity: 0.6 }} />
+                      <span style={{ color: "var(--text-body)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
+                      <span style={faint}>{[x.card.number, x.value !== null ? fmtUSD(x.value) : null].filter(Boolean).join(" · ")}</span>
+                      <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), false)} style={{ ...eyebrow, cursor: "pointer", background: "none", border: "none", padding: "4px 0", color: "var(--pink-700)" }}>Unhide</button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
 
             {histDone && (() => {
               // Opens by itself only when no cert has data in this mode at all (not because of the scope toggles).
@@ -500,6 +579,8 @@ export default function StatsPage() {
                       );
                     })}
                     <div style={line}>Certs to look up · {totalCerts}</div>
+                    {hiddenSet ? <div style={line}>Hidden · {hiddenSet.size} (saved in the sheet's Hidden tab)</div>
+                      : <div style={hint}>Hiding cards needs the updated Apps Script: the sheet response has no hidden list yet.</div>}
                     {diag && <div style={line}>ALT API · {diag.requests} request{diag.requests === 1 ? "" : "s"}, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}

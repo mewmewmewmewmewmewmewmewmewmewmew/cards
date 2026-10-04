@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "24.3";
+export const APP_VERSION = "24.4";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -222,6 +222,11 @@ export function applyFilters(cards, f) {
 
 /** Per-tab parse info from the last fetchAllSheets call (used by /stats "Data check"). */
 export const sheetDiag = {};
+/**
+ * Extra data from the last getAll response. hidden is the list of certs hidden on /stats
+ * (the sheet's "Hidden" tab), or null when the deployed Apps Script doesn't support it yet.
+ */
+export const sheetExtras = { hidden: null };
 function noteSheet(name, cards) {
   sheetDiag[name] = { headers: cards.headers || [], certColumn: !!cards.certColumn, rows: cards.length, withCert: cards.filter((c) => c.certs).length };
   return cards;
@@ -234,6 +239,7 @@ export async function fetchConfig() {
 
 /** Returns merged cards, or throws Error("auth") on a bad password. */
 export async function fetchAllSheets(password) {
+  sheetExtras.hidden = null;
   const sources = [
     { name: TAB_MAPPINGS.mew, flag: "isMew" },
     { name: TAB_MAPPINGS.cameo, flag: "isCameo" },
@@ -245,6 +251,7 @@ export async function fetchAllSheets(password) {
     const text = await (await fetch(url)).text();
     if (text.startsWith("Error: Authentication Failed")) throw new Error("auth");
     const json = JSON.parse(text);
+    sheetExtras.hidden = json && Array.isArray(json.hidden) ? json.hidden.map((c) => String(c).trim()).filter(Boolean) : null;
     if (json && json.sheets) {
       const groups = sources
         .map((s) => { if (!(s.name in json.sheets)) sheetDiag[s.name] = { missing: true }; return { cards: noteSheet(s.name, parseCSV(json.sheets[s.name] || "")), flag: s.flag }; })
@@ -389,4 +396,20 @@ export async function fetchAltHistories(certs, onBatch) {
   left.forEach((c) => { if (!results.has(c)) results.set(c, checkResult({ cert: c, history: null, sales: [], error: "Couldn't load, try again later" })); });
   if (onBatch) onBatch(new Map(results), diag);
   return results;
+}
+
+/**
+ * Hide or unhide a cert on /stats. Saved in the sheet's "Hidden" tab by the Apps Script
+ * (action=setHidden), which always requires the site password for writes.
+ * Resolves to the full hidden list after the change; throws Error("auth") on a wrong password.
+ */
+export async function setCardHidden(password, cert, hide, name) {
+  const url = `${APPS_SCRIPT_URL}?action=setHidden&cert=${encodeURIComponent(cert)}&hidden=${hide ? 1 : 0}` +
+    `&name=${encodeURIComponent(name || "")}&password=${encodeURIComponent(password || "")}`;
+  const text = await (await fetch(url)).text();
+  if (text.startsWith("Error: Authentication Failed")) throw new Error("auth");
+  let json = null;
+  try { json = JSON.parse(text); } catch (e) { throw new Error(text.slice(0, 120) || "save failed"); }
+  if (!json || !Array.isArray(json.hidden)) throw new Error("save failed");
+  return json.hidden.map((c) => String(c).trim()).filter(Boolean);
 }

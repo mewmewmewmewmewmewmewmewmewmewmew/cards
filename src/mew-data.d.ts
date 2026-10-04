@@ -22,3 +22,5 @@ export const ALT_BASE: string;
 export function certOf(card: any): string | null;
 export function fetchAltHistories(certs: string[], onBatch?: (results: Map<string, any>, diag: { requests: number; ok: number; errors: string[] }) => void): Promise<Map<string, any>>;
 export const sheetDiag: Record<string, any>;
+export const sheetExtras: { hidden: string[] | null };
+export function setCardHidden(password: string, cert: string, hide: boolean, name?: string): Promise<string[]>;
