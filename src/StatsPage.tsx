@@ -499,9 +499,7 @@ export default function StatsPage() {
         {phase === "ready" && (
           <section style={{ marginTop: narrow ? 20 : 28, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ minWidth: 0, flex: "1 1 260px", display: "flex", alignItems: "flex-start", gap: narrow ? 12 : 16 }}>
-                {sel && <span style={{ flex: "0 0 auto", width: narrow ? 64 : 96, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: sel.card.image ? `url("${sel.card.image}")` : "none", backgroundSize: "100% 100%", boxShadow: "var(--shadow-raised)" }} />}
-                <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ minWidth: 0, flex: "1 1 260px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={eyebrow}>{sel ? `${sel.card.number || ""} ${sel.card.set || ""}`.trim() || "Card" : "Total"}</span>
                   {sel && <button type="button" onClick={() => setSelected(null)} style={{ ...eyebrow, cursor: "pointer", background: "none", border: "none", padding: 0, color: "var(--pink-700)" }}>× Back to total</button>}
@@ -522,7 +520,6 @@ export default function StatsPage() {
                     `${rows.charted.length} card${rows.charted.length === 1 ? "" : "s"}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} ${total.backfilled === 1 ? "counts at its" : "count at their"} first ${sales ? "sale" : "value"} until then` : ""}`
                   )}
                 </div>
-                </div>
               </div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {RANGES.map(([label, d]) => (
@@ -532,7 +529,14 @@ export default function StatsPage() {
             </div>
             <div style={{ marginTop: 20 }}>
               {sel
-                ? <LineChart pts={sel.pts} lead={sel.lead} tail={sel.tail} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={chartEmpty} />
+                ? (
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: narrow ? 12 : 24 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <LineChart pts={sel.pts} lead={sel.lead} tail={sel.tail} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={chartEmpty} />
+                    </div>
+                    <span style={{ flex: "0 0 auto", height: narrow ? 180 : 260, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: sel.card.image ? `url("${sel.card.image}")` : "none", backgroundSize: "100% 100%", boxShadow: "var(--shadow-raised)" }} />
+                  </div>
+                )
                 : <LineChart pts={total.pts} domain={[total.start, today]} height={narrow ? 180 : 260} step={sales} empty={chartEmpty} />}
             </div>
             {salesList.length > 0 && (
