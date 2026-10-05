@@ -124,9 +124,45 @@ const C = {
 };
 const mono: React.CSSProperties = { fontFamily: "var(--font-data)", letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11 };
 
-const Img: React.FC<{ src?: string; w: number; glow?: string; tilt?: number; style?: React.CSSProperties }> = ({ src, w, glow, tilt = 0, style }) => (
-  <span style={{ flex: "0 0 auto", display: "block", width: w, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "#241a1f", backgroundImage: src ? `url("${src}")` : "none", backgroundSize: "100% 100%", transform: tilt ? `rotate(${tilt}deg)` : undefined, boxShadow: glow ? `0 0 0 1px rgba(255,255,255,0.08), 0 18px 50px -10px ${glow}` : "0 0 0 1px rgba(255,255,255,0.08)", ...style }} />
+/**
+ * A card image. Drawn as an <img> (the image export handles those far better than CSS
+ * backgrounds, Safari especially), with the glow as a soft gradient behind it rather than a
+ * blurred shadow, which exports cleanly.
+ */
+const Img: React.FC<{ src?: string; w: number; glow?: string }> = ({ src, w, glow }) => (
+  <span style={{ flex: "0 0 auto", position: "relative", display: "block", width: w, aspectRatio: "63 / 88" }}>
+    {glow && <span aria-hidden="true" style={{ position: "absolute", left: "-45%", right: "-45%", top: "-25%", bottom: "-35%", background: `radial-gradient(closest-side, ${glow}, transparent)`, pointerEvents: "none" }} />}
+    {src
+      ? <img src={src} alt="" draggable={false} style={{ position: "relative", display: "block", width: "100%", height: "100%", objectFit: "fill", borderRadius: "4.72% / 3.37%", background: "#241a1f", boxShadow: "0 0 0 1px rgba(255,255,255,0.08)" }} />
+      : <span style={{ position: "relative", display: "block", width: "100%", height: "100%", borderRadius: "4.72% / 3.37%", background: "#241a1f", boxShadow: "0 0 0 1px rgba(255,255,255,0.08)" }} />}
+  </span>
 );
+
+/**
+ * Card images as data URLs, so the export never has to fetch them (that's where they went
+ * missing). Tries the image host directly, then a CORS-friendly image proxy (wsrv.nl).
+ */
+const dataUrls = new Map<string, Promise<string | null>>();
+const blobToDataUrl = (b: Blob) => new Promise<string>((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = bad; r.readAsDataURL(b); });
+function toDataUrl(url: string): Promise<string | null> {
+  if (!/^https?:/i.test(url)) return Promise.resolve(null);
+  let p = dataUrls.get(url);
+  if (!p) {
+    const get = async (u: string) => {
+      const res = await fetch(u, { mode: "cors" });
+      if (!res.ok) throw new Error(String(res.status));
+      const b = await res.blob();
+      if (!/^image\//.test(b.type)) throw new Error("not an image");
+      return blobToDataUrl(b);
+    };
+    p = get(url)
+      .catch(() => get(`https://wsrv.nl/?url=${encodeURIComponent(url)}&w=600&output=jpg&q=90`))
+      .catch(() => null);
+    dataUrls.set(url, p);
+  }
+  return p;
+}
+const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
 
 const Tile: React.FC<{ label: string; children: React.ReactNode; delay?: number; style?: React.CSSProperties; tag?: string }> = ({ label, children, delay = 0, style, tag }) => (
   <div className="wk-in" data-tile={tag} style={{ animationDelay: `${delay}ms`, padding: 18, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, minWidth: 0, minHeight: 0, overflow: "hidden", ...style }}>
@@ -230,6 +266,24 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const week = useMemo(() => summarize(entries, start, end, mode), [entries, start, end, mode]);
   const prevWeek = useMemo(() => summarize(entries, addDays(start, -7), addDays(end, -7), mode), [entries, start, end, mode]);
 
+  // Load the poster's card images as data URLs (see toDataUrl).
+  const [imgData, setImgData] = useState<Record<string, string>>({});
+  const imgsReady = useRef<Promise<unknown>>(Promise.resolve());
+  useEffect(() => {
+    const urls = new Set<string>();
+    [...week.up.slice(0, 8), ...week.down.slice(0, 8)].forEach((m) => m.card.image && urls.add(m.card.image));
+    if (week.biggest && week.biggest.card.image) urls.add(week.biggest.card.image);
+    if (week.busiest && week.busiest.card.image) urls.add(week.busiest.card.image);
+    const todo = [...urls].filter((u) => !imgData[u]);
+    if (!todo.length) return;
+    let live = true;
+    imgsReady.current = Promise.all(todo.map((u) => toDataUrl(u).then((d) => {
+      if (d && live) setImgData((cur) => (cur[u] ? cur : { ...cur, [u]: d }));
+    })));
+    return () => { live = false; };
+  }, [week]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pic = (u?: string) => (u && imgData[u]) || u;
+
   // Phones save through the share sheet ("Save Image" puts it in Photos). Safari only allows
   // the share sheet straight from a tap, so the image is prepared ahead of time.
   const shareFiles = useMemo(() => {
@@ -313,10 +367,13 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const makeBlob = async () => {
     const node = shotRef.current;
     if (!node) throw new Error("no poster");
+    await imgsReady.current; // card images loaded as data URLs
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
     node.classList.add("wk-shot");
     try {
-      const opts = { pixelRatio: 2, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506" };
-      await toBlob(node, opts); // first pass warms up fonts and images (Safari often drops them otherwise)
+      const opts = { pixelRatio: 2, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506", imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" };
+      // Warm-up passes: Safari often leaves images and fonts out of the first renders.
+      for (let i = 0; i < (isSafari ? 3 : 1); i++) await toBlob(node, opts);
       const b = await toBlob(node, opts);
       if (!b) throw new Error("no image");
       return b;
@@ -420,7 +477,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number }> = ({ m, i, up, delay }) => (
     <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: "10px 0", borderTop: i ? `1px solid ${C.line}` : "none" }}>
       <span style={{ ...mono, color: C.faint }}>{i + (up && hero ? 2 : 1)}</span>
-      <Img src={m.card.image} w={34} />
+      <Img src={pic(m.card.image)} w={34} />
       <span style={{ minWidth: 0 }}>
         <span style={{ display: "block", fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(m.card)}</span>
         <span style={{ display: "block", marginTop: 5, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
@@ -434,7 +491,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const Highlight: React.FC<{ label: string; img?: string; title: string; sub: string; line: string; delay: number }> = ({ label, img, title, sub, line, delay }) => (
     <Tile label={label} delay={delay}>
       <div style={{ display: "flex", gap: 16, alignItems: "center", marginTop: 12 }}>
-        <Img src={img} w={58} glow="rgba(196,155,255,0.35)" />
+        <Img src={pic(img)} w={58} glow="rgba(196,155,255,0.35)" />
         <div style={{ minWidth: 0 }}>
           <div style={{ ...big, fontSize: 32 }}>{title}</div>
           <div style={{ marginTop: 6, fontWeight: 600, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>
@@ -490,7 +547,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const heroTile = hero && (story ? (
     <Tile label="Top climber" delay={260} style={{ position: "relative", overflow: "hidden", background: heroBg }}>
       <div style={{ display: "flex", alignItems: "center", gap: 36, marginTop: 14, padding: "0 12px" }}>
-        <span className="wk-float" style={{ display: "block" }}><Img src={hero.card.image} w={170} glow={C.upGlow} /></span>
+        <span className="wk-float" style={{ display: "block" }}><Img src={pic(hero.card.image)} w={170} glow={C.upGlow} /></span>
         <div style={{ minWidth: 0 }}>
           <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
           <div style={{ marginTop: 16, fontWeight: 600, fontSize: 24, lineHeight: 1.25 }}>{name(hero.card)}</div>
@@ -501,7 +558,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   ) : (
     <Tile label="Top climber" tag="hero" delay={260} style={{ position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", background: heroBg }}>
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 14 }}>
-        <span className="wk-float" style={{ display: "block" }}><Img src={hero.card.image} w={heroW} glow={C.upGlow} /></span>
+        <span className="wk-float" style={{ display: "block" }}><Img src={pic(hero.card.image)} w={heroW} glow={C.upGlow} /></span>
         <div data-hero-text="1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, maxWidth: "100%" }}>
           <div style={{ ...big, fontSize: tall ? 60 : 54, color: C.up, textShadow: `0 0 24px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
           <div style={{ maxWidth: "100%" }}>
