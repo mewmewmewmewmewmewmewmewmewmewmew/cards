@@ -164,9 +164,9 @@ function toDataUrl(url: string): Promise<string | null> {
 }
 const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
 
-const Tile: React.FC<{ label: string; children: React.ReactNode; delay?: number; style?: React.CSSProperties; tag?: string }> = ({ label, children, delay = 0, style, tag }) => (
+const Tile: React.FC<{ label: string; children: React.ReactNode; delay?: number; style?: React.CSSProperties; tag?: string; labelRight?: boolean }> = ({ label, children, delay = 0, style, tag, labelRight }) => (
   <div className="wk-in" data-tile={tag} style={{ animationDelay: `${delay}ms`, padding: 18, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, minWidth: 0, minHeight: 0, overflow: "hidden", ...style }}>
-    <div data-label="1" style={{ ...mono, color: C.faint }}>{label}</div>
+    <div data-label="1" style={{ ...mono, color: C.faint, textAlign: labelRight ? "right" : undefined }}>{label}</div>
     {children}
   </div>
 );
@@ -344,13 +344,12 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     const list = box.querySelector<HTMLElement>("[data-tile=list]");
     if (sr && top && slot && list) {
       const t = top.offsetTop + top.offsetHeight - 1;
-      const bottom = box.offsetTop + slot.offsetTop + slot.offsetHeight + 4;
+      // Left-aligned like the rest of the box's content, reaching about halfway into the slot.
+      const bottom = box.offsetTop + slot.offsetTop + slot.offsetHeight / 2;
       const w = list.offsetWidth;
-      const regionTop = top.offsetTop + 40, regionBottom = bottom - 18;
-      let imgW = Math.floor(Math.min(w - 70, ((regionBottom - regionTop) * 63) / 88));
-      imgW = Math.max(60, imgW);
-      const imgH = (imgW * 88) / 63;
-      nextExt = { top: t, w, h: Math.max(0, bottom - t), imgX: Math.round((w - imgW) / 2), imgY: Math.round(regionTop + (regionBottom - regionTop - imgH) / 2), imgW };
+      const regionTop = top.offsetTop + 44, regionBottom = bottom;
+      const imgW = Math.max(60, Math.floor(Math.min(w - 120, ((regionBottom - regionTop) * 63) / 88)));
+      nextExt = { top: t, w, h: Math.max(0, bottom - t), imgX: 30, imgY: Math.round(regionTop), imgW };
     }
     const same = (a: typeof ext, b: typeof ext) => (!a && !b) || (!!a && !!b && a.top === b.top && a.w === b.w && a.h === b.h && a.imgW === b.imgW && a.imgY === b.imgY);
     if (!same(ext, nextExt)) setExt(nextExt);
@@ -620,9 +619,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // over the climbers list's empty #1 slot (the boxes themselves stay as they are).
   const heroTile = hero && (story ? (
     <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", height: 230, boxSizing: "border-box", background: heroBg }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, height: "calc(100% - 14px)" }}>
-        <span />
-        <div style={{ minWidth: 0, alignSelf: "center", paddingLeft: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", height: "calc(100% - 14px)", paddingLeft: ext ? ext.imgX + ext.imgW + 40 - 18 : 220 }}>
+        <div style={{ minWidth: 0 }}>
           <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
           <div style={{ marginTop: 16, fontWeight: 600, fontSize: 24, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name(hero.card)}</div>
           <div style={{ marginTop: 6, fontFamily: "var(--font-data)", fontSize: 16, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
@@ -644,7 +642,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     </Tile>
   ));
   const climbersTile = (
-    <Tile label="Climbers" tag="list" delay={320}>
+    <Tile label="Climbers" tag="list" delay={320} labelRight={story && !!hero}>
       <div style={{ marginTop: 8 }}>
         {climbers.length ? climbers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up delay={380 + i * 60} hidden={story && i === 0} />)
           : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went up.</div>}
