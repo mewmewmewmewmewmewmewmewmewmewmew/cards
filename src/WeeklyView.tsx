@@ -3,7 +3,7 @@ import { toBlob } from "html-to-image";
 import * as D from "./mew-data";
 
 /* ------------------------------------------------------------------ *
- * /weekly — a one-page infographic of the week's biggest PSA 10 moves.
+ * Weekly view of /stats (/stats/#weekly) — a one-page infographic of the week's biggest PSA 10 moves.
  * The week is Monday–Sunday: the latest one ending on or before today,
  * so the page renews itself every Monday (arrows browse earlier weeks).
  * Same data and password as /stats: the sheet's certs ("all cert"), the
@@ -17,8 +17,6 @@ type Any = any;
 type Pt = { date: string; value: number; house?: string };
 type Mode = "sales" | "alt";
 
-const STATS_CONFIG_KEY = "mew_stats_config_v1";
-const MODE_KEY = "mew_stats_mode";
 const FMT_KEY = "mew_weekly_fmt";
 // Poster formats (all 1080 wide): square post, portrait post, Instagram story.
 type Fmt = "1:1" | "3:4" | "9:16";
@@ -175,57 +173,39 @@ const IndexLine: React.FC<{ pts: number[]; up: boolean }> = ({ pts, up }) => {
   );
 };
 
-export default function WeeklyPage() {
-  const [phase, setPhase] = useState<"checking" | "password" | "loading" | "ready" | "error">("checking");
-  const [pw, setPw] = useState("");
-  const [cards, setCards] = useState<Any[]>([]);
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [hist, setHist] = useState<Map<string, Any>>(new Map());
-  const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
+export type WeeklyProps = {
+  cards: Any[];
+  hist: Map<string, Any>;
+  hidden: Set<string>;
+  done: boolean;            // every cert's ALT data has loaded
+  mode: Mode;
+  setMode: (m: Mode) => void;
+  lang: "EN" | "JP";
+  onBack: () => void;
+};
+
+export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, lang, onBack }: WeeklyProps) {
   const shotRef = useRef<HTMLDivElement>(null);
   const [shot, setShot] = useState<"" | "busy" | "copy-ok" | "copy-err" | "save-ok" | "save-err">("");
+  const [note, setNote] = useState("");
   const [fmt, setFmtState] = useState<Fmt>(() => { try { const v = localStorage.getItem(FMT_KEY); return FORMATS.some(([f]) => f === v) ? (v as Fmt) : "1:1"; } catch (e) { return "1:1"; } });
   const setFmt = (f: Fmt) => { setFmtState(f); try { localStorage.setItem(FMT_KEY, f); } catch (e) {} };
   const [vw, setVw] = useState(() => [window.innerWidth, window.innerHeight]);
-  const lang = /^ja\b/i.test(navigator.language || "") ? "JP" : "EN";
   const latest = sundayOf(todayISO());
   const [end, setEnd] = useState(latest);
   const start = addDays(end, -6);
 
-  const setMode = (m: Mode) => { setModeState(m); try { localStorage.setItem(MODE_KEY, m); } catch (e) {} D.trackEvent("weekly_mode", { mode: m }); };
-  useEffect(() => { document.title = "JP Mews · weekly"; D.trackEvent("weekly_page_view"); document.documentElement.setAttribute("data-theme", "dark"); }, []);
+  useEffect(() => {
+    const prev = document.title;
+    document.title = "JP Mews · weekly";
+    D.trackEvent("weekly_page_view");
+    window.scrollTo(0, 0);
+    return () => { document.title = prev; };
+  }, []);
   useEffect(() => {
     const on = () => setVw([window.innerWidth, window.innerHeight]);
     window.addEventListener("resize", on);
     return () => window.removeEventListener("resize", on);
-  }, []);
-
-  const load = async (password: string) => {
-    setPhase("loading");
-    try {
-      const all = await D.fetchAllSheets(password, { forStats: true });
-      setCards(all);
-      const hl = D.sheetExtras.hidden;
-      setHidden(new Set(hl ? hl.all : []));
-      const certs = [...new Set(all.map((c: Any) => D.certOf(c)).filter(Boolean))] as string[];
-      await D.fetchAltHistories(certs, (m) => setHist(m));
-      setPhase("ready");
-    } catch (e: Any) {
-      if (e && e.message === "auth") { setPw(""); setPhase("password"); }
-      else { console.error(e); setPhase("error"); }
-    }
-  };
-  useEffect(() => {
-    let cached: Any = null;
-    try { cached = localStorage.getItem(STATS_CONFIG_KEY); } catch (e) {}
-    if (cached === "private") setPhase("password");
-    D.fetchConfig().then((cfg) => {
-      const need = !!(cfg && (cfg.statsPasswordEnabled || cfg.passwordEnabled));
-      try { localStorage.setItem(STATS_CONFIG_KEY, need ? "private" : "public"); } catch (e) {}
-      if (need) setPhase((p) => (p === "checking" ? "password" : p));
-      else load("");
-    }).catch(() => { if (cached !== "private") load(""); else setPhase("password"); });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const name = (c: Any) => (lang === "JP" ? (c.nameJP || c.nameEN) : (c.nameEN || c.nameJP));
@@ -250,8 +230,32 @@ export default function WeeklyPage() {
   const week = useMemo(() => summarize(entries, start, end, mode), [entries, start, end, mode]);
   const prevWeek = useMemo(() => summarize(entries, addDays(start, -7), addDays(end, -7), mode), [entries, start, end, mode]);
 
-  /* ---------- gate / loading ---------- */
-  if (phase !== "ready") {
+  // Phones save through the share sheet ("Save Image" puts it in Photos). Safari only allows
+  // the share sheet straight from a tap, so the image is prepared ahead of time.
+  const shareFiles = useMemo(() => {
+    try {
+      const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      const f = new File([new Blob(["x"], { type: "image/png" })], "x.png", { type: "image/png" });
+      return !!(coarse && navigator.canShare && navigator.canShare({ files: [f] }));
+    } catch (e) { return false; }
+  }, []);
+  const ready = useRef<{ key: string; blob: Blob } | null>(null);
+  const shotKey = `${end}|${mode}|${fmt}|${lang}|${done}|${hidden.size}`;
+  const makeRef = useRef<(() => Promise<Blob>) | null>(null);
+  useEffect(() => {
+    if (!shareFiles || !done) return;
+    ready.current = null;
+    const key = shotKey;
+    // After the intro animations have finished.
+    const t = window.setTimeout(() => {
+      if (!makeRef.current) return;
+      makeRef.current().then((blob) => { if (key === shotKey) ready.current = { key, blob }; }).catch(() => {});
+    }, 1800);
+    return () => window.clearTimeout(t);
+  }, [shotKey, shareFiles, done]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ---------- still loading the ALT data ---------- */
+  if (!done) {
     const totalCerts = new Set(cards.map((c: Any) => D.certOf(c)).filter(Boolean)).size;
     return (
       <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box", background: "#101010" }}>
@@ -259,17 +263,8 @@ export default function WeeklyPage() {
           <div className="loading-swirl" aria-hidden="true" style={{ position: "absolute", inset: 0 }} />
           <img src="/assets/mew-logo.png" alt="Loading..." style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.25 }} />
         </div>
-        {phase === "password" && (
-          <form onSubmit={(e) => { e.preventDefault(); if (pw) load(pw); }} style={{ position: "absolute", top: "50%", left: 0, right: 0, marginTop: 72, display: "flex", justifyContent: "center" }}>
-            <input type="password" className="mew-gate-input" value={pw} onChange={(e) => setPw(e.target.value)} aria-label="Password" autoFocus
-              style={{ height: 30, width: 96, padding: "0 10px", boxSizing: "border-box", borderRadius: 6, textAlign: "center", fontFamily: "var(--font-body)", fontSize: 13, letterSpacing: "0.25em", outline: "none" }} />
-          </form>
-        )}
-        {phase === "loading" && totalCerts > 0 && (
-          <div style={{ position: "absolute", top: "50%", marginTop: 76, ...mono, color: "rgba(203,151,165,0.8)" }}>reading {hist.size}/{totalCerts} cards</div>
-        )}
-        {phase === "error" && <div style={{ position: "absolute", top: "50%", marginTop: 76, ...mono, color: "rgba(203,151,165,0.8)" }}>Couldn't load. Refresh to try again.</div>}
-        <div style={{ position: "absolute", bottom: 16, ...mono, fontSize: 10, color: "rgba(203,151,165,0.8)" }}>v{D.APP_VERSION}</div>
+        <div style={{ position: "absolute", top: "50%", marginTop: 76, ...mono, color: "rgba(203,151,165,0.8)" }}>reading {Math.min(hist.size, totalCerts)}/{totalCerts} cards</div>
+        <button type="button" onClick={onBack} style={{ position: "absolute", top: 16, left: 16, ...mono, background: "none", border: "none", cursor: "pointer", color: "rgba(203,151,165,0.8)" }}>← Stats</button>
       </div>
     );
   }
@@ -321,8 +316,46 @@ export default function WeeklyPage() {
       flash("copy", "err");
     }
   };
+  makeRef.current = makeBlob;
   const downloadShot = async () => {
     if (shot === "busy") return;
+    setNote("");
+    if (shareFiles) {
+      // Phone: share sheet, where "Save Image" adds it to Photos. Uses the image prepared in the
+      // background; if it isn't ready yet, make it now and ask for a second tap (Safari won't open
+      // the share sheet after a wait).
+      const hit = ready.current && ready.current.key === shotKey ? ready.current.blob : null;
+      if (hit) {
+        try {
+          await navigator.share({ files: [new File([hit], fileName, { type: "image/png" })] });
+          D.trackEvent("weekly_download", { week: end, mode, fmt, via: "share" });
+          flash("save", "ok");
+        } catch (e: Any) {
+          if (e && e.name === "AbortError") return; // closed the share sheet
+          console.error(e);
+          flash("save", "err");
+        }
+        return;
+      }
+      setShot("busy");
+      try {
+        const blob = await makeBlob();
+        ready.current = { key: shotKey, blob };
+        try {
+          await navigator.share({ files: [new File([blob], fileName, { type: "image/png" })] });
+          D.trackEvent("weekly_download", { week: end, mode, fmt, via: "share" });
+          flash("save", "ok");
+        } catch (e: Any) {
+          setShot("");
+          if (e && e.name === "AbortError") return;
+          setNote("Image ready. Tap the download button again to save it.");
+        }
+      } catch (e) {
+        console.error(e);
+        flash("save", "err");
+      }
+      return;
+    }
     setShot("busy");
     try {
       saveBlob(await makeBlob());
@@ -489,7 +522,7 @@ export default function WeeklyPage() {
 
       {/* controls (outside the poster, so images of it stay clean) */}
       <div style={{ width: Math.max(SHOT_W * scale, Math.min(vw[0] - 24, 560)), display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <a href="/stats/" style={{ ...mono, color: C.muted, textDecoration: "none" }}>← Stats</a>
+        <button type="button" onClick={onBack} style={{ ...mono, color: C.muted, background: "none", border: "none", padding: 0, cursor: "pointer" }}>← Stats</button>
         <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           <button type="button" className="wk-nav" onClick={() => setEnd(addDays(end, -7))} aria-label="Previous week">‹</button>
           <button type="button" className="wk-nav" onClick={() => setEnd(addDays(end, 7))} disabled={end >= latest} aria-label="Next week">›</button>
@@ -508,11 +541,13 @@ export default function WeeklyPage() {
           <button type="button" className="wk-nav" onClick={copyShot} disabled={shot === "busy"} aria-label="Copy image to clipboard" title={shot === "copy-err" ? "Couldn't copy" : "Copy image"} style={{ color: iconCol("copy") }}>
             {shot === "copy-ok" ? check : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>}
           </button>
-          <button type="button" className="wk-nav" onClick={downloadShot} disabled={shot === "busy"} aria-label="Download image" title={shot === "save-err" ? "Couldn't save" : "Download image"} style={{ color: iconCol("save") }}>
+          <button type="button" className="wk-nav" onClick={downloadShot} disabled={shot === "busy"} aria-label={shareFiles ? "Save image" : "Download image"} title={shot === "save-err" ? "Couldn't save" : shareFiles ? "Save image (share sheet → Save Image)" : "Download image"} style={{ color: iconCol("save") }}>
             {shot === "save-ok" ? check : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11" /><path d="M7 10.5l5 5 5-5" /><path d="M5 20h14" /></svg>}
           </button>
         </span>
       </div>
+
+      {note && <div role="status" style={{ width: SHOT_W * scale, marginTop: -4, marginBottom: 10, fontSize: 13, color: GREEN }}>{note}</div>}
 
       {/* the poster (inside a 4px edge, which is what gets copied / downloaded) */}
       <div style={{ width: SHOT_W * scale, height: SHOT_H * scale, flex: "0 0 auto" }}>

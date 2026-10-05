@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as D from "./mew-data";
 import { MewIcon, CameoIcon, IntlIcon } from "./icons";
+import WeeklyView from "./WeeklyView";
 
 /* ------------------------------------------------------------------ *
  * /stats — PSA 10 prices for every card in the sheet.
@@ -232,6 +233,22 @@ export default function StatsPage() {
     else { setSort(k); setDir(SORT_START[k]); }
   };
   useEffect(() => { savePref("mew_stats_scope", scope); }, [scope]);
+  // The weekly poster is a view of this page (#weekly), so it reuses the password and loaded data.
+  const [weekly, setWeekly] = useState(() => location.hash === "#weekly");
+  useEffect(() => {
+    const on = () => setWeekly(location.hash === "#weekly");
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+  const closeWeekly = () => {
+    if (history.state && history.state.fromStats) history.back();
+    else { history.replaceState(null, "", location.pathname + location.search); setWeekly(false); }
+  };
+  const openWeekly = (e: React.MouseEvent) => {
+    e.preventDefault();
+    history.pushState({ fromStats: true }, "", "#weekly");
+    setWeekly(true);
+  };
 
   // Hidden cards: saved in the sheet's "Hidden" tab (shared across devices), left out of the
   // grid and totals. null = the deployed Apps Script doesn't support hiding yet.
@@ -470,6 +487,10 @@ export default function StatsPage() {
     );
   }
 
+  if (weekly) {
+    return <WeeklyView cards={cards} hist={hist} hidden={hiddenLists ? hiddenLists.all : new Set<string>()} done={histDone} mode={mode} setMode={setMode} lang={lang} onBack={closeWeekly} />;
+  }
+
   const pad = narrow ? 16 : 32;
   const listCols = narrow ? "24px minmax(0,1fr) auto 64px" : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}`;
   const noMatch = q.trim() && rows.charted.length > 0 && shown.length === 0 ? (
@@ -500,7 +521,7 @@ export default function StatsPage() {
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <a href="/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Catalog</a>
-          <a href="/weekly/" data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>This week ✦</a>
+          <a href="#weekly" onClick={openWeekly} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>This week ✦</a>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
             <button type="button" onClick={() => setLang(lang === "JP" ? "EN" : "JP")} data-hover-pink="1" style={iconBtn} aria-label="Toggle language">{lang === "JP" ? "JA" : "EN"}</button>
             <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">
