@@ -307,10 +307,22 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // into the row below whatever the fonts and names do.
   const moversRef = useRef<HTMLDivElement>(null);
   const storyRef = useRef<HTMLDivElement>(null);
+  // The title shrinks to fit its line if a font renders it wider than planned.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [titleFit, setTitleFit] = useState<{ key: string; k: number } | null>(null);
   const [ext, setExt] = useState<{ top: number; w: number; h: number; imgX: number; imgY: number; imgW: number } | null>(null);
   const [fit, setFit] = useState<{ key: string; rows: number; heroW: number; pad: number } | null>(null);
   const [fontsTick, setFontsTick] = useState(0);
   useEffect(() => { try { (document as Any).fonts.ready.then(() => setFontsTick((t) => t + 1)); } catch (e) {} }, []);
+  useLayoutEffect(() => {
+    const h = titleRef.current;
+    const key = `${fmt}|${end}|${fontsTick}`;
+    if (h) {
+      const cur = titleFit && titleFit.key === key ? titleFit.k : 1;
+      const need = h.scrollWidth > h.clientWidth + 1 ? Math.max(0.6, (cur * h.clientWidth) / h.scrollWidth) : cur;
+      if (!titleFit || titleFit.key !== key || Math.abs(need - titleFit.k) > 0.005) setTitleFit({ key, k: need });
+    }
+  });
   useLayoutEffect(() => {
     const box = moversRef.current;
     if (!box) return;
@@ -586,21 +598,19 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
 
   /* ---------- poster pieces, arranged per format below ---------- */
   const gradTitle: React.CSSProperties = { background: `linear-gradient(90deg, #fff 0%, ${C.up} 55%, #c49bff 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" };
-  const kicker = <div style={{ ...mono, fontSize: story ? 16 : 13, color: C.up }}>PSA 10 · {sales ? "weekly movers" : "ALT value movers"}</div>;
+  const kicker = <div style={{ ...mono, fontSize: story ? 16 : 13, color: C.up }}>{sales ? "weekly movers" : "ALT value movers"}</div>;
   const dates = <div style={{ fontFamily: "var(--font-data)", fontSize: story ? 22 : 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>;
+  const tk = titleFit && titleFit.key === `${fmt}|${end}|${fontsTick}` ? titleFit.k : 1;
   const title = story ? (
     <div className="wk-in" style={{ position: "relative" }}>
       {kicker}
-      <h1 style={{ margin: "14px 0 0", ...big, fontSize: 120, letterSpacing: "-0.03em", lineHeight: 0.95, ...gradTitle }}>JP Mews<br />Week {weekNo(end)}</h1>
+      <h1 style={{ margin: "14px 0 0", ...big, fontSize: 104 * tk, letterSpacing: "-0.03em", lineHeight: 1.0, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews<br />PSA10・Week {weekNo(end)}</h1>
       <div style={{ marginTop: 18 }}>{dates}</div>
     </div>
   ) : (
-    <div className="wk-in" style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}>
-      <div style={{ minWidth: 0 }}>
-        {kicker}
-        <h1 style={{ margin: "8px 0 0", ...big, fontSize: 76, letterSpacing: "-0.02em", lineHeight: 1.0, ...gradTitle, whiteSpace: "nowrap" }}>JP Mews ・ Week {weekNo(end)}</h1>
-      </div>
-      <div style={{ marginLeft: "auto", textAlign: "right", paddingBottom: 8, flex: "0 0 auto" }}>{dates}</div>
+    <div className="wk-in" style={{ position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>{kicker}{dates}</div>
+      <h1 style={{ margin: "8px 0 0", ...big, fontSize: 70 * tk, letterSpacing: "-0.02em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10・Week {weekNo(end)}</h1>
     </div>
   );
   const indexTile = (
@@ -685,7 +695,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: `repeat(${nHigh}, minmax(0, 1fr))` }}>
       {sales && week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={fmtUSD(week.biggest.value)} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
       {sales && week.busiest && <Highlight label="Most sold" delay={560} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
-      {week.bigGain && <Highlight label="Biggest $ gain" delay={620} img={week.bigGain.card.image} title={`+${usd0.format(week.bigGain.to - week.bigGain.from)}`} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
+      {week.bigGain && <Highlight label="Biggest gain" delay={620} img={week.bigGain.card.image} title={`+${usd0.format(week.bigGain.to - week.bigGain.from)}`} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
     </div>
   );
 
