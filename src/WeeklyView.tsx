@@ -122,6 +122,9 @@ const C = {
   down: "#9fb4ff",
   downGlow: "rgba(159,180,255,0.35)",
 };
+// The story's top-climber box: solid on its left half so the part reaching down joins seamlessly.
+const HERO_SOLID = "#2a1620";
+const HERO_TOP_BG = `linear-gradient(90deg, ${HERO_SOLID} 0%, ${HERO_SOLID} 46%, #161216 100%)`;
 const mono: React.CSSProperties = { fontFamily: "var(--font-data)", letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11 };
 
 /**
@@ -301,6 +304,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // show only the rows that fit, and size the top climber's card to its tile, so nothing spills
   // into the row below whatever the fonts and names do.
   const moversRef = useRef<HTMLDivElement>(null);
+  const storyRef = useRef<HTMLDivElement>(null);
+  const [ext, setExt] = useState<{ top: number; w: number; h: number; imgX: number; imgY: number; imgW: number } | null>(null);
   const [fit, setFit] = useState<{ key: string; rows: number; heroW: number; pad: number } | null>(null);
   const [fontsTick, setFontsTick] = useState(0);
   useEffect(() => { try { (document as Any).fonts.ready.then(() => setFontsTick((t) => t + 1)); } catch (e) {} }, []);
@@ -333,6 +338,25 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       }
     }
     if (rows === 99) { rows = 0; pad = 0; }
+    // Story: where the top climber's box reaches down to (the bottom of the climbers' #1 slot),
+    // and the big card filling its left half.
+    let nextExt: typeof ext = null;
+    const sr = storyRef.current;
+    const top = sr && sr.querySelector<HTMLElement>("[data-tile=hero-top]");
+    const slot = box.querySelector<HTMLElement>("[data-slot]");
+    const list = box.querySelector<HTMLElement>("[data-tile=list]");
+    if (sr && top && slot && list) {
+      const t = top.offsetTop + top.offsetHeight - 1;
+      const bottom = box.offsetTop + slot.offsetTop + slot.offsetHeight + 6;
+      const w = list.offsetWidth;
+      const regionTop = top.offsetTop + 40, regionBottom = bottom - 18;
+      let imgW = Math.floor(Math.min(w - 70, ((regionBottom - regionTop) * 63) / 88));
+      imgW = Math.max(60, imgW);
+      const imgH = (imgW * 88) / 63;
+      nextExt = { top: t, w, h: Math.max(0, bottom - t), imgX: Math.round((w - imgW) / 2), imgY: Math.round(regionTop + (regionBottom - regionTop - imgH) / 2), imgW };
+    }
+    const same = (a: typeof ext, b: typeof ext) => (!a && !b) || (!!a && !!b && a.top === b.top && a.w === b.w && a.h === b.h && a.imgW === b.imgW && a.imgY === b.imgY);
+    if (!same(ext, nextExt)) setExt(nextExt);
     if (!fit || fit.key !== fitKey || fit.rows !== rows || fit.heroW !== heroW || fit.pad !== pad) {
       setFit({ key: fitKey, rows, heroW, pad });
     }
@@ -389,7 +413,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       if (!ctx) throw new Error("no canvas");
       const box = node.getBoundingClientRect();
       const k = box.width / SHOT_W; // on-screen scale of the poster
-      const imgs = [...node.querySelectorAll<HTMLImageElement>("img[data-card]")];
+      const imgs = [...node.querySelectorAll<HTMLImageElement>("img[data-card]")].filter((el) => getComputedStyle(el).visibility !== "hidden");
       // Load every image first, then paint them one at a time (each paint sets its own
       // transform and clip on the shared canvas).
       const loaded = await Promise.all(imgs.map(async (el) => {
@@ -511,10 +535,12 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
 
   const story = fmt === "9:16", tall = fmt !== "1:1";
   const hero = week.up[0] || null;
-  const rowsMax = story ? 8 : tall ? 9 : 6;
+  const rowsMax = 14; // the measured fit decides; this only bounds the first render
   const fitNow = fit && fit.key === `${shotKey}|${vw[0]}|${fontsTick}` ? fit : null;
   const rowsShown = fitNow && fitNow.rows ? Math.min(rowsMax, fitNow.rows) : rowsMax;
-  const climbers = week.up.slice(hero ? 1 : 0, (hero ? 1 : 0) + rowsShown);
+  // Both lists number from #1 so places line up; the top climber is #1 in the climbers list too
+  // (in the story it's covered by the top climber's box, which reaches down into that slot).
+  const climbers = week.up.slice(0, rowsShown);
   const fallers = week.down.slice(0, rowsShown);
   const heroMax = tall ? 170 : 140;
   const heroW = fitNow && fitNow.heroW ? Math.min(heroMax, fitNow.heroW) : heroMax;
@@ -524,9 +550,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const scale = Math.min(1, (vw[0] - 24) / SHOT_W, Math.max(320, vw[1] - 76) / SHOT_H);
   const big: React.CSSProperties = { fontFamily: "var(--font-display)", fontWeight: 700, lineHeight: 1 };
 
-  const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number }> = ({ m, i, up, delay }) => (
-    <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${fitNow && fitNow.pad ? fitNow.pad : tall ? 8 : 10}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
-      <span style={{ ...mono, color: C.faint }}>{i + (up && hero ? 2 : 1)}</span>
+  const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number; hidden?: boolean }> = ({ m, i, up, delay, hidden }) => (
+    <div className="wk-in" data-row="1" data-slot={i === 0 && up ? "1" : undefined} style={{ visibility: hidden ? "hidden" : undefined, animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${fitNow && fitNow.pad ? fitNow.pad : tall ? 8 : 10}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
+      <span style={{ ...mono, color: C.faint }}>{i + 1}</span>
       <Img src={pic(m.card.image)} w={34} />
       <span style={{ minWidth: 0 }}>
         <span style={{ display: "block", fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(m.card)}</span>
@@ -593,13 +619,15 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     </>
   );
   const heroBg = "linear-gradient(160deg, rgba(255,126,182,0.18), rgba(255,255,255,0.03) 65%)";
+  // Story: the top climber's box spans the width, and its left half reaches down over the
+  // climbers list's #1 slot (an L shape), with a big card filling that left part.
   const heroTile = hero && (story ? (
-    <Tile label="Top climber" delay={260} style={{ position: "relative", overflow: "hidden", background: heroBg }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 36, marginTop: 14, padding: "0 12px" }}>
-        <span className="wk-float" style={{ display: "block" }}><Img src={pic(hero.card.image)} w={170} glow={C.upGlow} /></span>
-        <div style={{ minWidth: 0 }}>
+    <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", zIndex: 1, height: 230, boxSizing: "border-box", background: HERO_TOP_BG, borderBottomLeftRadius: ext ? 0 : 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, height: "calc(100% - 14px)" }}>
+        <span />
+        <div style={{ minWidth: 0, alignSelf: "center", paddingLeft: 10 }}>
           <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
-          <div style={{ marginTop: 16, fontWeight: 600, fontSize: 24, lineHeight: 1.25 }}>{name(hero.card)}</div>
+          <div style={{ marginTop: 16, fontWeight: 600, fontSize: 24, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name(hero.card)}</div>
           <div style={{ marginTop: 6, fontFamily: "var(--font-data)", fontSize: 16, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
         </div>
       </div>
@@ -621,8 +649,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const climbersTile = (
     <Tile label="Climbers" tag="list" delay={320}>
       <div style={{ marginTop: 8 }}>
-        {climbers.length ? climbers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up delay={380 + i * 60} />)
-          : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>{hero ? "Just the one this week." : "Nothing went up."}</div>}
+        {climbers.length ? climbers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up delay={380 + i * 60} hidden={story && i === 0} />)
+          : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went up.</div>}
       </div>
     </Tile>
   );
@@ -708,8 +736,18 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
               <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: sales ? "repeat(4, 1fr)" : "1fr 1fr" }}>{statTiles}</div>
               {nothing ? quiet : (
                 <>
-                  {heroTile && <div style={{ position: "relative" }}>{heroTile}</div>}
-                  <div ref={moversRef} style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr", gridTemplateRows: "minmax(0, 1fr)" }}>{climbersTile}{fallersTile}</div>
+                  <div ref={storyRef} style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+                    {heroTile}
+                    <div ref={moversRef} style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr", gridTemplateRows: "minmax(0, 1fr)" }}>{climbersTile}{fallersTile}</div>
+                    {hero && ext && (
+                      <>
+                        <div aria-hidden="true" className="wk-in" style={{ animationDelay: "260ms", position: "absolute", zIndex: 2, left: 0, top: ext.top, width: ext.w, height: ext.h, boxSizing: "border-box", background: HERO_SOLID, border: `1px solid ${C.line}`, borderTop: "none", borderRadius: "0 0 14px 14px" }} />
+                        <div className="wk-in" style={{ animationDelay: "300ms", position: "absolute", zIndex: 3, left: ext.imgX, top: ext.imgY }}>
+                          <span className="wk-float" style={{ display: "block" }}><Img src={pic(hero.card.image)} w={ext.imgW} glow={C.upGlow} /></span>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </>
               )}
               {highlights}
