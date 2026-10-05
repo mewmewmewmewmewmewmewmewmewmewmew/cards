@@ -336,11 +336,11 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       if (!row || !label) return;
       const avail = tile.clientHeight - 36 - label.offsetHeight - 8; // padding, label, list margin
       const content = row.offsetHeight - 2 * (parseFloat(getComputedStyle(row).paddingTop) || 0);
-      const n = Math.max(1, Math.floor((avail + 1) / (content + 8 + 1)));
+      const n = Math.max(1, Math.min(fmt === "9:16" ? 10 : 99, Math.floor((avail + 1) / (content + 8 + 1)))); // story: top 10
       rows = Math.min(rows, n);
       pad = Math.min(pad, Math.floor(((avail + 1) / n - 1 - content) / 2));
     });
-    pad = Math.max(4, Math.min(12, pad));
+    pad = Math.max(4, Math.min(16, pad));
     let heroW = 0;
     const hero = box.querySelector<HTMLElement>("[data-tile=hero]");
     if (hero) {
@@ -548,7 +548,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
 
   const story = fmt === "9:16", tall = fmt !== "1:1";
   const hero = week.up[0] || null;
-  const rowsMax = 14; // the measured fit decides; this only bounds the first render
+  const rowsMax = story ? 10 : 14; // story shows the top 10; otherwise the measured fit decides
   const fitNow = fit && fit.key === `${shotKey}|${vw[0]}|${fontsTick}` ? fit : null;
   const rowsShown = fitNow && fitNow.rows ? Math.min(rowsMax, fitNow.rows) : rowsMax;
   // Both lists number from #1 so places line up; the top climber is #1 in the climbers list too
@@ -598,19 +598,19 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
 
   /* ---------- poster pieces, arranged per format below ---------- */
   const gradTitle: React.CSSProperties = { background: `linear-gradient(90deg, #fff 0%, ${C.up} 55%, #c49bff 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" };
-  const kicker = <div style={{ ...mono, fontSize: story ? 16 : 13, color: C.up }}>{sales ? "weekly movers" : "ALT value movers"}</div>;
+  const kicker = <div style={{ ...mono, fontSize: story ? 18 : 14, color: C.up }}>Week {weekNo(end)}{sales ? "" : " · ALT value"}</div>;
   const dates = <div style={{ fontFamily: "var(--font-data)", fontSize: story ? 22 : 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>;
   const tk = titleFit && titleFit.key === `${fmt}|${end}|${fontsTick}` ? titleFit.k : 1;
   const title = story ? (
     <div className="wk-in" style={{ position: "relative" }}>
       {kicker}
-      <h1 style={{ margin: "14px 0 0", ...big, fontSize: 104 * tk, letterSpacing: "-0.03em", lineHeight: 1.0, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews<br />PSA10・Week {weekNo(end)}</h1>
+      <h1 style={{ margin: "12px 0 0", ...big, fontSize: 104 * tk, letterSpacing: "-0.03em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10</h1>
       <div style={{ marginTop: 18 }}>{dates}</div>
     </div>
   ) : (
     <div className="wk-in" style={{ position: "relative" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>{kicker}{dates}</div>
-      <h1 style={{ margin: "8px 0 0", ...big, fontSize: 70 * tk, letterSpacing: "-0.02em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10・Week {weekNo(end)}</h1>
+      <h1 style={{ margin: "8px 0 0", ...big, fontSize: 70 * tk, letterSpacing: "-0.02em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10</h1>
     </div>
   );
   const indexTile = (
