@@ -562,7 +562,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         </span>
         <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{fmtUSD(m.from)} <span style={{ color: up ? C.gain : C.down }}>→</span> {fmtUSD(m.to)}</span>
       </span>
-      <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: up ? C.gain : C.down, textShadow: `0 0 12px ${up ? C.gainGlow : C.downGlow}` }}>{fmtPct(m.pct)}</span>
+      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+        <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: up ? C.gain : C.down, textShadow: `0 0 12px ${up ? C.gainGlow : C.downGlow}` }}>{fmtPct(m.pct)}</span>
+        <span style={{ marginTop: 3, fontFamily: "var(--font-data)", fontSize: 12, color: up ? C.gain : C.down, opacity: 0.8 }}>{m.to >= m.from ? "+" : "−"}{usd0.format(Math.abs(m.to - m.from))}</span>
+      </span>
     </div>
   );
   const Highlight: React.FC<{ label: string; img?: string; title: string; sub: string; line: string; delay: number }> = ({ label, img, title, sub, line, delay }) => (
