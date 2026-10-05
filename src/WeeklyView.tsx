@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import * as D from "./mew-data";
 
@@ -128,9 +128,9 @@ const Img: React.FC<{ src?: string; w: number; glow?: string; tilt?: number; sty
   <span style={{ flex: "0 0 auto", display: "block", width: w, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "#241a1f", backgroundImage: src ? `url("${src}")` : "none", backgroundSize: "100% 100%", transform: tilt ? `rotate(${tilt}deg)` : undefined, boxShadow: glow ? `0 0 0 1px rgba(255,255,255,0.08), 0 18px 50px -10px ${glow}` : "0 0 0 1px rgba(255,255,255,0.08)", ...style }} />
 );
 
-const Tile: React.FC<{ label: string; children: React.ReactNode; delay?: number; style?: React.CSSProperties }> = ({ label, children, delay = 0, style }) => (
-  <div className="wk-in" style={{ animationDelay: `${delay}ms`, padding: 18, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, minWidth: 0, ...style }}>
-    <div style={{ ...mono, color: C.faint }}>{label}</div>
+const Tile: React.FC<{ label: string; children: React.ReactNode; delay?: number; style?: React.CSSProperties; tag?: string }> = ({ label, children, delay = 0, style, tag }) => (
+  <div className="wk-in" data-tile={tag} style={{ animationDelay: `${delay}ms`, padding: 18, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, minWidth: 0, minHeight: 0, overflow: "hidden", ...style }}>
+    <div data-label="1" style={{ ...mono, color: C.faint }}>{label}</div>
     {children}
   </div>
 );
@@ -242,6 +242,41 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const ready = useRef<{ key: string; blob: Blob } | null>(null);
   const shotKey = `${end}|${mode}|${fmt}|${lang}|${done}|${hidden.size}`;
   const makeRef = useRef<(() => Promise<Blob>) | null>(null);
+
+  // The movers area gets whatever height is left in the poster. Measure it (in unscaled px) and
+  // show only the rows that fit, and size the top climber's card to its tile, so nothing spills
+  // into the row below whatever the fonts and names do.
+  const moversRef = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState<{ key: string; rows: number; heroW: number } | null>(null);
+  useLayoutEffect(() => {
+    const box = moversRef.current;
+    if (!box) return;
+    const fitKey = `${shotKey}|${vw[0]}`;
+    let rows = 99;
+    box.querySelectorAll<HTMLElement>("[data-tile=list]").forEach((tile) => {
+      const row = tile.querySelector<HTMLElement>("[data-row]");
+      const label = tile.querySelector<HTMLElement>("[data-label]");
+      if (!row || !label) return;
+      const avail = tile.clientHeight - 36 - label.offsetHeight - 8; // padding, label, list margin
+      rows = Math.min(rows, Math.max(1, Math.floor((avail + 1) / (row.offsetHeight + 1))));
+    });
+    let heroW = 0;
+    const hero = box.querySelector<HTMLElement>("[data-tile=hero]");
+    if (hero) {
+      const label = hero.querySelector<HTMLElement>("[data-label]");
+      const text = hero.querySelector<HTMLElement>("[data-hero-text]");
+      if (label && text) {
+        const avail = hero.clientHeight - 36 - label.offsetHeight - text.offsetHeight - 14 - 10; // padding, label, text, gap, tilt room
+        heroW = Math.max(56, Math.floor(avail / (88 / 63)));
+      }
+    }
+    if (rows === 99) rows = 0;
+    if (!fit || fit.key !== fitKey || fit.rows !== rows || fit.heroW !== heroW) {
+      // Only shrink within one layout (more rows would change what's measured).
+      if (fit && fit.key === fitKey && rows >= fit.rows && heroW >= fit.heroW) return;
+      setFit({ key: fitKey, rows, heroW });
+    }
+  });
   useEffect(() => {
     if (!shareFiles || !done) return;
     ready.current = null;
@@ -369,9 +404,13 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
 
   const story = fmt === "9:16", tall = fmt !== "1:1";
   const hero = week.up[0] || null;
-  const rowsMax = story ? 5 : tall ? 6 : 4;
-  const climbers = week.up.slice(hero ? 1 : 0, (hero ? 1 : 0) + rowsMax);
-  const fallers = week.down.slice(0, rowsMax);
+  const rowsMax = story ? 6 : tall ? 7 : 5;
+  const fitNow = fit && fit.key === `${shotKey}|${vw[0]}` ? fit : null;
+  const rowsShown = fitNow && fitNow.rows ? Math.min(rowsMax, fitNow.rows) : rowsMax;
+  const climbers = week.up.slice(hero ? 1 : 0, (hero ? 1 : 0) + rowsShown);
+  const fallers = week.down.slice(0, rowsShown);
+  const heroMax = tall ? 170 : 140;
+  const heroW = fitNow && fitNow.heroW ? Math.min(heroMax, fitNow.heroW) : heroMax;
   const maxPct = Math.max(1, ...[...climbers, ...fallers].map((m) => Math.abs(m.pct)));
   const idxUp = week.idxPct >= 0;
   const nothing = !week.up.length && !week.down.length;
@@ -379,7 +418,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const big: React.CSSProperties = { fontFamily: "var(--font-display)", fontWeight: 700, lineHeight: 1 };
 
   const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number }> = ({ m, i, up, delay }) => (
-    <div className="wk-in" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: "10px 0", borderTop: i ? `1px solid ${C.line}` : "none" }}>
+    <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: "10px 0", borderTop: i ? `1px solid ${C.line}` : "none" }}>
       <span style={{ ...mono, color: C.faint }}>{i + (up && hero ? 2 : 1)}</span>
       <Img src={m.card.image} w={34} />
       <span style={{ minWidth: 0 }}>
@@ -460,19 +499,21 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       </div>
     </Tile>
   ) : (
-    <Tile label="Top climber" delay={260} style={{ position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", background: heroBg }}>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 14 }}>
-        <span className="wk-float" style={{ display: "block" }}><Img src={hero.card.image} w={tall ? 160 : 128} glow={C.upGlow} /></span>
-        <div style={{ ...big, fontSize: tall ? 60 : 54, color: C.up, textShadow: `0 0 24px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 18, lineHeight: 1.25 }}>{name(hero.card)}</div>
-          <div style={{ marginTop: 4, fontFamily: "var(--font-data)", fontSize: 13, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
+    <Tile label="Top climber" tag="hero" delay={260} style={{ position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", background: heroBg }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 14 }}>
+        <span className="wk-float" style={{ display: "block" }}><Img src={hero.card.image} w={heroW} glow={C.upGlow} /></span>
+        <div data-hero-text="1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, maxWidth: "100%" }}>
+          <div style={{ ...big, fontSize: tall ? 60 : 54, color: C.up, textShadow: `0 0 24px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
+          <div style={{ maxWidth: "100%" }}>
+            <div style={{ fontWeight: 600, fontSize: 18, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name(hero.card)}</div>
+            <div style={{ marginTop: 4, fontFamily: "var(--font-data)", fontSize: 13, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
+          </div>
         </div>
       </div>
     </Tile>
   ));
   const climbersTile = (
-    <Tile label="Climbers" delay={320}>
+    <Tile label="Climbers" tag="list" delay={320}>
       <div style={{ marginTop: 8 }}>
         {climbers.length ? climbers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up delay={380 + i * 60} />)
           : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>{hero ? "Just the one this week." : "Nothing went up."}</div>}
@@ -480,7 +521,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     </Tile>
   );
   const fallersTile = (
-    <Tile label="Fallers" delay={380}>
+    <Tile label="Fallers" tag="list" delay={380}>
       <div style={{ marginTop: 8 }}>
         {fallers.length ? fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up={false} delay={440 + i * 60} />)
           : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went down.</div>}
@@ -562,7 +603,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
               {nothing ? quiet : (
                 <>
                   {heroTile && <div style={{ position: "relative" }}>{heroTile}</div>}
-                  <div style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>{climbersTile}{fallersTile}</div>
+                  <div ref={moversRef} style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr", gridTemplateRows: "minmax(0, 1fr)" }}>{climbersTile}{fallersTile}</div>
                 </>
               )}
               {highlights}
@@ -574,7 +615,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
                 <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>{statTiles}</div>
               </div>
               {nothing ? quiet : (
-                <div style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: hero ? "1.05fr 1fr 1fr" : "1fr 1fr" }}>
+                <div ref={moversRef} style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: hero ? "1.05fr 1fr 1fr" : "1fr 1fr", gridTemplateRows: "minmax(0, 1fr)" }}>
                   {heroTile}{climbersTile}{fallersTile}
                 </div>
               )}
