@@ -89,7 +89,9 @@ function summarize(entries: Entry[], start: string, end: string, mode: Mode) {
   const counts = new Map<string, Any>();
   sales.forEach((x) => { const c = counts.get(x.cert) || { card: x.card, cert: x.cert, n: 0, sum: 0 }; c.n++; c.sum += x.value; counts.set(x.cert, c); });
   const busiest = [...counts.values()].sort((a, b) => b.n - a.n || b.sum - a.sum)[0] || null;
-  return { up, down, index, idxPct, idxCards: indexSeries.length, volume, nSales: sales.length, avg: sales.length ? volume / sales.length : 0, traded: counts.size, biggest, busiest: busiest && busiest.n > 1 ? busiest : null };
+  // Biggest gain in dollars (not percent): a big card's modest move can beat a cheap card's jump.
+  const bigGain = up.slice().sort((a, b) => (b.to - b.from) - (a.to - a.from))[0] || null;
+  return { up, down, index, idxPct, idxCards: indexSeries.length, volume, nSales: sales.length, avg: sales.length ? volume / sales.length : 0, traded: counts.size, biggest, busiest: busiest && busiest.n > 1 ? busiest : null, bigGain };
 }
 
 /** Counts up to `to` once it's set (eases out over ~1s). */
@@ -276,6 +278,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     [...week.up.slice(0, 8), ...week.down.slice(0, 8)].forEach((m) => m.card.image && urls.add(m.card.image));
     if (week.biggest && week.biggest.card.image) urls.add(week.biggest.card.image);
     if (week.busiest && week.busiest.card.image) urls.add(week.busiest.card.image);
+    if (week.bigGain && week.bigGain.card.image) urls.add(week.bigGain.card.image);
     const todo = [...urls].filter((u) => !imgData[u]);
     if (!todo.length) return;
     let live = true;
@@ -613,7 +616,14 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     <>
       <Tile label="Sales" delay={140}><Num v={week.nSales} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 40 }} /><Delta now={week.nSales} prev={prevWeek.nSales} /></Tile>
       <Tile label="Volume" delay={200}><Num v={week.volume} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.volume} prev={prevWeek.volume} money /></Tile>
-      <Tile label="Cards traded" delay={260}><Num v={week.traded} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 40 }} /><Delta now={week.traded} prev={prevWeek.traded} /></Tile>
+      <Tile label="Up vs down" delay={260}>
+        <div style={{ marginTop: 12, display: "flex", alignItems: "baseline", gap: 10, ...big, fontSize: 36 }}>
+          <span style={{ color: C.gain }}>{week.up.length}<span style={{ fontSize: 18 }}> ▲</span></span>
+          <span style={{ color: C.faint, fontSize: 24 }}>/</span>
+          <span style={{ color: C.down }}>{week.down.length}<span style={{ fontSize: 18 }}> ▼</span></span>
+        </div>
+        <div style={{ marginTop: 8, fontFamily: "var(--font-data)", fontSize: 13, color: C.faint, whiteSpace: "nowrap" }}>last week {prevWeek.up.length} ▲ / {prevWeek.down.length} ▼</div>
+      </Tile>
       <Tile label="Avg sale" delay={320}><Num v={week.avg} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.avg} prev={prevWeek.avg} money /></Tile>
     </>
   ) : (
@@ -670,10 +680,12 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       <div style={{ marginTop: 12, fontSize: 20, color: C.muted }}>{sales ? "No price moves from sales this week." : "No ALT value moves this week."}</div>
     </Tile>
   );
-  const highlights = sales && (week.biggest || week.busiest) && (
-    <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: week.busiest && week.biggest ? "1fr 1fr" : "1fr" }}>
-      {week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={fmtUSD(week.biggest.value)} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
-      {week.busiest && <Highlight label="Most sold" delay={560} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
+  const nHigh = (sales && week.biggest ? 1 : 0) + (sales && week.busiest ? 1 : 0) + (week.bigGain ? 1 : 0);
+  const highlights = nHigh > 0 && (
+    <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: `repeat(${nHigh}, minmax(0, 1fr))` }}>
+      {sales && week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={fmtUSD(week.biggest.value)} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
+      {sales && week.busiest && <Highlight label="Most sold" delay={560} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
+      {week.bigGain && <Highlight label="Biggest $ gain" delay={620} img={week.bigGain.card.image} title={`+${usd0.format(week.bigGain.to - week.bigGain.from)}`} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
     </div>
   );
 
