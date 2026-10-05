@@ -121,6 +121,8 @@ const C = {
   upGlow: "rgba(255,126,182,0.45)",
   down: "#9fb4ff",
   downGlow: "rgba(159,180,255,0.35)",
+  gain: "#7ee2a8",                     // climbers list (fallers use down)
+  gainGlow: "rgba(126,226,168,0.35)",
 };
 const mono: React.CSSProperties = { fontFamily: "var(--font-data)", letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11 };
 
@@ -551,13 +553,16 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       <span style={{ ...mono, color: C.faint }}>{i + 1}</span>
       <Img src={pic(m.card.image)} w={34} />
       <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(m.card)}</span>
-        <span style={{ display: "block", marginTop: 5, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-          <span className="wk-bar" style={{ display: "block", height: "100%", width: `${(Math.abs(m.pct) / maxPct) * 100}%`, background: up ? C.up : C.down, boxShadow: `0 0 10px ${up ? C.upGlow : C.downGlow}`, animationDelay: `${delay + 150}ms` }} />
+        <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+          <span style={{ fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name(m.card)}</span>
+          {m.card.number && <span style={{ flex: "0 0 auto", fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{m.card.number}</span>}
         </span>
-        <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{fmtUSD(m.from)} → {fmtUSD(m.to)}</span>
+        <span style={{ display: "block", marginTop: 5, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+          <span className="wk-bar" style={{ display: "block", height: "100%", width: `${(Math.abs(m.pct) / maxPct) * 100}%`, background: up ? C.gain : C.down, boxShadow: `0 0 10px ${up ? C.gainGlow : C.downGlow}`, animationDelay: `${delay + 150}ms` }} />
+        </span>
+        <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{fmtUSD(m.from)} <span style={{ color: up ? C.gain : C.down }}>→</span> {fmtUSD(m.to)}</span>
       </span>
-      <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: up ? C.up : C.down, textShadow: `0 0 12px ${up ? C.upGlow : C.downGlow}` }}>{fmtPct(m.pct)}</span>
+      <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: up ? C.gain : C.down, textShadow: `0 0 12px ${up ? C.gainGlow : C.downGlow}` }}>{fmtPct(m.pct)}</span>
     </div>
   );
   const Highlight: React.FC<{ label: string; img?: string; title: string; sub: string; line: string; delay: number }> = ({ label, img, title, sub, line, delay }) => (
