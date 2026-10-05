@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { toBlob } from "html-to-image";
+import { toCanvas } from "html-to-image";
 import * as D from "./mew-data";
 
 /* ------------------------------------------------------------------ *
@@ -133,7 +133,7 @@ const Img: React.FC<{ src?: string; w: number; glow?: string }> = ({ src, w, glo
   <span style={{ flex: "0 0 auto", position: "relative", display: "block", width: w, aspectRatio: "63 / 88" }}>
     {glow && <span aria-hidden="true" style={{ position: "absolute", left: "-45%", right: "-45%", top: "-25%", bottom: "-35%", background: `radial-gradient(closest-side, ${glow}, transparent)`, pointerEvents: "none" }} />}
     {src
-      ? <img src={src} alt="" draggable={false} style={{ position: "relative", display: "block", width: "100%", height: "100%", objectFit: "fill", borderRadius: "4.72% / 3.37%", background: "#241a1f", boxShadow: "0 0 0 1px rgba(255,255,255,0.08)" }} />
+      ? <img src={src} data-card={src} alt="" draggable={false} style={{ position: "relative", display: "block", width: "100%", height: "100%", objectFit: "fill", borderRadius: "4.72% / 3.37%", background: "#241a1f", boxShadow: "0 0 0 1px rgba(255,255,255,0.08)" }} />
       : <span style={{ position: "relative", display: "block", width: "100%", height: "100%", borderRadius: "4.72% / 3.37%", background: "#241a1f", boxShadow: "0 0 0 1px rgba(255,255,255,0.08)" }} />}
   </span>
 );
@@ -302,10 +302,12 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // into the row below whatever the fonts and names do.
   const moversRef = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<{ key: string; rows: number; heroW: number } | null>(null);
+  const [fontsTick, setFontsTick] = useState(0);
+  useEffect(() => { try { (document as Any).fonts.ready.then(() => setFontsTick((t) => t + 1)); } catch (e) {} }, []);
   useLayoutEffect(() => {
     const box = moversRef.current;
     if (!box) return;
-    const fitKey = `${shotKey}|${vw[0]}`;
+    const fitKey = `${shotKey}|${vw[0]}|${fontsTick}`;
     let rows = 99;
     box.querySelectorAll<HTMLElement>("[data-tile=list]").forEach((tile) => {
       const row = tile.querySelector<HTMLElement>("[data-row]");
@@ -326,8 +328,6 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     }
     if (rows === 99) rows = 0;
     if (!fit || fit.key !== fitKey || fit.rows !== rows || fit.heroW !== heroW) {
-      // Only shrink within one layout (more rows would change what's measured).
-      if (fit && fit.key === fitKey && rows >= fit.rows && heroW >= fit.heroW) return;
       setFit({ key: fitKey, rows, heroW });
     }
   });
@@ -371,10 +371,54 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     await new Promise((r) => requestAnimationFrame(() => r(null)));
     node.classList.add("wk-shot");
     try {
-      const opts = { pixelRatio: 2, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506", imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" };
-      // Warm-up passes: Safari often leaves images and fonts out of the first renders.
-      for (let i = 0; i < (isSafari ? 3 : 1); i++) await toBlob(node, opts);
-      const b = await toBlob(node, opts);
+      // The poster is rendered without its card images (Safari leaves pictures out of this kind
+      // of render, whatever their source), then each card is painted onto the canvas at its
+      // place on the poster: same position, size, rounded corners and tilt.
+      const PR = 2;
+      const opts = { pixelRatio: PR, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506",
+        filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && n.dataset.card) };
+      for (let i = 0; i < (isSafari ? 2 : 0); i++) await toCanvas(node, opts); // warm-up passes for Safari (fonts)
+      const canvas = await toCanvas(node, opts);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("no canvas");
+      const box = node.getBoundingClientRect();
+      const k = box.width / SHOT_W; // on-screen scale of the poster
+      const imgs = [...node.querySelectorAll<HTMLImageElement>("img[data-card]")];
+      // Load every image first, then paint them one at a time (each paint sets its own
+      // transform and clip on the shared canvas).
+      const loaded = await Promise.all(imgs.map(async (el) => {
+        const src = el.dataset.card || "";
+        const data = src.startsWith("data:") ? src : await toDataUrl(src);
+        if (!data) return null;
+        const im = new Image();
+        im.src = data;
+        try { await im.decode(); return im; } catch (e) { return null; }
+      }));
+      imgs.forEach((el, i) => {
+        const r = el.getBoundingClientRect();
+        const cx = ((r.left + r.right) / 2 - box.left) / k, cy = ((r.top + r.bottom) / 2 - box.top) / k;
+        const w = el.offsetWidth, h = el.offsetHeight;
+        const tilt = el.closest(".wk-float") ? (-4 * Math.PI) / 180 : 0;
+        ctx.save();
+        ctx.scale(PR, PR);
+        ctx.translate(cx, cy);
+        if (tilt) ctx.rotate(tilt);
+        const rx = w * 0.0472, ry = h * 0.0337;
+        ctx.beginPath();
+        ctx.moveTo(-w / 2 + rx, -h / 2);
+        ctx.lineTo(w / 2 - rx, -h / 2); ctx.ellipse(w / 2 - rx, -h / 2 + ry, rx, ry, 0, -Math.PI / 2, 0);
+        ctx.lineTo(w / 2, h / 2 - ry); ctx.ellipse(w / 2 - rx, h / 2 - ry, rx, ry, 0, 0, Math.PI / 2);
+        ctx.lineTo(-w / 2 + rx, h / 2); ctx.ellipse(-w / 2 + rx, h / 2 - ry, rx, ry, 0, Math.PI / 2, Math.PI);
+        ctx.lineTo(-w / 2, -h / 2 + ry); ctx.ellipse(-w / 2 + rx, -h / 2 + ry, rx, ry, 0, Math.PI, Math.PI * 1.5);
+        ctx.closePath();
+        ctx.clip();
+        ctx.fillStyle = "#241a1f";
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+        const im = loaded[i];
+        if (im) ctx.drawImage(im, -w / 2, -h / 2, w, h);
+        ctx.restore();
+      });
+      const b = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/png"));
       if (!b) throw new Error("no image");
       return b;
     } finally {
@@ -461,8 +505,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
 
   const story = fmt === "9:16", tall = fmt !== "1:1";
   const hero = week.up[0] || null;
-  const rowsMax = story ? 6 : tall ? 7 : 5;
-  const fitNow = fit && fit.key === `${shotKey}|${vw[0]}` ? fit : null;
+  const rowsMax = story ? 8 : tall ? 9 : 6;
+  const fitNow = fit && fit.key === `${shotKey}|${vw[0]}|${fontsTick}` ? fit : null;
   const rowsShown = fitNow && fitNow.rows ? Math.min(rowsMax, fitNow.rows) : rowsMax;
   const climbers = week.up.slice(hero ? 1 : 0, (hero ? 1 : 0) + rowsShown);
   const fallers = week.down.slice(0, rowsShown);
@@ -475,7 +519,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const big: React.CSSProperties = { fontFamily: "var(--font-display)", fontWeight: 700, lineHeight: 1 };
 
   const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number }> = ({ m, i, up, delay }) => (
-    <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: "10px 0", borderTop: i ? `1px solid ${C.line}` : "none" }}>
+    <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: tall ? "8px 0" : "10px 0", borderTop: i ? `1px solid ${C.line}` : "none" }}>
       <span style={{ ...mono, color: C.faint }}>{i + (up && hero ? 2 : 1)}</span>
       <Img src={pic(m.card.image)} w={34} />
       <span style={{ minWidth: 0 }}>
@@ -505,12 +549,11 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const gradTitle: React.CSSProperties = { background: `linear-gradient(90deg, #fff 0%, ${C.up} 55%, #c49bff 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" };
   const kicker = <div style={{ ...mono, fontSize: story ? 16 : 13, color: C.up }}>PSA 10 · {sales ? "weekly movers" : "ALT value movers"}</div>;
   const dates = <div style={{ fontFamily: "var(--font-data)", fontSize: story ? 22 : 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>;
-  const brand = <div style={{ ...mono, fontSize: story ? 14 : 12, color: C.faint }}>mew.cards</div>;
   const title = story ? (
     <div className="wk-in" style={{ position: "relative" }}>
       {kicker}
       <h1 style={{ margin: "14px 0 0", ...big, fontSize: 120, letterSpacing: "-0.03em", lineHeight: 0.95, ...gradTitle }}>JP Mews<br />Week {weekNo(end)}</h1>
-      <div style={{ marginTop: 18, display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>{dates}{brand}</div>
+      <div style={{ marginTop: 18 }}>{dates}</div>
     </div>
   ) : (
     <div className="wk-in" style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}>
@@ -518,7 +561,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         {kicker}
         <h1 style={{ margin: "8px 0 0", ...big, fontSize: 76, letterSpacing: "-0.02em", lineHeight: 1.0, ...gradTitle, whiteSpace: "nowrap" }}>JP Mews ・ Week {weekNo(end)}</h1>
       </div>
-      <div style={{ marginLeft: "auto", textAlign: "right", paddingBottom: 8, flex: "0 0 auto" }}>{dates}<div style={{ marginTop: 6 }}>{brand}</div></div>
+      <div style={{ marginLeft: "auto", textAlign: "right", paddingBottom: 8, flex: "0 0 auto" }}>{dates}</div>
     </div>
   );
   const indexTile = (
@@ -650,7 +693,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       {/* the poster (inside a 4px edge, which is what gets copied / downloaded) */}
       <div style={{ width: SHOT_W * scale, height: SHOT_H * scale, flex: "0 0 auto" }}>
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: story ? "150px 56px 170px" : 52, display: "flex", flexDirection: "column", gap: story ? 20 : 16 }}>
+        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: story ? "136px 56px 150px" : 52, display: "flex", flexDirection: "column", gap: story ? 20 : 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
           {title}
           {story ? (
