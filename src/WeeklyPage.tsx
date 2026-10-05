@@ -9,7 +9,8 @@ import * as D from "./mew-data";
  * Same data and password as /stats: the sheet's certs ("all cert"), the
  * ALT Worker's PSA 10 sales or daily ALT value, minus cards hidden in
  * /stats' All view. Japanese Mews only (no Cameo or Intl).
- * The infographic is a 1080×1080 square (scaled to fit) for Instagram / X.
+ * The infographic is 1080 wide at 1:1, 3:4 or 9:16 (story), scaled to fit, and can be
+ * copied or downloaded as a PNG for Instagram / X.
  * ------------------------------------------------------------------ */
 
 type Any = any;
@@ -18,6 +19,10 @@ type Mode = "sales" | "alt";
 
 const STATS_CONFIG_KEY = "mew_stats_config_v1";
 const MODE_KEY = "mew_stats_mode";
+const FMT_KEY = "mew_weekly_fmt";
+// Poster formats (all 1080 wide): square post, portrait post, Instagram story.
+type Fmt = "1:1" | "3:4" | "9:16";
+const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "Story"]];
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -178,7 +183,9 @@ export default function WeeklyPage() {
   const [hist, setHist] = useState<Map<string, Any>>(new Map());
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
   const shotRef = useRef<HTMLDivElement>(null);
-  const [shot, setShot] = useState<"" | "busy" | "ok" | "saved" | "err">("");
+  const [shot, setShot] = useState<"" | "busy" | "copy-ok" | "copy-err" | "save-ok" | "save-err">("");
+  const [fmt, setFmtState] = useState<Fmt>(() => { try { const v = localStorage.getItem(FMT_KEY); return FORMATS.some(([f]) => f === v) ? (v as Fmt) : "1:1"; } catch (e) { return "1:1"; } });
+  const setFmt = (f: Fmt) => { setFmtState(f); try { localStorage.setItem(FMT_KEY, f); } catch (e) {} };
   const [vw, setVw] = useState(() => [window.innerWidth, window.innerHeight]);
   const lang = /^ja\b/i.test(navigator.language || "") ? "JP" : "EN";
   const latest = sundayOf(todayISO());
@@ -268,60 +275,74 @@ export default function WeeklyPage() {
   }
 
   const sales = mode === "sales";
-  // Copy the square (plus its 4px edge) as a PNG. The image is made from the unscaled 1080px
-  // layout at 2x, with animations frozen in their end state. Falls back to a download where
-  // the browser can't put images on the clipboard.
-  const copyShot = async () => {
+  // Poster formats: 1080 wide, height by ratio. The copied/downloaded image is the poster plus
+  // a 4px edge, rendered from the unscaled layout at 2x with animations frozen in their end state.
+  const W = 1080, EDGE = 4;
+  const H = fmt === "9:16" ? 1920 : fmt === "3:4" ? 1440 : 1080;
+  const SHOT_W = W + EDGE * 2, SHOT_H = H + EDGE * 2;
+  const makeBlob = async () => {
     const node = shotRef.current;
-    if (!node || shot === "busy") return;
+    if (!node) throw new Error("no poster");
+    node.classList.add("wk-shot");
+    try {
+      const opts = { pixelRatio: 2, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506" };
+      await toBlob(node, opts); // first pass warms up fonts and images (Safari often drops them otherwise)
+      const b = await toBlob(node, opts);
+      if (!b) throw new Error("no image");
+      return b;
+    } finally {
+      node.classList.remove("wk-shot");
+      node.classList.add("wk-still");
+    }
+  };
+  const fileName = `jp-mews-week-${weekNo(end)}-${end}-${fmt.replace(":", "x")}.png`;
+  const saveBlob = (b: Blob) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b); a.download = fileName;
+    document.body.appendChild(a); a.click(); a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+  const flash = (which: "copy" | "save", st: "ok" | "err") => { setShot(`${which}-${st}`); window.setTimeout(() => setShot(""), 1800); };
+  const copyShot = async () => {
+    if (shot === "busy") return;
     setShot("busy");
-    const SHOT_PX = 1080 + 8;
-    const make = async () => {
-      node.classList.add("wk-shot");
-      try {
-        const opts = { pixelRatio: 2, width: SHOT_PX, height: SHOT_PX, style: { transform: "none" }, backgroundColor: "#060506" };
-        await toBlob(node, opts); // first pass warms up fonts and images (Safari often drops them otherwise)
-        const b = await toBlob(node, opts);
-        if (!b) throw new Error("no image");
-        return b;
-      } finally {
-        node.classList.remove("wk-shot");
-        node.classList.add("wk-still");
-      }
-    };
-    const done = (st: "ok" | "saved" | "err") => { setShot(st); window.setTimeout(() => setShot(""), 1800); };
-    const fileName = `jp-mews-week-${weekNo(end)}-${end}.png`;
-    const download = (b: Blob) => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(b); a.download = fileName;
-      document.body.appendChild(a); a.click(); a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    };
     try {
       const CI = (window as Any).ClipboardItem;
       if (navigator.clipboard && navigator.clipboard.write && CI) {
         // Hand the clipboard a promise so Safari keeps the click's permission while the image renders.
-        await navigator.clipboard.write([new CI({ "image/png": make() })]);
-        D.trackEvent("weekly_copy", { week: end, mode });
-        done("ok");
+        await navigator.clipboard.write([new CI({ "image/png": makeBlob() })]);
       } else {
-        download(await make());
-        done("saved");
+        saveBlob(await makeBlob()); // no image clipboard here: download instead
       }
+      D.trackEvent("weekly_copy", { week: end, mode, fmt });
+      flash("copy", "ok");
     } catch (e) {
       console.error(e);
-      try { download(await make()); done("saved"); } catch (e2) { done("err"); }
+      flash("copy", "err");
     }
   };
+  const downloadShot = async () => {
+    if (shot === "busy") return;
+    setShot("busy");
+    try {
+      saveBlob(await makeBlob());
+      D.trackEvent("weekly_download", { week: end, mode, fmt });
+      flash("save", "ok");
+    } catch (e) {
+      console.error(e);
+      flash("save", "err");
+    }
+  };
+
+  const story = fmt === "9:16", tall = fmt !== "1:1";
   const hero = week.up[0] || null;
-  const climbers = week.up.slice(hero ? 1 : 0, hero ? 5 : 4);
-  const fallers = week.down.slice(0, 4);
+  const rowsMax = story ? 5 : tall ? 6 : 4;
+  const climbers = week.up.slice(hero ? 1 : 0, (hero ? 1 : 0) + rowsMax);
+  const fallers = week.down.slice(0, rowsMax);
   const maxPct = Math.max(1, ...[...climbers, ...fallers].map((m) => Math.abs(m.pct)));
   const idxUp = week.idxPct >= 0;
   const nothing = !week.up.length && !week.down.length;
-  // The poster is laid out at 1080×1080 and scaled to fit the window (controls sit above it).
-  const SIZE = 1080, EDGE = 4, SHOT = SIZE + EDGE * 2; // the copied image: the square plus a 4px edge
-  const scale = Math.min(1, (vw[0] - 24) / SHOT, Math.max(320, vw[1] - 76) / SHOT);
+  const scale = Math.min(1, (vw[0] - 24) / SHOT_W, Math.max(320, vw[1] - 76) / SHOT_H);
   const big: React.CSSProperties = { fontFamily: "var(--font-display)", fontWeight: 700, lineHeight: 1 };
 
   const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number }> = ({ m, i, up, delay }) => (
@@ -351,6 +372,104 @@ export default function WeeklyPage() {
     </Tile>
   );
 
+  /* ---------- poster pieces, arranged per format below ---------- */
+  const gradTitle: React.CSSProperties = { background: `linear-gradient(90deg, #fff 0%, ${C.up} 55%, #c49bff 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" };
+  const kicker = <div style={{ ...mono, fontSize: story ? 16 : 13, color: C.up }}>PSA 10 · {sales ? "weekly movers" : "ALT value movers"}</div>;
+  const dates = <div style={{ fontFamily: "var(--font-data)", fontSize: story ? 22 : 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>;
+  const brand = <div style={{ ...mono, fontSize: story ? 14 : 12, color: C.faint }}>mew.cards</div>;
+  const title = story ? (
+    <div className="wk-in" style={{ position: "relative" }}>
+      {kicker}
+      <h1 style={{ margin: "14px 0 0", ...big, fontSize: 120, letterSpacing: "-0.03em", lineHeight: 0.95, ...gradTitle }}>JP Mews<br />Week {weekNo(end)}</h1>
+      <div style={{ marginTop: 18, display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>{dates}{brand}</div>
+    </div>
+  ) : (
+    <div className="wk-in" style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}>
+      <div style={{ minWidth: 0 }}>
+        {kicker}
+        <h1 style={{ margin: "8px 0 0", ...big, fontSize: 76, letterSpacing: "-0.02em", lineHeight: 1.0, ...gradTitle, whiteSpace: "nowrap" }}>JP Mews ・ Week {weekNo(end)}</h1>
+      </div>
+      <div style={{ marginLeft: "auto", textAlign: "right", paddingBottom: 8, flex: "0 0 auto" }}>{dates}<div style={{ marginTop: 6 }}>{brand}</div></div>
+    </div>
+  );
+  const indexTile = (
+    <Tile label={`${sales ? "Collection" : "ALT"} index · ${week.idxCards} cards`} delay={80}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginTop: 8 }}>
+        <Num v={week.index[week.index.length - 1] || 0} fmt={(n) => usd0.format(n)} style={{ ...big, fontSize: story ? 56 : 46 }} />
+        <span style={{ fontFamily: "var(--font-data)", fontWeight: 700, fontSize: story ? 24 : 20, color: idxUp ? C.up : C.down, textShadow: `0 0 14px ${idxUp ? C.upGlow : C.downGlow}` }}>{idxUp ? "▲" : "▼"} {fmtPct(week.idxPct)}</span>
+      </div>
+      <div style={{ marginTop: 12 }}><IndexLine pts={week.index} up={idxUp} /></div>
+    </Tile>
+  );
+  const statTiles = sales ? (
+    <>
+      <Tile label="Sales" delay={140}><Num v={week.nSales} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 40 }} /><Delta now={week.nSales} prev={prevWeek.nSales} /></Tile>
+      <Tile label="Volume" delay={200}><Num v={week.volume} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.volume} prev={prevWeek.volume} money /></Tile>
+      <Tile label="Cards traded" delay={260}><Num v={week.traded} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 40 }} /><Delta now={week.traded} prev={prevWeek.traded} /></Tile>
+      <Tile label="Avg sale" delay={320}><Num v={week.avg} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.avg} prev={prevWeek.avg} money /></Tile>
+    </>
+  ) : (
+    <>
+      <Tile label="Going up" delay={140}><Num v={week.up.length} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 56, color: C.up }} /><Delta now={week.up.length} prev={prevWeek.up.length} /></Tile>
+      <Tile label="Going down" delay={200}><Num v={week.down.length} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 56, color: C.down }} /><Delta now={week.down.length} prev={prevWeek.down.length} invert /></Tile>
+    </>
+  );
+  const heroBg = "linear-gradient(160deg, rgba(255,126,182,0.18), rgba(255,255,255,0.03) 65%)";
+  const heroTile = hero && (story ? (
+    <Tile label="Top climber" delay={260} style={{ position: "relative", overflow: "hidden", background: heroBg }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 36, marginTop: 14, padding: "0 12px" }}>
+        <span className="wk-float" style={{ display: "block" }}><Img src={hero.card.image} w={170} glow={C.upGlow} /></span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
+          <div style={{ marginTop: 16, fontWeight: 600, fontSize: 24, lineHeight: 1.25 }}>{name(hero.card)}</div>
+          <div style={{ marginTop: 6, fontFamily: "var(--font-data)", fontSize: 16, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
+        </div>
+      </div>
+    </Tile>
+  ) : (
+    <Tile label="Top climber" delay={260} style={{ position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", background: heroBg }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 14 }}>
+        <span className="wk-float" style={{ display: "block" }}><Img src={hero.card.image} w={tall ? 160 : 128} glow={C.upGlow} /></span>
+        <div style={{ ...big, fontSize: tall ? 60 : 54, color: C.up, textShadow: `0 0 24px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 18, lineHeight: 1.25 }}>{name(hero.card)}</div>
+          <div style={{ marginTop: 4, fontFamily: "var(--font-data)", fontSize: 13, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
+        </div>
+      </div>
+    </Tile>
+  ));
+  const climbersTile = (
+    <Tile label="Climbers" delay={320}>
+      <div style={{ marginTop: 8 }}>
+        {climbers.length ? climbers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up delay={380 + i * 60} />)
+          : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>{hero ? "Just the one this week." : "Nothing went up."}</div>}
+      </div>
+    </Tile>
+  );
+  const fallersTile = (
+    <Tile label="Fallers" delay={380}>
+      <div style={{ marginTop: 8 }}>
+        {fallers.length ? fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up={false} delay={440 + i * 60} />)
+          : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went down.</div>}
+      </div>
+    </Tile>
+  );
+  const quiet = (
+    <Tile label="Quiet week" delay={200} style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+      <div style={{ marginTop: 12, fontSize: 20, color: C.muted }}>{sales ? "No price moves from sales this week." : "No ALT value moves this week."}</div>
+    </Tile>
+  );
+  const highlights = sales && (week.biggest || week.busiest) && (
+    <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: week.busiest && week.biggest ? "1fr 1fr" : "1fr" }}>
+      {week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={fmtUSD(week.biggest.value)} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
+      {week.busiest && <Highlight label="Most traded" delay={560} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
+    </div>
+  );
+
+  const pill = (on: boolean): React.CSSProperties => ({ ...mono, fontSize: 10, cursor: "pointer", padding: "7px 10px", borderRadius: 6, border: `1px solid ${on ? C.up : C.line}`, background: on ? C.up : "transparent", color: on ? "#1a0a12" : C.muted, fontWeight: 700 });
+  const iconCol = (which: "copy" | "save") => (shot === `${which}-ok` ? GREEN : shot === `${which}-err` ? RED : C.text);
+  const check = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
+
   return (
     <div style={{ minHeight: "100vh", background: "#060506", color: C.text, fontFamily: "var(--font-body)", display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 12px 24px", boxSizing: "border-box" }}>
       <style>{`
@@ -360,7 +479,7 @@ export default function WeeklyPage() {
         @keyframes wkBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
         .wk-float { animation: wkFl 6s ease-in-out infinite; }
         @keyframes wkFl { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(-2deg); } }
-        .wk-nav { background: none; border: 1px solid ${C.line}; color: ${C.text}; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .wk-nav { background: none; border: 1px solid ${C.line}; color: ${C.text}; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
         .wk-nav:disabled { opacity: .25; cursor: default; }
         .wk-nav:not(:disabled):hover { border-color: ${C.up}; color: ${C.up}; }
         .wk-shot .wk-in, .wk-shot .wk-bar, .wk-shot .wk-float, .wk-still .wk-in, .wk-still .wk-bar { animation: none !important; }
@@ -368,8 +487,8 @@ export default function WeeklyPage() {
         @media (prefers-reduced-motion: reduce) { .wk-in, .wk-bar, .wk-float { animation: none !important; } }
       `}</style>
 
-      {/* controls (outside the square, so screenshots of the square stay clean) */}
-      <div style={{ width: SHOT * scale, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+      {/* controls (outside the poster, so images of it stay clean) */}
+      <div style={{ width: Math.max(SHOT_W * scale, Math.min(vw[0] - 24, 560)), display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <a href="/stats/" style={{ ...mono, color: C.muted, textDecoration: "none" }}>← Stats</a>
         <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           <button type="button" className="wk-nav" onClick={() => setEnd(addDays(end, -7))} aria-label="Previous week">‹</button>
@@ -377,105 +496,55 @@ export default function WeeklyPage() {
         </span>
         <span style={{ display: "flex", gap: 4 }}>
           {(["sales", "alt"] as Mode[]).map((m) => (
-            <button key={m} type="button" onClick={() => setMode(m)} style={{ ...mono, fontSize: 10, cursor: "pointer", padding: "7px 10px", borderRadius: 6, border: `1px solid ${mode === m ? C.up : C.line}`, background: mode === m ? C.up : "transparent", color: mode === m ? "#1a0a12" : C.muted, fontWeight: 700 }}>{m === "sales" ? "Sales" : "ALT value"}</button>
+            <button key={m} type="button" onClick={() => setMode(m)} style={pill(mode === m)}>{m === "sales" ? "Sales" : "ALT value"}</button>
           ))}
         </span>
-        <button type="button" className="wk-nav" onClick={copyShot} disabled={shot === "busy"} aria-label="Copy image to clipboard" title={shot === "saved" ? "Saved as a PNG" : shot === "err" ? "Couldn't copy" : "Copy image"}
-          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", color: shot === "ok" || shot === "saved" ? GREEN : shot === "err" ? RED : C.text }}>
-          {shot === "ok" || shot === "saved" ? (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-          ) : (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: shot === "busy" ? 0.4 : 1 }}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
-          )}
-        </button>
+        <span style={{ display: "flex", gap: 4 }}>
+          {FORMATS.map(([f, label]) => (
+            <button key={f} type="button" onClick={() => setFmt(f)} aria-pressed={fmt === f} title={f === "9:16" ? "Instagram story" : f === "3:4" ? "Portrait post" : "Square post"} style={pill(fmt === f)}>{label}</button>
+          ))}
+        </span>
+        <span style={{ display: "flex", gap: 6 }}>
+          <button type="button" className="wk-nav" onClick={copyShot} disabled={shot === "busy"} aria-label="Copy image to clipboard" title={shot === "copy-err" ? "Couldn't copy" : "Copy image"} style={{ color: iconCol("copy") }}>
+            {shot === "copy-ok" ? check : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>}
+          </button>
+          <button type="button" className="wk-nav" onClick={downloadShot} disabled={shot === "busy"} aria-label="Download image" title={shot === "save-err" ? "Couldn't save" : "Download image"} style={{ color: iconCol("save") }}>
+            {shot === "save-ok" ? check : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11" /><path d="M7 10.5l5 5 5-5" /><path d="M5 20h14" /></svg>}
+          </button>
+        </span>
       </div>
 
-      {/* the square (inside a 4px edge, which is what gets copied) */}
-      <div style={{ width: SHOT * scale, height: SHOT * scale, flex: "0 0 auto" }}>
-       <div ref={shotRef} style={{ width: SHOT, height: SHOT, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-        <div key={`${end}-${mode}`} style={{ width: SIZE, height: SIZE, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
-          <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% 50% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% 45% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
-
-          {/* title */}
-          <div className="wk-in" style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ ...mono, fontSize: 13, color: C.up }}>PSA 10 · {sales ? "weekly movers" : "ALT value movers"}</div>
-              <h1 style={{ margin: "8px 0 0", ...big, fontSize: 76, letterSpacing: "-0.02em", lineHeight: 1.0, background: `linear-gradient(90deg, #fff 0%, ${C.up} 55%, #c49bff 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", whiteSpace: "nowrap" }}>
-                JP Mews ・ Week {weekNo(end)}
-              </h1>
-            </div>
-            <div style={{ marginLeft: "auto", textAlign: "right", paddingBottom: 8, flex: "0 0 auto" }}>
-              <div style={{ fontFamily: "var(--font-data)", fontSize: 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>
-              <div style={{ marginTop: 6, ...mono, fontSize: 12, color: C.faint }}>mew.cards</div>
-            </div>
-          </div>
-
-          {/* index + stats */}
-          <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: "1.3fr 1fr" }}>
-            <Tile label={`${sales ? "Collection" : "ALT"} index · ${week.idxCards} cards`} delay={80}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginTop: 8 }}>
-                <Num v={week.index[week.index.length - 1] || 0} fmt={(n) => usd0.format(n)} style={{ ...big, fontSize: 46 }} />
-                <span style={{ fontFamily: "var(--font-data)", fontWeight: 700, fontSize: 20, color: idxUp ? C.up : C.down, textShadow: `0 0 14px ${idxUp ? C.upGlow : C.downGlow}` }}>{idxUp ? "▲" : "▼"} {fmtPct(week.idxPct)}</span>
-              </div>
-              <div style={{ marginTop: 12 }}><IndexLine pts={week.index} up={idxUp} /></div>
-            </Tile>
-            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>
-              {sales ? (
+      {/* the poster (inside a 4px edge, which is what gets copied / downloaded) */}
+      <div style={{ width: SHOT_W * scale, height: SHOT_H * scale, flex: "0 0 auto" }}>
+       <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
+        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: story ? "150px 56px 170px" : 52, display: "flex", flexDirection: "column", gap: story ? 20 : 16 }}>
+          <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
+          {title}
+          {story ? (
+            <>
+              <div style={{ position: "relative", marginTop: 10 }}>{indexTile}</div>
+              <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: sales ? "repeat(4, 1fr)" : "1fr 1fr" }}>{statTiles}</div>
+              {nothing ? quiet : (
                 <>
-                  <Tile label="Sales" delay={140}><Num v={week.nSales} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 40 }} /><Delta now={week.nSales} prev={prevWeek.nSales} /></Tile>
-                  <Tile label="Volume" delay={200}><Num v={week.volume} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.volume} prev={prevWeek.volume} money /></Tile>
-                  <Tile label="Cards traded" delay={260}><Num v={week.traded} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 40 }} /><Delta now={week.traded} prev={prevWeek.traded} /></Tile>
-                  <Tile label="Avg sale" delay={320}><Num v={week.avg} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.avg} prev={prevWeek.avg} money /></Tile>
-                </>
-              ) : (
-                <>
-                  <Tile label="Going up" delay={140}><Num v={week.up.length} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 56, color: C.up }} /><Delta now={week.up.length} prev={prevWeek.up.length} /></Tile>
-                  <Tile label="Going down" delay={200}><Num v={week.down.length} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 56, color: C.down }} /><Delta now={week.down.length} prev={prevWeek.down.length} invert /></Tile>
+                  {heroTile && <div style={{ position: "relative" }}>{heroTile}</div>}
+                  <div style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>{climbersTile}{fallersTile}</div>
                 </>
               )}
-            </div>
-          </div>
-
-          {/* movers */}
-          {nothing ? (
-            <Tile label="Quiet week" delay={200} style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-              <div style={{ marginTop: 12, fontSize: 20, color: C.muted }}>{sales ? "No price moves from sales this week." : "No ALT value moves this week."}</div>
-            </Tile>
+              {highlights}
+            </>
           ) : (
-            <div style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: hero ? "1.05fr 1fr 1fr" : "1fr 1fr" }}>
-              {hero && (
-                <Tile label="Top climber" delay={260} style={{ position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", background: "linear-gradient(160deg, rgba(255,126,182,0.18), rgba(255,255,255,0.03) 65%)" }}>
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 14 }}>
-                    <span className="wk-float" style={{ display: "block" }}><Img src={hero.card.image} w={128} glow={C.upGlow} /></span>
-                    <div style={{ ...big, fontSize: 54, color: C.up, textShadow: `0 0 24px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 18, lineHeight: 1.25 }}>{name(hero.card)}</div>
-                      <div style={{ marginTop: 4, fontFamily: "var(--font-data)", fontSize: 13, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
-                    </div>
-                  </div>
-                </Tile>
+            <>
+              <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: "1.3fr 1fr" }}>
+                {indexTile}
+                <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr" }}>{statTiles}</div>
+              </div>
+              {nothing ? quiet : (
+                <div style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: hero ? "1.05fr 1fr 1fr" : "1fr 1fr" }}>
+                  {heroTile}{climbersTile}{fallersTile}
+                </div>
               )}
-              <Tile label="Climbers" delay={320}>
-                <div style={{ marginTop: 8 }}>
-                  {climbers.length ? climbers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up delay={380 + i * 60} />)
-                    : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>{hero ? "Just the one this week." : "Nothing went up."}</div>}
-                </div>
-              </Tile>
-              <Tile label="Fallers" delay={380}>
-                <div style={{ marginTop: 8 }}>
-                  {fallers.length ? fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up={false} delay={440 + i * 60} />)
-                    : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went down.</div>}
-                </div>
-              </Tile>
-            </div>
-          )}
-
-          {/* sale highlights */}
-          {sales && (week.biggest || week.busiest) && (
-            <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: week.busiest && week.biggest ? "1fr 1fr" : "1fr" }}>
-              {week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={fmtUSD(week.biggest.value)} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
-              {week.busiest && <Highlight label="Most traded" delay={560} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
-            </div>
+              {highlights}
+            </>
           )}
         </div>
        </div>
