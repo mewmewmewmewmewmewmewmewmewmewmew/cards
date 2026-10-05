@@ -301,21 +301,27 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // show only the rows that fit, and size the top climber's card to its tile, so nothing spills
   // into the row below whatever the fonts and names do.
   const moversRef = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState<{ key: string; rows: number; heroW: number } | null>(null);
+  const [fit, setFit] = useState<{ key: string; rows: number; heroW: number; pad: number } | null>(null);
   const [fontsTick, setFontsTick] = useState(0);
   useEffect(() => { try { (document as Any).fonts.ready.then(() => setFontsTick((t) => t + 1)); } catch (e) {} }, []);
   useLayoutEffect(() => {
     const box = moversRef.current;
     if (!box) return;
     const fitKey = `${shotKey}|${vw[0]}|${fontsTick}`;
-    let rows = 99;
+    // Rows can tighten their padding (down to 4px) when that lets one more fit, then spread the
+    // space that's left evenly, so the lists end flush with the bottom of their tiles.
+    let rows = 99, pad = 99;
     box.querySelectorAll<HTMLElement>("[data-tile=list]").forEach((tile) => {
       const row = tile.querySelector<HTMLElement>("[data-row]");
       const label = tile.querySelector<HTMLElement>("[data-label]");
       if (!row || !label) return;
       const avail = tile.clientHeight - 36 - label.offsetHeight - 8; // padding, label, list margin
-      rows = Math.min(rows, Math.max(1, Math.floor((avail + 1) / (row.offsetHeight + 1))));
+      const content = row.offsetHeight - 2 * (parseFloat(getComputedStyle(row).paddingTop) || 0);
+      const n = Math.max(1, Math.floor((avail + 1) / (content + 8 + 1)));
+      rows = Math.min(rows, n);
+      pad = Math.min(pad, Math.floor(((avail + 1) / n - 1 - content) / 2));
     });
+    pad = Math.max(4, Math.min(12, pad));
     let heroW = 0;
     const hero = box.querySelector<HTMLElement>("[data-tile=hero]");
     if (hero) {
@@ -326,9 +332,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         heroW = Math.max(56, Math.floor(avail / (88 / 63)));
       }
     }
-    if (rows === 99) rows = 0;
-    if (!fit || fit.key !== fitKey || fit.rows !== rows || fit.heroW !== heroW) {
-      setFit({ key: fitKey, rows, heroW });
+    if (rows === 99) { rows = 0; pad = 0; }
+    if (!fit || fit.key !== fitKey || fit.rows !== rows || fit.heroW !== heroW || fit.pad !== pad) {
+      setFit({ key: fitKey, rows, heroW, pad });
     }
   });
   useEffect(() => {
@@ -519,7 +525,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const big: React.CSSProperties = { fontFamily: "var(--font-display)", fontWeight: 700, lineHeight: 1 };
 
   const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number }> = ({ m, i, up, delay }) => (
-    <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: tall ? "8px 0" : "10px 0", borderTop: i ? `1px solid ${C.line}` : "none" }}>
+    <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${fitNow && fitNow.pad ? fitNow.pad : tall ? 8 : 10}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
       <span style={{ ...mono, color: C.faint }}>{i + (up && hero ? 2 : 1)}</span>
       <Img src={pic(m.card.image)} w={34} />
       <span style={{ minWidth: 0 }}>
