@@ -564,7 +564,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       </span>
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
         <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: up ? C.gain : C.down, textShadow: `0 0 12px ${up ? C.gainGlow : C.downGlow}` }}>{fmtPct(m.pct)}</span>
-        <span style={{ marginTop: 3, fontFamily: "var(--font-data)", fontSize: 12, color: up ? C.gain : C.down, opacity: 0.8 }}>{m.to >= m.from ? "+" : "−"}{usd0.format(Math.abs(m.to - m.from))}</span>
+        <span style={{ marginTop: 3, fontFamily: "var(--font-data)", fontSize: 12, color: C.text }}>{m.to >= m.from ? "+" : "−"}{usd0.format(Math.abs(m.to - m.from))}</span>
       </span>
     </div>
   );
@@ -673,7 +673,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const highlights = sales && (week.biggest || week.busiest) && (
     <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: week.busiest && week.biggest ? "1fr 1fr" : "1fr" }}>
       {week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={fmtUSD(week.biggest.value)} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
-      {week.busiest && <Highlight label="Most traded" delay={560} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
+      {week.busiest && <Highlight label="Most sold" delay={560} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
     </div>
   );
 
