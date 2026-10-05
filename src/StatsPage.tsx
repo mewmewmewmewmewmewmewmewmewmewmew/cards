@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as D from "./mew-data";
 import { MewIcon, CameoIcon, IntlIcon } from "./icons";
 import WeeklyView from "./WeeklyView";
+import Loader from "./Loader";
 
 /* ------------------------------------------------------------------ *
  * /stats — PSA 10 prices for every card in the sheet.
@@ -219,6 +220,7 @@ export default function StatsPage() {
   useEffect(() => { savePref("mew_stats_list", list); setSelected(null); }, [list]);
   const [histP, setHistP] = useState<Map<string, Any>>(new Map());
   const [histPDone, setHistPDone] = useState(false);
+  const [pTotal, setPTotal] = useState(0); // personal (non-10) certs to fetch
   const [diagP, setDiagP] = useState<Any>(null);
   const [view, setView] = useState<"grid" | "list">(() => readPref("mew_stats_view", "grid" as "grid" | "list", (v) => v === "grid" || v === "list"));
   useEffect(() => { savePref("mew_stats_view", view); }, [view]);
@@ -316,8 +318,11 @@ export default function StatsPage() {
       setHiddenLists(hl ? { all: new Set(hl.all), personal: new Set(hl.personal) } : null);
       setPhase("ready");
       const certs = all.map((c: Any) => D.certOf(c)).filter(Boolean) as string[];
+      // The page stays on the loading screen until every cert's ALT data is in (both passes);
+      // an ALT failure is shown in the Data check rather than blocking the page.
       setDiag({ requests: 0, ok: 0, errors: [] });
-      await D.fetchAltHistories(certs, (m, d) => { setHist(m); setDiag({ ...d, errors: [...d.errors] }); });
+      try { await D.fetchAltHistories(certs, (m, d) => { setHist(m); setDiag({ ...d, errors: [...d.errors] }); }); }
+      catch (e) { console.error(e); }
       setHistDone(true);
       // Personal: owned PSA 10s reuse the data above; other owned grades are fetched at that grade.
       const pairs: Array<{ cert: string; grade: number }> = [];
@@ -327,8 +332,10 @@ export default function StatsPage() {
         if (!cert || !g || g === 10 || seen.has(cert)) continue;
         seen.add(cert); pairs.push({ cert, grade: g });
       }
+      setPTotal(pairs.length);
       setDiagP({ requests: 0, ok: 0, errors: [] });
-      await D.fetchAltByGrade(pairs, (m, d) => { setHistP(m); setDiagP({ ...d, errors: [...d.errors] }); });
+      try { await D.fetchAltByGrade(pairs, (m, d) => { setHistP(m); setDiagP({ ...d, errors: [...d.errors] }); }); }
+      catch (e) { console.error(e); }
       setHistPDone(true);
     } catch (e: Any) {
       if (e && e.message === "auth") { setPw(""); setPhase("password"); }
@@ -468,22 +475,22 @@ export default function StatsPage() {
   const noScope = !scope.mew && !scope.cameo && !scope.intl;
   const sales = mode === "sales";
 
-  /* ---------- gate ---------- */
-  if (phase !== "ready" && phase !== "error") {
+  /* ---------- gate: password, then loading until all ALT data is in ---------- */
+  const allLoaded = histDone && histPDone;
+  if ((phase !== "ready" && phase !== "error") || (phase === "ready" && !allLoaded)) {
+    // Sheets ≈ the first 8%; the rest follows the certs answered (main pass, then owned grades).
+    const want = totalCerts + (histDone ? pTotal : 0);
+    const got = Math.min(loadedCerts, totalCerts) + (histDone ? Math.min(histP.size, pTotal) : 0);
+    const progress = phase === "ready" ? 8 + (want ? (92 * got) / want : histDone ? 92 : 0) : phase === "loading" ? 4 : 0;
     return (
-      <div data-theme={theme} style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box", background: theme === "dark" ? "#101010" : "var(--surface-page)" }}>
-        <div style={{ position: "relative", width: 112, height: 112, flex: "0 0 auto" }}>
-          <div className="loading-swirl" aria-hidden="true" style={{ position: "absolute", inset: 0 }} />
-          <img src="/assets/mew-logo.png" alt="Loading..." style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.25 }} />
-        </div>
+      <Loader theme={theme} progress={progress}>
         {phase === "password" && (
           <form onSubmit={(e) => { e.preventDefault(); if (pw) load(pw); }} style={{ position: "absolute", top: "50%", left: 0, right: 0, marginTop: 72, display: "flex", justifyContent: "center", animation: "mewFadeUp 400ms var(--ease) both" }}>
             <input type="password" className="mew-gate-input" value={pw} onChange={(e) => setPw(e.target.value)} aria-label="Password" autoFocus
               style={{ height: 30, width: 96, padding: "0 10px", boxSizing: "border-box", borderRadius: 6, textAlign: "center", fontFamily: "var(--font-body)", fontSize: 13, letterSpacing: "0.25em", textIndent: "0.25em", outline: "none" }} />
           </form>
         )}
-        <div style={{ position: "absolute", bottom: 16, left: 0, right: 0, textAlign: "center", fontFamily: "var(--font-data)", fontSize: 10, fontWeight: 600, color: "rgba(203, 151, 165, 0.8)" }}>v{D.APP_VERSION}</div>
-      </div>
+      </Loader>
     );
   }
 

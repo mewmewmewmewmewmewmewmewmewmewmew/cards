@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toCanvas } from "html-to-image";
 import * as D from "./mew-data";
+import Loader from "./Loader";
 
 /* ------------------------------------------------------------------ *
  * Weekly view of /stats (/stats/#weekly) — a one-page infographic of the week's biggest PSA 10 moves.
@@ -20,7 +21,7 @@ type Mode = "sales" | "alt";
 const FMT_KEY = "mew_weekly_fmt";
 // Poster formats (all 1080 wide): square post, portrait post, Instagram story.
 type Fmt = "1:1" | "3:4" | "9:16";
-const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "Story"]];
+const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"]];
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -386,19 +387,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     return () => window.clearTimeout(t);
   }, [shotKey, shareFiles, done]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ---------- still loading the ALT data ---------- */
+  /* ---------- still loading the ALT data (normally /stats has already waited for it) ---------- */
   if (!done) {
     const totalCerts = new Set(cards.map((c: Any) => D.certOf(c)).filter(Boolean)).size;
-    return (
-      <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box", background: "#101010" }}>
-        <div style={{ position: "relative", width: 112, height: 112 }}>
-          <div className="loading-swirl" aria-hidden="true" style={{ position: "absolute", inset: 0 }} />
-          <img src="/assets/mew-logo.png" alt="Loading..." style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.25 }} />
-        </div>
-        <div style={{ position: "absolute", top: "50%", marginTop: 76, ...mono, color: "rgba(203,151,165,0.8)" }}>reading {Math.min(hist.size, totalCerts)}/{totalCerts} cards</div>
-        <button type="button" onClick={onBack} style={{ position: "absolute", top: 16, left: 16, ...mono, background: "none", border: "none", cursor: "pointer", color: "rgba(203,151,165,0.8)" }}>← Stats</button>
-      </div>
-    );
+    return <Loader progress={totalCerts ? (100 * Math.min(hist.size, totalCerts)) / totalCerts : 0} />;
   }
 
   const sales = mode === "sales";
@@ -626,7 +618,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     <>
       <Tile label="Sales" delay={140}><Num v={week.nSales} fmt={(n) => String(Math.round(n))} style={{ display: "block", marginTop: 12, ...big, fontSize: 40 }} /><Delta now={week.nSales} prev={prevWeek.nSales} /></Tile>
       <Tile label="Volume" delay={200}><Num v={week.volume} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.volume} prev={prevWeek.volume} money /></Tile>
-      <Tile label="Up vs down" delay={260}>
+      <Tile label="Avg sale" delay={260}><Num v={week.avg} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.avg} prev={prevWeek.avg} money /></Tile>
+      <Tile label="Up vs down" delay={320}>
         <div style={{ marginTop: 12, display: "flex", alignItems: "baseline", gap: 10, ...big, fontSize: 36 }}>
           <span style={{ color: C.gain }}>{week.up.length}<span style={{ fontSize: 18 }}> ▲</span></span>
           <span style={{ color: C.faint, fontSize: 24 }}>/</span>
@@ -634,7 +627,6 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         </div>
         <div style={{ marginTop: 8, fontFamily: "var(--font-data)", fontSize: 13, color: C.faint, whiteSpace: "nowrap" }}>last week {prevWeek.up.length} ▲ / {prevWeek.down.length} ▼</div>
       </Tile>
-      <Tile label="Avg sale" delay={320}><Num v={week.avg} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.avg} prev={prevWeek.avg} money /></Tile>
     </>
   ) : (
     <>
@@ -694,8 +686,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const highlights = nHigh > 0 && (
     <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: `repeat(${nHigh}, minmax(0, 1fr))` }}>
       {sales && week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={fmtUSD(week.biggest.value)} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
-      {sales && week.busiest && <Highlight label="Most sold" delay={560} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
-      {week.bigGain && <Highlight label="Biggest gain" delay={620} img={week.bigGain.card.image} title={`+${usd0.format(week.bigGain.to - week.bigGain.from)}`} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
+      {week.bigGain && <Highlight label="Biggest gain" delay={560} img={week.bigGain.card.image} title={`+${usd0.format(week.bigGain.to - week.bigGain.from)}`} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
+      {sales && week.busiest && <Highlight label="Most sold" delay={620} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
     </div>
   );
 
