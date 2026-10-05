@@ -699,7 +699,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       {/* the poster (inside a 4px edge, which is what gets copied / downloaded) */}
       <div style={{ width: SHOT_W * scale, height: SHOT_H * scale, flex: "0 0 auto" }}>
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: story ? "136px 56px 150px" : 52, display: "flex", flexDirection: "column", gap: story ? 20 : 16 }}>
+        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: story ? "76px 56px 80px" : 52, display: "flex", flexDirection: "column", gap: story ? 20 : 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
           {title}
           {story ? (
