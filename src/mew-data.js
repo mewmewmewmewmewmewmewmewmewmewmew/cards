@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "28.2";
+export const APP_VERSION = "28.3";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -399,7 +399,9 @@ function checkResult(r, grade) {
  * returns that card's series and sales at the requested grade. Budget errors retry up to twice.
  * pairs: [{ cert, grade }]. onBatch(results, diag); diag = { requests, ok, errors[] }.
  */
-export async function fetchAltByGrade(pairs, onBatch) {
+export async function fetchAltByGrade(pairs, onBatch, opts) {
+  // opts.fresh: ask the Worker to skip its 12h cache and fetch from ALT (the "Refresh now" button).
+  const fresh = opts && opts.fresh ? "&fresh=1" : "";
   const byGrade = new Map();
   for (const { cert, grade } of pairs) {
     if (!cert || !grade) continue;
@@ -411,7 +413,7 @@ export async function fetchAltByGrade(pairs, onBatch) {
   for (const [grade, set] of byGrade) {
     const certs = [...set];
     const publish = (raw) => { raw.forEach((r, c) => results.set(c, checkResult(r, grade))); if (onBatch) onBatch(new Map(results), diag); };
-    const left = await altBatches(certs, `&sales=1&grade=${grade}&grader=PSA`, grade === 10 ? "" : `PSA ${grade}: `, new Map(), diag, publish);
+    const left = await altBatches(certs, `&sales=1&grade=${grade}&grader=PSA${fresh}`, grade === 10 ? "" : `PSA ${grade}: `, new Map(), diag, publish);
     left.forEach((c) => { if (!results.has(c)) results.set(c, checkResult({ cert: c, history: null, sales: [], error: "Couldn't load, try again later" }, grade)); });
   }
   if (onBatch) onBatch(new Map(results), diag);
@@ -419,8 +421,8 @@ export async function fetchAltByGrade(pairs, onBatch) {
 }
 
 /** Every cert at PSA 10 (the "All" view). */
-export function fetchAltHistories(certs, onBatch) {
-  return fetchAltByGrade([...new Set(certs.filter(Boolean))].map((cert) => ({ cert, grade: 10 })), onBatch);
+export function fetchAltHistories(certs, onBatch, opts) {
+  return fetchAltByGrade([...new Set(certs.filter(Boolean))].map((cert) => ({ cert, grade: 10 })), onBatch, opts);
 }
 
 /** The PSA grade you own (from the sheet's pc column), 1–10, or null (blank, N/A, RAW). */

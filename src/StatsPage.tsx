@@ -323,17 +323,33 @@ export default function StatsPage() {
     return () => window.removeEventListener("resize", on);
   }, []);
 
-  /** Fetch every cert's ALT data again (in the background) and save it. */
-  const refreshAlt = async () => {
+  /**
+   * Fetch every cert's ALT data again (in the background) and save it. The Worker keeps its own
+   * 12h copy: "Refresh now" (force) asks it to go to ALT for everything; the automatic 12h
+   * refresh takes the Worker's copy and only forces the ones it reports as stale.
+   */
+  const refreshAlt = async (force = false) => {
     const job = altJob.current;
     if (!job || refreshing) return;
     setRefreshing(true);
+    const withStale = async (first: Map<string, Any>, again: (stale: string[]) => Promise<Map<string, Any>>) => {
+      const stale = [...first].filter(([, r]) => r && r.cache === "stale").map(([c]) => c);
+      if (force || !stale.length) return first;
+      const fresh = await again(stale);
+      const out = new Map(first);
+      fresh.forEach((r, c) => { if (AC.keepable(r)) out.set(c, r); });
+      return out;
+    };
     try {
-      const d10 = await D.fetchAltHistories(job.certs, (_m, d) => setDiag({ ...d, errors: [...d.errors] }));
+      const d10 = await withStale(
+        await D.fetchAltHistories(job.certs, (_m, d) => setDiag({ ...d, errors: [...d.errors] }), { fresh: force }),
+        (stale) => D.fetchAltHistories(stale, null, { fresh: true }));
       // Keep the saved result for any cert this refresh couldn't get.
       setHist((cur) => { const n = new Map(cur); d10.forEach((r, c) => { if (AC.keepable(r) || !n.has(c)) n.set(c, r); }); return n; });
       const gradeOf = new Map(job.pairs.map((p) => [p.cert, p.grade]));
-      const dP = job.pairs.length ? await D.fetchAltByGrade(job.pairs, (_m, d) => setDiagP({ ...d, errors: [...d.errors] })) : new Map();
+      const dP = job.pairs.length ? await withStale(
+        await D.fetchAltByGrade(job.pairs, (_m, d) => setDiagP({ ...d, errors: [...d.errors] }), { fresh: force }),
+        (stale) => D.fetchAltByGrade(job.pairs.filter((p) => stale.includes(p.cert)), null, { fresh: true })) : new Map<string, Any>();
       setHistP((cur) => { const n = new Map(cur); dP.forEach((r, c) => { if (AC.keepable(r) || !n.has(c)) n.set(c, r); }); return n; });
       const at = Date.now();
       await AC.save(dP, (c) => gradeOf.get(c) || 10);
@@ -551,6 +567,14 @@ export default function StatsPage() {
   const loadedCerts = [...allCerts].filter((c) => hist.has(c as string)).length;
   const noScope = !scope.mew && !scope.cameo && !scope.intl;
   const sales = mode === "sales";
+
+  // Age of the Worker's cached ALT data behind what's shown (its oldest and newest results).
+  const workerAge = useMemo(() => {
+    let lo = Infinity, hi = -Infinity;
+    [hist, histP].forEach((m) => m.forEach((r: Any) => { const t = r && r.cachedAt ? Date.parse(r.cachedAt) : NaN; if (isFinite(t)) { lo = Math.min(lo, t); hi = Math.max(hi, t); } }));
+    if (!isFinite(lo)) return "";
+    return ago(hi) === ago(lo) ? `from ${ago(lo)}` : `from ${ago(hi)} to ${ago(lo)}`;
+  }, [hist, histP]);
 
   /* ---------- gate: password, then loading until all ALT data is in ---------- */
   const allLoaded = histDone && histPDone && imgs.finished;
@@ -857,7 +881,8 @@ export default function StatsPage() {
                   <div style={{ marginTop: 10, display: "grid", gap: 2 }}>
                     <div style={line}>
                       ALT data · {refreshing ? "refreshing…" : altAt ? `saved ${ago(altAt)}, refreshes after 12h` : "not saved yet"}
-                      {!refreshing && altAt && <> · <button type="button" onClick={refreshAlt} style={{ font: "inherit", color: "var(--text-accent)", background: "none", border: "none", padding: 0, cursor: "pointer" }}>Refresh now</button></>}
+                      {workerAge && <> · Worker copy {workerAge}</>}
+                      {!refreshing && altAt && <> · <button type="button" onClick={() => refreshAlt(true)} style={{ font: "inherit", color: "var(--text-accent)", background: "none", border: "none", padding: 0, cursor: "pointer" }}>Refresh now</button></>}
                     </div>
                     <div style={line}>Sheet · {cards.length} rows</div>
                     {tabs.map((t) => {
