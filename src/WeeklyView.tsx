@@ -122,9 +122,6 @@ const C = {
   down: "#9fb4ff",
   downGlow: "rgba(159,180,255,0.35)",
 };
-// The story's top-climber box: solid on its left half so the part reaching down joins seamlessly.
-const HERO_SOLID = "#2a1620";
-const HERO_TOP_BG = `linear-gradient(90deg, ${HERO_SOLID} 0%, ${HERO_SOLID} 46%, #161216 100%)`;
 const mono: React.CSSProperties = { fontFamily: "var(--font-data)", letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11 };
 
 /**
@@ -338,8 +335,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       }
     }
     if (rows === 99) { rows = 0; pad = 0; }
-    // Story: where the top climber's box reaches down to (the bottom of the climbers' #1 slot),
-    // and the big card filling its left half.
+    // Story: the area for the top climber's big card, from below its box's label down to the
+    // bottom of the climbers' (empty) #1 slot, in the left column.
     let nextExt: typeof ext = null;
     const sr = storyRef.current;
     const top = sr && sr.querySelector<HTMLElement>("[data-tile=hero-top]");
@@ -347,7 +344,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     const list = box.querySelector<HTMLElement>("[data-tile=list]");
     if (sr && top && slot && list) {
       const t = top.offsetTop + top.offsetHeight - 1;
-      const bottom = box.offsetTop + slot.offsetTop + slot.offsetHeight + 6;
+      const bottom = box.offsetTop + slot.offsetTop + slot.offsetHeight + 4;
       const w = list.offsetWidth;
       const regionTop = top.offsetTop + 40, regionBottom = bottom - 18;
       let imgW = Math.floor(Math.min(w - 70, ((regionBottom - regionTop) * 63) / 88));
@@ -619,10 +616,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     </>
   );
   const heroBg = "linear-gradient(160deg, rgba(255,126,182,0.18), rgba(255,255,255,0.03) 65%)";
-  // Story: the top climber's box spans the width, and its left half reaches down over the
-  // climbers list's #1 slot (an L shape), with a big card filling that left part.
+  // Story: the top climber's box spans the width; its card is drawn over it and reaches down
+  // over the climbers list's empty #1 slot (the boxes themselves stay as they are).
   const heroTile = hero && (story ? (
-    <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", zIndex: 1, height: 230, boxSizing: "border-box", background: HERO_TOP_BG, borderBottomLeftRadius: ext ? 0 : 14 }}>
+    <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", height: 230, boxSizing: "border-box", background: heroBg }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, height: "calc(100% - 14px)" }}>
         <span />
         <div style={{ minWidth: 0, alignSelf: "center", paddingLeft: 10 }}>
@@ -741,7 +738,6 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
                     <div ref={moversRef} style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr", gridTemplateRows: "minmax(0, 1fr)" }}>{climbersTile}{fallersTile}</div>
                     {hero && ext && (
                       <>
-                        <div aria-hidden="true" className="wk-in" style={{ animationDelay: "260ms", position: "absolute", zIndex: 2, left: 0, top: ext.top, width: ext.w, height: ext.h, boxSizing: "border-box", background: HERO_SOLID, border: `1px solid ${C.line}`, borderTop: "none", borderRadius: "0 0 14px 14px" }} />
                         <div className="wk-in" style={{ animationDelay: "300ms", position: "absolute", zIndex: 3, left: ext.imgX, top: ext.imgY }}>
                           <span className="wk-float" style={{ display: "block" }}><Img src={pic(hero.card.image)} w={ext.imgW} glow={C.upGlow} /></span>
                         </div>
