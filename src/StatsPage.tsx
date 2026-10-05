@@ -188,6 +188,11 @@ const SortArrow: React.FC<{ dir: SortDir | null }> = ({ dir }) => (
   </svg>
 );
 
+/** A small, quiet pill for the card's edition (e.g. 1st / UED) from the sheet's edition column. */
+const Edition: React.FC<{ e?: string }> = ({ e }) => (e ? (
+  <span style={{ display: "inline-block", marginLeft: 6, padding: "0 4px", borderRadius: 3, border: "1px solid var(--line-hairline)", fontSize: 9, lineHeight: 1.4, letterSpacing: "0.04em", color: "var(--text-faint)", verticalAlign: "1px" }}>{e}</span>
+) : null);
+
 const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "var(--web-small)" }) => (
   <span style={{ fontFamily: "var(--font-data)", fontSize: size, fontWeight: 600, color: pct !== null && pct > 0 ? "var(--text-accent)" : "var(--text-muted)" }}>
     {pct !== null && pct > 0 ? "▲ " : pct !== null && pct < 0 ? "▼ " : ""}{fmtPct(pct)}
@@ -221,6 +226,7 @@ export default function StatsPage() {
   const [histP, setHistP] = useState<Map<string, Any>>(new Map());
   const [histPDone, setHistPDone] = useState(false);
   const [pTotal, setPTotal] = useState(0); // personal (non-10) certs to fetch
+  const [imgs, setImgs] = useState<{ done: number; total: number; finished: boolean }>({ done: 0, total: 0, finished: false });
   const [diagP, setDiagP] = useState<Any>(null);
   const [view, setView] = useState<"grid" | "list">(() => readPref("mew_stats_view", "grid" as "grid" | "list", (v) => v === "grid" || v === "list"));
   useEffect(() => { savePref("mew_stats_view", view); }, [view]);
@@ -337,6 +343,20 @@ export default function StatsPage() {
       try { await D.fetchAltByGrade(pairs, (m, d) => { setHistP(m); setDiagP({ ...d, errors: [...d.errors] }); }); }
       catch (e) { console.error(e); }
       setHistPDone(true);
+      // Card images too, so the grid (and the weekly poster) open fully drawn. A slow or broken
+      // image gives up after 8s rather than holding the page.
+      const urls = [...new Set(all.filter((c: Any) => D.certOf(c)).map((c: Any) => c.image).filter((u: Any) => typeof u === "string" && /^https?:/i.test(u)))] as string[];
+      let done = 0;
+      setImgs({ done: 0, total: urls.length, finished: false });
+      await Promise.all(urls.map((u) => new Promise<void>((ok) => {
+        const im = new Image();
+        let over = false;
+        const fin = () => { if (over) return; over = true; done++; setImgs({ done, total: urls.length, finished: false }); ok(); };
+        const t = window.setTimeout(fin, 8000);
+        im.onload = im.onerror = () => { window.clearTimeout(t); fin(); };
+        im.src = u;
+      })));
+      setImgs({ done: urls.length, total: urls.length, finished: true });
     } catch (e: Any) {
       if (e && e.message === "auth") { setPw(""); setPhase("password"); }
       else { console.error(e); setPhase("error"); }
@@ -476,12 +496,15 @@ export default function StatsPage() {
   const sales = mode === "sales";
 
   /* ---------- gate: password, then loading until all ALT data is in ---------- */
-  const allLoaded = histDone && histPDone;
+  const allLoaded = histDone && histPDone && imgs.finished;
   if ((phase !== "ready" && phase !== "error") || (phase === "ready" && !allLoaded)) {
     // Sheets ≈ the first 8%; the rest follows the certs answered (main pass, then owned grades).
     const want = totalCerts + (histDone ? pTotal : 0);
     const got = Math.min(loadedCerts, totalCerts) + (histDone ? Math.min(histP.size, pTotal) : 0);
-    const progress = phase === "ready" ? 8 + (want ? (92 * got) / want : histDone ? 92 : 0) : phase === "loading" ? 4 : 0;
+    // Images take the last 15%.
+    const altPart = want ? got / want : histDone ? 1 : 0;
+    const imgPart = imgs.total ? imgs.done / imgs.total : imgs.finished ? 1 : 0;
+    const progress = phase === "ready" ? 8 + 77 * altPart + (histPDone ? 15 * imgPart : 0) : phase === "loading" ? 4 : 0;
     return (
       <Loader theme={theme} progress={progress}>
         {phase === "password" && (
@@ -669,7 +692,7 @@ export default function StatsPage() {
                       <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}</span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                     </span>
                     <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} />
@@ -716,7 +739,7 @@ export default function StatsPage() {
                       <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}</span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                       {!narrow && <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} height={28} />}
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{fmtUSD(x.value)}</span>
