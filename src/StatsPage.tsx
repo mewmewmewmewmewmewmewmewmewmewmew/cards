@@ -3,6 +3,7 @@ import * as D from "./mew-data";
 import { MewIcon, CameoIcon, IntlIcon } from "./icons";
 import WeeklyView from "./WeeklyView";
 import Loader from "./Loader";
+import * as AC from "./alt-cache";
 
 /* ------------------------------------------------------------------ *
  * /stats — PSA 10 prices for every card in the sheet.
@@ -46,6 +47,11 @@ const fmtPct = (p: number | null) => (p === null || !isFinite(p) ? "—" : `${p 
 const pctOf = (pts: Pt[]) => (pts.length > 1 && pts[0].value > 0 ? ((pts[pts.length - 1].value - pts[0].value) / pts[0].value) * 100 : null);
 const fmtDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 const tsOf = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
+/** "just now", "5 min ago", "3h ago", "2 days ago". */
+const ago = (t: number) => {
+  const m = Math.round((Date.now() - t) / 60000);
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)} days ago`;
+};
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 function shiftDate(iso: string, days: number) {
@@ -226,6 +232,10 @@ export default function StatsPage() {
   const [histP, setHistP] = useState<Map<string, Any>>(new Map());
   const [histPDone, setHistPDone] = useState(false);
   const [pTotal, setPTotal] = useState(0); // personal (non-10) certs to fetch
+  // Saved ALT data: when the last full refresh finished, and whether one is running now.
+  const [altAt, setAltAt] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const altJob = useRef<{ certs: string[]; pairs: Array<{ cert: string; grade: number }> } | null>(null);
   const [imgs, setImgs] = useState<{ done: number; total: number; finished: boolean }>({ done: 0, total: 0, finished: false });
   const [diagP, setDiagP] = useState<Any>(null);
   const [view, setView] = useState<"grid" | "list">(() => readPref("mew_stats_view", "grid" as "grid" | "list", (v) => v === "grid" || v === "list"));
@@ -313,6 +323,26 @@ export default function StatsPage() {
     return () => window.removeEventListener("resize", on);
   }, []);
 
+  /** Fetch every cert's ALT data again (in the background) and save it. */
+  const refreshAlt = async () => {
+    const job = altJob.current;
+    if (!job || refreshing) return;
+    setRefreshing(true);
+    try {
+      const d10 = await D.fetchAltHistories(job.certs, (_m, d) => setDiag({ ...d, errors: [...d.errors] }));
+      // Keep the saved result for any cert this refresh couldn't get.
+      setHist((cur) => { const n = new Map(cur); d10.forEach((r, c) => { if (AC.keepable(r) || !n.has(c)) n.set(c, r); }); return n; });
+      const gradeOf = new Map(job.pairs.map((p) => [p.cert, p.grade]));
+      const dP = job.pairs.length ? await D.fetchAltByGrade(job.pairs, (_m, d) => setDiagP({ ...d, errors: [...d.errors] })) : new Map();
+      setHistP((cur) => { const n = new Map(cur); dP.forEach((r, c) => { if (AC.keepable(r) || !n.has(c)) n.set(c, r); }); return n; });
+      const at = Date.now();
+      await AC.save(dP, (c) => gradeOf.get(c) || 10);
+      await AC.save(d10, 10, at);
+      setAltAt(at);
+    } catch (e) { console.error(e); }
+    setRefreshing(false);
+  };
+
   const load = async (password: string) => {
     setPhase("loading");
     try {
@@ -323,14 +353,8 @@ export default function StatsPage() {
       const hl = D.sheetExtras.hidden;
       setHiddenLists(hl ? { all: new Set(hl.all), personal: new Set(hl.personal) } : null);
       setPhase("ready");
-      const certs = all.map((c: Any) => D.certOf(c)).filter(Boolean) as string[];
-      // The page stays on the loading screen until every cert's ALT data is in (both passes);
-      // an ALT failure is shown in the Data check rather than blocking the page.
-      setDiag({ requests: 0, ok: 0, errors: [] });
-      try { await D.fetchAltHistories(certs, (m, d) => { setHist(m); setDiag({ ...d, errors: [...d.errors] }); }); }
-      catch (e) { console.error(e); }
-      setHistDone(true);
-      // Personal: owned PSA 10s reuse the data above; other owned grades are fetched at that grade.
+      const certs = [...new Set(all.map((c: Any) => D.certOf(c)).filter(Boolean))] as string[];
+      // Personal: owned PSA 10s reuse the grade-10 data; other owned grades are fetched at that grade.
       const pairs: Array<{ cert: string; grade: number }> = [];
       const seen = new Set<string>();
       for (const c of all) {
@@ -338,11 +362,44 @@ export default function StatsPage() {
         if (!cert || !g || g === 10 || seen.has(cert)) continue;
         seen.add(cert); pairs.push({ cert, grade: g });
       }
-      setPTotal(pairs.length);
+      altJob.current = { certs, pairs };
+      // Saved ALT data (alt-cache): open from it, fetch only what it lacks (cards new to the sheet,
+      // changed owned grades, earlier failures), and refresh everything in the background once
+      // it's over 12h old. The loading screen waits only for what has to be fetched now.
+      const saved = await AC.readAll();
+      setAltAt(saved.at);
+      const have10 = new Map<string, Any>(), haveP = new Map<string, Any>();
+      certs.forEach((c) => { const r = saved.map.get(AC.keyOf(c, 10)); if (r) have10.set(c, r); });
+      pairs.forEach((p) => { const r = saved.map.get(AC.keyOf(p.cert, p.grade)); if (r) haveP.set(p.cert, r); });
+      const miss10 = certs.filter((c) => !have10.has(c));
+      const missP = pairs.filter((p) => !haveP.has(p.cert));
+      const first = have10.size === 0;
+      setHist(have10);
+      setDiag({ requests: 0, ok: 0, errors: [] });
+      if (miss10.length) {
+        try {
+          const got = await D.fetchAltHistories(miss10, (m, d) => { setHist(new Map([...have10, ...m])); setDiag({ ...d, errors: [...d.errors] }); });
+          got.forEach((r, c) => have10.set(c, r));
+          setHist(new Map(have10));
+          await AC.save(got, 10, first ? Date.now() : undefined);
+        } catch (e) { console.error(e); }
+      }
+      setHistDone(true);
+      setPTotal(missP.length);
+      setHistP(haveP);
       setDiagP({ requests: 0, ok: 0, errors: [] });
-      try { await D.fetchAltByGrade(pairs, (m, d) => { setHistP(m); setDiagP({ ...d, errors: [...d.errors] }); }); }
-      catch (e) { console.error(e); }
+      if (missP.length) {
+        const gradeOf = new Map(missP.map((p) => [p.cert, p.grade]));
+        try {
+          const got = await D.fetchAltByGrade(missP, (m, d) => { setHistP(new Map([...haveP, ...m])); setDiagP({ ...d, errors: [...d.errors] }); });
+          got.forEach((r, c) => haveP.set(c, r));
+          setHistP(new Map(haveP));
+          await AC.save(got, (c) => gradeOf.get(c) || 10);
+        } catch (e) { console.error(e); }
+      }
       setHistPDone(true);
+      if (first) setAltAt(Date.now());
+      else if (saved.at === null || Date.now() - saved.at > AC.ALT_MAX_AGE) refreshAlt(); // in the background
       // Card images too, so the grid (and the weekly poster) open fully drawn. A slow or broken
       // image gives up after 8s rather than holding the page.
       const urls = [...new Set(all.filter((c: Any) => D.certOf(c)).map((c: Any) => c.image).filter((u: Any) => typeof u === "string" && /^https?:/i.test(u)))] as string[];
@@ -798,6 +855,10 @@ export default function StatsPage() {
                 <details key={String(empty)} open={empty} style={{ marginTop: 32, borderTop: "1px solid var(--line-hairline)", paddingTop: 14 }}>
                   <summary style={{ ...eyebrow, cursor: "pointer" }}>Data check</summary>
                   <div style={{ marginTop: 10, display: "grid", gap: 2 }}>
+                    <div style={line}>
+                      ALT data · {refreshing ? "refreshing…" : altAt ? `saved ${ago(altAt)}, refreshes after 12h` : "not saved yet"}
+                      {!refreshing && altAt && <> · <button type="button" onClick={refreshAlt} style={{ font: "inherit", color: "var(--text-accent)", background: "none", border: "none", padding: 0, cursor: "pointer" }}>Refresh now</button></>}
+                    </div>
                     <div style={line}>Sheet · {cards.length} rows</div>
                     {tabs.map((t) => {
                       const s = sheets[t];
