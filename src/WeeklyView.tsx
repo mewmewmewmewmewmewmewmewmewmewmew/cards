@@ -650,7 +650,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       <div style={{ display: "flex", alignItems: "center", height: "calc(100% - 14px)", paddingLeft: ext ? ext.imgX + ext.imgW + 40 - 18 : 220 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
-          <div style={{ marginTop: 16, fontWeight: 600, fontSize: 24, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name(hero.card)}</div>
+          <div style={{ marginTop: 16, fontWeight: 600, fontSize: 24, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name(hero.card)}{hero.card.number && <span style={{ marginLeft: 10, fontFamily: "var(--font-data)", fontWeight: 400, fontSize: 16, color: C.faint }}>{hero.card.number}</span>}</div>
           <div style={{ marginTop: 6, fontFamily: "var(--font-data)", fontSize: 16, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
         </div>
       </div>
@@ -662,7 +662,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         <div data-hero-text="1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, maxWidth: "100%" }}>
           <div style={{ ...big, fontSize: tall ? 60 : 54, color: C.up, textShadow: `0 0 24px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
           <div style={{ maxWidth: "100%" }}>
-            <div style={{ fontWeight: 600, fontSize: 18, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name(hero.card)}</div>
+            <div style={{ fontWeight: 600, fontSize: 18, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{name(hero.card)}{hero.card.number && <span style={{ marginLeft: 8, fontFamily: "var(--font-data)", fontWeight: 400, fontSize: 13, color: C.faint }}>{hero.card.number}</span>}</div>
             <div style={{ marginTop: 4, fontFamily: "var(--font-data)", fontSize: 13, color: C.muted }}>{fmtUSD(hero.from)} → <span style={{ color: C.text, fontWeight: 600 }}>{fmtUSD(hero.to)}</span></div>
           </div>
         </div>
