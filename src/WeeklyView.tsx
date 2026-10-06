@@ -32,8 +32,8 @@ const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD"
 const fmtUSD = (v: number) => (Math.abs(v) < 100 ? usd2 : usd0).format(v);
 const fmtPct = (p: number) => `${p > 0 ? "+" : p < 0 ? "−" : ""}${Math.abs(p).toFixed(1)}%`;
 const fmtDay = (iso: string, year = false) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}), timeZone: "UTC" });
-/** "9/28", "10/04" */
-const fmtMD = (iso: string) => { const [, m, d] = iso.split("-"); return `${Number(m)}/${d}`; };
+/** "09/28", "10/04" */
+const fmtMD = (iso: string) => { const [, m, d] = iso.split("-"); return `${m}/${d}`; };
 const todayISO = () => new Date().toISOString().slice(0, 10);
 function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -1149,9 +1149,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
           {fmt === "reel" && (
             // Reel cover: big text in the space under the poster, to catch the eye in the feed.
-            <div className="wk-in" style={{ position: "absolute", left: 52, right: 52, bottom: 52, height: REEL_EXTRA - 52, display: "flex", flexDirection: "column", justifyContent: "center", ...fadeAt(vt, 200) }}>
-              <div style={{ ...mono, fontSize: 22, letterSpacing: "0.2em", color: C.up }}>PSA 10 · weekly report</div>
-              <div style={{ marginTop: 14, ...big, fontSize: 132, letterSpacing: "-0.03em", lineHeight: 1, ...gradTitle, whiteSpace: "nowrap" }}>Japanese Mew</div>
+            <div className="wk-in" style={{ position: "absolute", left: 52, right: 52, bottom: 52, height: REEL_EXTRA - 52, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", ...fadeAt(vt, 200) }}>
+              <div style={{ ...mono, fontSize: 40, letterSpacing: "0.16em", color: C.up, whiteSpace: "nowrap" }}>PSA 10 · weekly report</div>
+              <div style={{ marginTop: 18, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, ...gradTitle, whiteSpace: "nowrap" }}>JP Mew</div>
               <div style={{ marginTop: 18, ...big, fontSize: 92, letterSpacing: "-0.02em", lineHeight: 1, color: C.text, whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
             </div>
           )}
