@@ -28,7 +28,6 @@ const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD"
 const fmtUSD = (v: number) => (Math.abs(v) < 100 ? usd2 : usd0).format(v);
 const fmtPct = (p: number) => `${p > 0 ? "+" : p < 0 ? "−" : ""}${Math.abs(p).toFixed(1)}%`;
 const fmtDay = (iso: string, year = false) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}), timeZone: "UTC" });
-const fmtMonth = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
 const todayISO = () => new Date().toISOString().slice(0, 10);
 function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -347,7 +346,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [titleFit, setTitleFit] = useState<{ key: string; k: number } | null>(null);
   const [ext, setExt] = useState<{ top: number; w: number; h: number; imgX: number; imgY: number; imgW: number } | null>(null);
-  const [fit, setFit] = useState<{ key: string; rows: Record<string, number>; pads: Record<string, number>; heroW: number } | null>(null);
+  const [fit, setFit] = useState<{ key: string; rows: Record<string, number>; pads: Record<string, number>; rowH: Record<string, number>; labelH: number; heroW: number } | null>(null);
   const [fontsTick, setFontsTick] = useState(0);
   useEffect(() => { try { (document as Any).fonts.ready.then(() => setFontsTick((t) => t + 1)); } catch (e) {} }, []);
   useLayoutEffect(() => {
@@ -366,7 +365,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     // Rows can tighten their padding (down to 4px) when that lets one more fit, then spread the
     // space that's left evenly, so the lists end flush with the bottom of their tiles.
     // Each list is measured on its own (the comebacks and fallers share a column).
-    const rows: Record<string, number> = {}, pads: Record<string, number> = {};
+    const rows: Record<string, number> = {}, pads: Record<string, number> = {}, rowH: Record<string, number> = {};
+    let labelH = 0;
     box.querySelectorAll<HTMLElement>("[data-tile=list]").forEach((tile) => {
       const name = tile.dataset.list || "list";
       const row = tile.querySelector<HTMLElement>("[data-row]");
@@ -377,6 +377,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       const n = Math.max(1, Math.min(fmt === "9:16" ? 10 : 99, Math.floor((avail + 1) / (content + 8 + 1)))); // story: top 10
       rows[name] = n;
       pads[name] = Math.max(4, Math.min(16, Math.floor(((avail + 1) / n - 1 - content) / 2)));
+      rowH[name] = content + 2 * pads[name];
+      labelH = label.offsetHeight;
     });
     let heroW = 0;
     const hero = box.querySelector<HTMLElement>("[data-tile=hero]");
@@ -407,8 +409,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     const same = (a: typeof ext, b: typeof ext) => (!a && !b) || (!!a && !!b && a.top === b.top && a.w === b.w && a.h === b.h && a.imgW === b.imgW && a.imgY === b.imgY);
     if (!same(ext, nextExt)) setExt(nextExt);
     const sameRec = (a: Record<string, number>, b: Record<string, number>) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => a[k] === b[k]);
-    if (!fit || fit.key !== fitKey || !sameRec(fit.rows, rows) || !sameRec(fit.pads, pads) || fit.heroW !== heroW) {
-      setFit({ key: fitKey, rows, pads, heroW });
+    if (!fit || fit.key !== fitKey || !sameRec(fit.rows, rows) || !sameRec(fit.pads, pads) || !sameRec(fit.rowH, rowH) || fit.labelH !== labelH || fit.heroW !== heroW) {
+      setFit({ key: fitKey, rows, pads, rowH, labelH, heroW });
     }
   });
   useEffect(() => {
@@ -585,7 +587,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const climbers = week.up.slice(0, rowsFor("climbers"));
   // The right column is one list on the same row grid as the climbers: comebacks first (if any),
   // then a row-high "Fallers" heading, then the fallers, so every row lines up across.
-  const slots = rowsFor("fallers");
+  const slots = week.comebacks.length ? rowsFor("climbers") : rowsFor("fallers");
   const comebacks = week.comebacks.slice(0, Math.max(0, Math.min(week.comebacks.length, slots - 2)));
   const fallers = week.down.slice(0, comebacks.length ? Math.max(0, slots - comebacks.length - 1) : slots);
   const heroMax = tall ? 170 : 140;
@@ -621,7 +623,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // A card back on the market after more than ~6 months: shown apart from the climbers/fallers.
   const ComebackRow: React.FC<{ m: Any; i: number; delay: number }> = ({ m, i, delay }) => {
     return (
-      <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor("fallers")}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
+      <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor("climbers")}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
         <span style={{ ...mono, color: C.faint }}>{i + 1}</span>
         <Img src={pic(m.card.image)} w={34} />
         <span style={{ minWidth: 0 }}>
@@ -634,12 +636,12 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
             <span className="wk-bar" style={{ display: "block", height: "100%", width: `${Math.min(100, (Math.abs(m.pct) / maxPct) * 100)}%`, background: C.comeback, animationDelay: `${delay + 150}ms` }} />
           </span>
           <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-data)", fontSize: 12, color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {fmtUSD(m.from)} <span style={{ color: C.comeback }}>→</span> {fmtUSD(m.to)}{story ? ` · last sold ${fmtMonth(m.lastDate)}` : ""}
+            {fmtUSD(m.from)} <span style={{ color: C.comeback }}>→</span> {fmtUSD(m.to)}
           </span>
         </span>
         <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
           <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: C.comeback }}>{fmtPct(m.pct)}</span>
-          <span style={{ marginTop: 3, fontFamily: "var(--font-data)", fontSize: 12, color: C.text, whiteSpace: "nowrap" }}>{story ? `after ${gapLabel(m.gap)}` : `${gapLabel(m.gap)} gap`}</span>
+          <span style={{ marginTop: 3, fontFamily: "var(--font-data)", fontSize: 12, color: C.text, whiteSpace: "nowrap" }}>after {gapLabel(m.gap)}</span>
         </span>
       </div>
     );
@@ -748,18 +750,22 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   );
   const fallersRows = fallers.length ? fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up={false} list="fallers" delay={(comebacks.length ? 520 : 440) + i * 60} />)
     : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went down.</div>;
+  // Two boxes. The gap between them is sized so the Fallers box's top edge, padding and label
+  // take exactly one row of the climbers' grid, so every faller lines up with a climber.
+  const rh = fitNow && fitNow.rowH.climbers ? fitNow.rowH.climbers : 0;
+  const cbGap = rh ? Math.max(6, rh - 44 - (fitNow ? fitNow.labelH : 13)) : 16;
   const fallersTile = comebacks.length ? (
-    <Tile label="Comebacks · 6mo+ since last sale" tag="list" list="fallers" delay={380}>
-      <div style={{ marginTop: 8 }}>
-        {comebacks.map((m, i) => <ComebackRow key={m.cert} m={m} i={i} delay={440 + i * 60} />)}
-        {/* the "Fallers" heading takes exactly one row's height, keeping the rows below in line */}
-        <div style={{ position: "relative", borderTop: `1px solid ${C.line}` }}>
-          <div aria-hidden="true" style={{ visibility: "hidden" }}><ComebackRow m={comebacks[0]} i={0} delay={0} /></div>
-          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: 0, display: "flex", alignItems: "flex-end", paddingBottom: 8, ...mono, color: C.faint }}>Fallers</div>
+    <div style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: cbGap }}>
+      <Tile label="Comebacks · 6mo+ since last sale" delay={380} style={{ flex: "0 0 auto" }}>
+        <div style={{ marginTop: 8 }}>{comebacks.map((m, i) => <ComebackRow key={m.cert} m={m} i={i} delay={440 + i * 60} />)}</div>
+      </Tile>
+      <Tile label="Fallers" delay={460} style={{ flex: 1 }}>
+        <div style={{ marginTop: 8 }}>
+          {fallers.length ? fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up={false} list="climbers" delay={520 + i * 60} />)
+            : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went down.</div>}
         </div>
-        {fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i + 1} n={i + 1} up={false} list="fallers" delay={520 + i * 60} />)}
-      </div>
-    </Tile>
+      </Tile>
+    </div>
   ) : (
     <Tile label="Fallers" tag="list" list="fallers" delay={380}>
       <div style={{ marginTop: 8 }}>{fallersRows}</div>
