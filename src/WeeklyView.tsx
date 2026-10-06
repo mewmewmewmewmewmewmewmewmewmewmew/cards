@@ -583,8 +583,11 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // Both lists number from #1 so places line up; the top climber is #1 in the climbers list too
   // (in the story it's covered by the top climber's box, which reaches down into that slot).
   const climbers = week.up.slice(0, rowsFor("climbers"));
-  const fallers = week.down.slice(0, rowsFor("fallers"));
-  const comebacks = week.comebacks.slice(0, rowsFor("comebacks"));
+  // The right column is one list on the same row grid as the climbers: comebacks first (if any),
+  // then a row-high "Fallers" heading, then the fallers, so every row lines up across.
+  const slots = rowsFor("fallers");
+  const comebacks = week.comebacks.slice(0, Math.max(0, Math.min(week.comebacks.length, slots - 2)));
+  const fallers = week.down.slice(0, comebacks.length ? Math.max(0, slots - comebacks.length - 1) : slots);
   const heroMax = tall ? 170 : 140;
   const heroW = fitNow && fitNow.heroW ? Math.min(heroMax, fitNow.heroW) : heroMax;
   const maxPct = Math.max(1, ...[...climbers, ...fallers].map((m) => Math.abs(m.pct)));
@@ -593,9 +596,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const scale = Math.min(1, (vw[0] - 24) / SHOT_W, Math.max(320, vw[1] - 76) / SHOT_H);
   const big: React.CSSProperties = { fontFamily: "var(--font-display)", fontWeight: 700, lineHeight: 1 };
 
-  const MoverRow: React.FC<{ m: Any; i: number; up: boolean; delay: number; hidden?: boolean; list: string }> = ({ m, i, up, delay, hidden, list }) => (
+  // i: position in its list (0 = no divider above); n: the number shown (defaults to i + 1).
+  const MoverRow: React.FC<{ m: Any; i: number; n?: number; up: boolean; delay: number; hidden?: boolean; list: string }> = ({ m, i, n, up, delay, hidden, list }) => (
     <div className="wk-in" data-row="1" data-slot={i === 0 && up ? "1" : undefined} style={{ visibility: hidden ? "hidden" : undefined, animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor(list)}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
-      <span style={{ ...mono, color: C.faint }}>{i + 1}</span>
+      <span style={{ ...mono, color: C.faint }}>{n ?? i + 1}</span>
       <Img src={pic(m.card.image)} w={34} />
       <span style={{ minWidth: 0 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -617,7 +621,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // A card back on the market after more than ~6 months: shown apart from the climbers/fallers.
   const ComebackRow: React.FC<{ m: Any; i: number; delay: number }> = ({ m, i, delay }) => {
     return (
-      <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor("comebacks")}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
+      <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor("fallers")}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
         <span style={{ ...mono, color: C.faint }}>{i + 1}</span>
         <Img src={pic(m.card.image)} w={34} />
         <span style={{ minWidth: 0 }}>
@@ -625,6 +629,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
             <span style={{ fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: "3.2em", flex: "0 1 auto" }}>{name(m.card)}</span>
             {m.card.number && <span style={{ flex: "0 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{m.card.number}</span>}
             <Edition e={m.card.edition} />
+          </span>
+          <span style={{ display: "block", marginTop: 5, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+            <span className="wk-bar" style={{ display: "block", height: "100%", width: `${Math.min(100, (Math.abs(m.pct) / maxPct) * 100)}%`, background: C.comeback, animationDelay: `${delay + 150}ms` }} />
           </span>
           <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-data)", fontSize: 12, color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {fmtUSD(m.from)} <span style={{ color: C.comeback }}>→</span> {fmtUSD(m.to)}{story ? ` · last sold ${fmtMonth(m.lastDate)}` : ""}
@@ -739,22 +746,25 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       </div>
     </Tile>
   );
-  const fallersOnly = (
-    <Tile label="Fallers" tag="list" list="fallers" delay={comebacks.length ? 460 : 380}>
+  const fallersRows = fallers.length ? fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up={false} list="fallers" delay={(comebacks.length ? 520 : 440) + i * 60} />)
+    : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went down.</div>;
+  const fallersTile = comebacks.length ? (
+    <Tile label="Comebacks · 6mo+ since last sale" tag="list" list="fallers" delay={380}>
       <div style={{ marginTop: 8 }}>
-        {fallers.length ? fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up={false} list="fallers" delay={(comebacks.length ? 520 : 440) + i * 60} />)
-          : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went down.</div>}
+        {comebacks.map((m, i) => <ComebackRow key={m.cert} m={m} i={i} delay={440 + i * 60} />)}
+        {/* the "Fallers" heading takes exactly one row's height, keeping the rows below in line */}
+        <div style={{ position: "relative", borderTop: `1px solid ${C.line}` }}>
+          <div aria-hidden="true" style={{ visibility: "hidden" }}><ComebackRow m={comebacks[0]} i={0} delay={0} /></div>
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: 0, display: "flex", alignItems: "flex-end", paddingBottom: 8, ...mono, color: C.faint }}>Fallers</div>
+        </div>
+        {fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i + 1} n={i + 1} up={false} list="fallers" delay={520 + i * 60} />)}
       </div>
     </Tile>
-  );  // The fallers column gives its top half to comebacks when there are any.
-  const fallersTile = comebacks.length ? (
-    <div style={{ minWidth: 0, minHeight: 0, display: "grid", gap: 16, gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)" }}>
-      <Tile label="Comebacks · 6mo+ since last sale" tag="list" list="comebacks" delay={380}>
-        <div style={{ marginTop: 8 }}>{comebacks.map((m, i) => <ComebackRow key={m.cert} m={m} i={i} delay={440 + i * 60} />)}</div>
-      </Tile>
-      {fallersOnly}
-    </div>
-  ) : fallersOnly;
+  ) : (
+    <Tile label="Fallers" tag="list" list="fallers" delay={380}>
+      <div style={{ marginTop: 8 }}>{fallersRows}</div>
+    </Tile>
+  );
 
   const quiet = (
     <Tile label="Quiet week" delay={200} style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
