@@ -27,11 +27,13 @@ const FMT_KEY = "mew_weekly_fmt";
 type Fmt = "1:1" | "3:4" | "9:16" | "reel" | "reelsafe";
 const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"], ["reel", "Reel cover"], ["reelsafe", "Reel"]];
 const REEL_EXTRA = 1920 - 1440; // reel cover: the space under the 3:4 layout
-// Reel: the 9:16 layout reworked for a reel playing full screen on a phone. Instagram zooms 9:16
-// to fill the taller screen (cropping ~100px off each side) and covers the top ~230px (header),
-// the bottom ~400px (name / caption) and the lower right (like / comment / share). Everything
-// sits in the clear box below, at full size; the bottom row also stops short of the buttons.
-const REEL = { x: 110, y: 236, w: 860, h: 1264, buttons: 110 };
+// Reel: the 9:16 layout reworked for a reel playing full screen on a phone (measured from an
+// iPhone screenshot). Instagram zooms 9:16 to fill the taller screen, cropping ~47px off each
+// side, puts its header ("Your reels") over the top ~250px, the name / caption over the bottom
+// from ~1700, and the like / comment / share buttons at the right from ~1460. Everything sits in
+// the clear box below at full size; the bottom row (which reaches the buttons' height) also
+// stops short of them.
+const REEL = { x: 64, y: 262, w: 952, h: 1363, buttons: 120 };
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
