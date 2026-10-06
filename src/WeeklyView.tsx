@@ -27,11 +27,11 @@ const FMT_KEY = "mew_weekly_fmt";
 type Fmt = "1:1" | "3:4" | "9:16" | "reel" | "reelsafe";
 const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"], ["reel", "Reel cover"], ["reelsafe", "Reel"]];
 const REEL_EXTRA = 1920 - 1440; // reel cover: the space under the 3:4 layout
-// Reel, laid out for playing full screen on a phone: Instagram zooms 9:16 to fill
-// the taller screen (cropping ~100px off each side) and covers the top ~230px (header), the
-// bottom ~400px (name/caption) and the lower right (buttons). So the 3:4 poster is scaled down
-// into the clear area, with the title just above it.
-const REEL = { s: 0.72, x: 104, y: 470, textTop: 238, textW: 778 };
+// Reel: the 9:16 layout reworked for a reel playing full screen on a phone. Instagram zooms 9:16
+// to fill the taller screen (cropping ~100px off each side) and covers the top ~230px (header),
+// the bottom ~400px (name / caption) and the lower right (like / comment / share). Everything
+// sits in the clear box below, at full size; the bottom row also stops short of the buttons.
+const REEL = { x: 110, y: 236, w: 860, h: 1264, buttons: 110 };
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -350,7 +350,7 @@ const Num: React.FC<{ v: number; fmt: (n: number) => string; style?: React.CSSPr
 };
 
 /** Daily index across the week, as a glowing area line. */
-const IndexLine: React.FC<{ pts: number[]; up: boolean }> = ({ pts, up }) => {
+const IndexLine: React.FC<{ pts: number[]; up: boolean; h?: number }> = ({ pts, up, h = 90 }) => {
   const vt = useContext(VT);
   if (pts.length < 2) return null;
   // In the video the line draws in from the left (with its tile, over ~1.2s).
@@ -360,7 +360,7 @@ const IndexLine: React.FC<{ pts: number[]; up: boolean }> = ({ pts, up }) => {
   const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
   const col = up ? C.up : C.down;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 90, overflow: "visible", ...(shown < 1 ? { clipPath: `inset(-20px ${((1 - shown) * 100).toFixed(2)}% -20px -20px)` } : {}) }} aria-hidden="true">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: h, overflow: "visible", ...(shown < 1 ? { clipPath: `inset(-20px ${((1 - shown) * 100).toFixed(2)}% -20px -20px)` } : {}) }} aria-hidden="true">
       <defs>
         <linearGradient id="wkfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={col} stopOpacity="0.35" /><stop offset="1" stopColor={col} stopOpacity="0" /></linearGradient>
       </defs>
@@ -875,7 +875,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     }
   };
 
-  const story = fmt === "9:16", tall = fmt !== "1:1";
+  const reelSafe = fmt === "reelsafe";
+  const story = fmt === "9:16" || reelSafe, tall = fmt !== "1:1"; // the reel uses the stacked 9:16 layout
   const hero = week.up[0] || null;
   const rowsMax = story ? 10 : 14; // story shows the top 10; otherwise the measured fit decides
   const fitNow = fit && fit.key === `${shotKey}|${vw[0]}|${fontsTick}` ? fit : null;
@@ -963,10 +964,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const kicker = <div style={{ ...mono, fontSize: story ? 18 : 14, color: C.up }}>Week {weekNo(end)}{sales ? "" : " · ALT value"}</div>;
   const dates = <div style={{ fontFamily: "var(--font-data)", fontSize: story ? 22 : 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>;
   const tk = titleFit && titleFit.key === `${fmt}|${end}|${fontsTick}` ? titleFit.k : 1;
-  const logoH = LOGO.h[fmt], logoW = Math.round((logoH * 200) / 211), beside = Math.max(0, logoW + LOGO.inset - 52 + 16); // room kept beside the logo
+  const logoH = LOGO.h[fmt], logoW = Math.round((logoH * 200) / 211), beside = Math.max(0, logoW + (reelSafe ? 0 : LOGO.inset - 52) + 16); // room kept beside the logo
   // Tucked into the poster's top-right corner (into the padding), in the poster's pink.
-  const logo = <img data-logo="1" src={logoSrc} alt="mew.cards" draggable={false} style={{ position: "absolute", top: LOGO.inset - 52, right: LOGO.inset - 52, height: logoH, width: logoW, opacity: 0.9 }} />;
-  const title = story ? (
+  const logo = <img data-logo="1" src={logoSrc} alt="mew.cards" draggable={false} style={{ position: "absolute", top: reelSafe ? 0 : LOGO.inset - 52, right: reelSafe ? 0 : LOGO.inset - 52, height: logoH, width: logoW, opacity: 0.9 }} />;
+  const title = story && !reelSafe ? (
     <div className="wk-in" style={{ position: "relative", ...fadeAt(vt, 0) }}>
       {logo}
       {kicker}
@@ -986,7 +987,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         <Num v={week.index[week.index.length - 1] || 0} fmt={(n) => usd0.format(n)} style={{ ...big, fontSize: story ? 56 : 46 }} />
         <span style={{ fontFamily: "var(--font-data)", fontWeight: 700, fontSize: story ? 24 : 20, color: idxUp ? C.up : C.down, textShadow: `0 0 14px ${idxUp ? C.upGlow : C.downGlow}` }}>{idxUp ? "▲" : "▼"} {fmtPct(week.idxPct)}</span>
       </div>
-      <div style={{ marginTop: 12 }}><IndexLine pts={week.index} up={idxUp} /></div>
+      <div style={{ marginTop: 12 }}><IndexLine pts={week.index} up={idxUp} h={reelSafe ? 56 : 90} /></div>
     </Tile>
   );
   const statTiles = sales ? (
@@ -1013,10 +1014,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // Story: the top climber's box spans the width; its card is drawn over it and reaches down
   // over the climbers list's empty #1 slot (the boxes themselves stay as they are).
   const heroTile = hero && (story ? (
-    <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", height: 230, boxSizing: "border-box", background: heroBg }}>
+    <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", height: reelSafe ? 196 : 230, boxSizing: "border-box", background: heroBg }}>
       <div style={{ display: "flex", alignItems: "center", height: "calc(100% - 14px)", paddingLeft: ext ? ext.imgX + ext.imgW + 40 - 18 : 220 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}><Num reserve v={hero.pct} fmt={fmtPct} delay={260} /></div>
+          <div style={{ ...big, fontSize: reelSafe ? 68 : 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}><Num reserve v={hero.pct} fmt={fmtPct} delay={260} /></div>
           <div style={{ marginTop: 16, display: "flex", alignItems: "center", columnGap: 10, fontWeight: 600, fontSize: 24, lineHeight: 1.25, whiteSpace: "nowrap" }}>
             <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(hero.card)}</span>
             {hero.card.number && <span style={{ fontFamily: "var(--font-data)", fontWeight: 400, fontSize: 16, color: C.faint }}>{hero.card.number}</span>}
@@ -1088,7 +1089,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   );
   const nHigh = (sales && week.biggest ? 1 : 0) + (sales && week.busiest ? 1 : 0) + (week.bigGain ? 1 : 0);
   const highlights = nHigh > 0 && (
-    <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: `repeat(${nHigh}, minmax(0, 1fr))` }}>
+    <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: `repeat(${nHigh}, minmax(0, 1fr))`, paddingRight: reelSafe ? REEL.buttons : 0 }}>
       {sales && week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={<Num v={week.biggest.value} fmt={fmtUSD} delay={500} />} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
       {week.bigGain && <Highlight label="Biggest gain" delay={560} img={week.bigGain.card.image} title={<Num v={week.bigGain.to - week.bigGain.from} fmt={(n) => `+${usd0.format(n)}`} delay={560} />} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
       {sales && week.busiest && <Highlight label="Most sold" delay={620} img={week.busiest.card.image} title={<Num v={week.busiest.n} fmt={(n) => `${Math.round(n)} sales`} delay={620} />} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
@@ -1163,16 +1164,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
               <div style={{ marginTop: 18, ...big, fontSize: 92, letterSpacing: "-0.02em", lineHeight: 1, color: C.text, whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
             </div>
           )}
-          {fmt === "reelsafe" && (
-            // Reel: the title above the (scaled-down) poster.
-            <div className="wk-in" style={{ position: "absolute", left: REEL.x, width: REEL.textW, top: REEL.textTop, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", ...fadeAt(vt, 200) }}>
-              <div style={{ ...mono, fontSize: 30, letterSpacing: "0.16em", color: C.up, whiteSpace: "nowrap" }}>Weekly market report</div>
-              <div style={{ marginTop: 14, ...big, fontSize: 104, letterSpacing: "-0.03em", lineHeight: 1, ...gradTitle, whiteSpace: "nowrap" }}>JP Mews</div>
-              <div style={{ marginTop: 12, ...big, fontSize: 56, letterSpacing: "-0.02em", lineHeight: 1, color: C.text, whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
-            </div>
-          )}
-          <div data-scale={fmt === "reelsafe" ? REEL.s : undefined} style={{ width: W, height: fmt === "reel" || fmt === "reelsafe" ? 1440 : H, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16, position: fmt === "reelsafe" ? "absolute" : "relative",
-            ...(fmt === "reelsafe" ? { left: REEL.x, top: REEL.y, transform: `scale(${REEL.s})`, transformOrigin: "0 0" } : {}) }}>
+          <div style={fmt === "reelsafe"
+            ? { position: "absolute", left: REEL.x, top: REEL.y, width: REEL.w, height: REEL.h, display: "flex", flexDirection: "column", gap: 14 }
+            : { position: "relative", width: W, height: fmt === "reel" ? 1440 : H, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
           {title}
           {story ? (
             <>
