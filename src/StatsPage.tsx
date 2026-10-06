@@ -918,13 +918,13 @@ export default function StatsPage() {
                 <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
                   {rows.failed.map((x: Any) => (
                     <div key={x.cert} style={{ display: "flex", gap: 12, fontSize: "var(--web-small)" }}>
-                      <span style={{ color: "var(--text-title)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
+                      <span style={{ color: "var(--text-title)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}{x.card.number && <span style={{ ...faint, marginLeft: 8 }}>{x.card.number}</span>}<Edition e={x.card.edition} /></span>
                       <span style={faint}>cert {x.cert} · {x.error}</span>
                     </div>
                   ))}
                   {rows.noCert.map((c: Any) => (
                     <div key={c.id} style={{ display: "flex", gap: 12, fontSize: "var(--web-small)" }}>
-                      <span style={{ color: "var(--text-title)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(c)}</span>
+                      <span style={{ color: "var(--text-title)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(c)}{c.number && <span style={{ ...faint, marginLeft: 8 }}>{c.number}</span>}<Edition e={c.edition} /></span>
                       <span style={faint}>no cert in sheet</span>
                     </div>
                   ))}
