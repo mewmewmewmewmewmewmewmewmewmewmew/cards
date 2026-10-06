@@ -1,5 +1,7 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { toCanvas } from "html-to-image";
+import React, { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { toCanvas, getFontEmbedCSS } from "html-to-image";
+import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import * as D from "./mew-data";
 import Loader from "./Loader";
 
@@ -119,21 +121,42 @@ function summarize(entries: Entry[], start: string, end: string, mode: Mode) {
   return { up, down, comebacks, index, idxPct, idxCards: indexSeries.length, volume, nSales: sales.length, avg: sales.length ? volume / sales.length : 0, traded: counts.size, biggest, busiest: busiest && busiest.n > 1 ? busiest : null, bigGain };
 }
 
-/** Counts up to `to` once it's set (eases out over ~1s). */
-function useCountUp(to: number, ms = 1100) {
-  const [v, setV] = useState(0);
+/* ---------- video timeline ----------
+ * Normally the poster animates with CSS and a requestAnimationFrame count-up. While a video is
+ * being made, the poster is driven by a clock instead (VT = ms since the start), so every frame
+ * can be drawn at an exact moment. The curves match the CSS ones. */
+const VT = React.createContext<number | null>(null);
+const ease = (p: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, p)), 3);
+/** The tiles' fade-up (CSS .wk-in: 600ms, 14px). */
+const fadeAt = (vt: number | null, delay: number): React.CSSProperties => {
+  if (vt === null) return {};
+  const k = ease((vt - delay) / 600);
+  return { opacity: k, transform: `translateY(${(14 * (1 - k)).toFixed(2)}px)` };
+};
+/** The bars' fill (CSS .wk-bar: 900ms). */
+const barAt = (vt: number | null, delay: number): React.CSSProperties => (vt === null ? {} : { transform: `scaleX(${ease((vt - delay) / 900).toFixed(4)})` });
+// (The top card no longer floats: it holds a still -4° tilt, set in CSS.)
+const floatPhase = (_vt: number) => 0;
+const floatAt = (_vt: number | null): React.CSSProperties => ({});
+const VIDEO_ANIM_MS = 2500, VIDEO_HOLD_MS = 30000, VIDEO_FPS = 30;
+
+// When the poster (this week / mode / size) appeared: every count-up is timed from here, so a
+// number that gets re-created mid-animation carries on instead of starting again from 0.
+const AnimStart = React.createContext<number>(0);
+const reducedMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+/** 0→1 progress of a count-up starting `delay` ms after the poster appeared (re-renders until done). */
+function useCountProgress(delay: number, ms = 1100) {
+  const start = useContext(AnimStart);
+  const at = () => (reducedMotion() ? 1 : ease((performance.now() - start - delay) / ms));
+  const [, setTick] = useState(0);
   useEffect(() => {
-    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setV(to); return; }
-    let raf = 0; const t0 = performance.now();
-    const tick = (t: number) => {
-      const k = Math.min(1, (t - t0) / ms);
-      setV(to * (1 - Math.pow(1 - k, 3)));
-      if (k < 1) raf = requestAnimationFrame(tick);
-    };
+    if (at() >= 1) return;
+    let raf = 0;
+    const tick = () => { setTick((x) => x + 1); if (at() < 1) raf = requestAnimationFrame(tick); };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [to, ms]);
-  return v;
+  }, [start, delay]); // eslint-disable-line react-hooks/exhaustive-deps
+  return at();
 }
 
 /* ---------- poster palette (always dark, whatever the site theme) ---------- */
@@ -218,12 +241,15 @@ function toDataUrl(url: string): Promise<string | null> {
 }
 const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
 
-const Tile: React.FC<{ label: string; children: React.ReactNode; delay?: number; style?: React.CSSProperties; tag?: string; list?: string; labelRight?: boolean }> = ({ label, children, delay = 0, style, tag, list, labelRight }) => (
-  <div className="wk-in" data-tile={tag} data-list={list} style={{ animationDelay: `${delay}ms`, padding: 18, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, minWidth: 0, minHeight: 0, overflow: "hidden", ...style }}>
+const Tile: React.FC<{ label: string; children: React.ReactNode; delay?: number; style?: React.CSSProperties; tag?: string; list?: string; labelRight?: boolean }> = ({ label, children, delay = 0, style, tag, list, labelRight }) => {
+  const vt = useContext(VT);
+  return (
+  <div className="wk-in" data-tile={tag} data-list={list} style={{ animationDelay: `${delay}ms`, padding: 18, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, minWidth: 0, minHeight: 0, overflow: "hidden", ...style, ...fadeAt(vt, delay) }}>
     <div data-label="1" style={{ ...mono, color: C.faint, textAlign: labelRight ? "right" : undefined }}>{label}</div>
     {children}
   </div>
-);
+  );
+};
 
 /** Change from the week before, under a stat: green when up, red when down. */
 const GREEN = "#4ade80", RED = "#f87171";
@@ -249,20 +275,33 @@ const Edition: React.FC<{ e?: string; size?: number }> = ({ e, size = 10 }) => (
   <span style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", height: Math.round(size * 1.6), marginLeft: 6, padding: "0 5px", borderRadius: 4, border: "1px solid currentColor", fontFamily: "var(--font-data)", fontWeight: 500, fontSize: size, lineHeight: 1, letterSpacing: "0.04em", color: C.faint, verticalAlign: "middle", ...PILL_TRIM }}>{D.editionLabel(e)}</span>
 ) : null);
 
-const Num: React.FC<{ v: number; fmt: (n: number) => string; style?: React.CSSProperties }> = ({ v, fmt, style }) => {
-  const n = useCountUp(v);
-  return <span style={style}>{fmt(n)}</span>;
+/** A number that counts up from 0 (after `delay` ms), on screen and in the video. */
+const Num: React.FC<{ v: number; fmt: (n: number) => string; style?: React.CSSProperties; delay?: number; reserve?: boolean }> = ({ v, fmt, style, delay = 0, reserve }) => {
+  const k = useCountProgress(delay);
+  const vt = useContext(VT);
+  const shown = fmt(v * (vt === null ? k : ease((vt - delay) / 1100)));
+  if (!reserve) return <span style={style}>{shown}</span>;
+  // Keeps the final number's width while counting, so nothing next to it shifts.
+  return (
+    <span style={{ ...style, position: "relative", display: style && style.display === "block" ? "block" : "inline-block" }}>
+      <span style={{ visibility: "hidden" }}>{fmt(v)}</span>
+      <span style={{ position: "absolute", right: 0, top: 0, whiteSpace: "nowrap" }}>{shown}</span>
+    </span>
+  );
 };
 
 /** Daily index across the week, as a glowing area line. */
 const IndexLine: React.FC<{ pts: number[]; up: boolean }> = ({ pts, up }) => {
+  const vt = useContext(VT);
   if (pts.length < 2) return null;
+  // In the video the line draws in from the left (with its tile, over ~1.2s).
+  const shown = vt === null ? 1 : ease((vt - 80) / 1200);
   const W = 300, H = 90, lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
   const xy = pts.map((v, i) => [(i / (pts.length - 1)) * W, H - 8 - ((v - lo) / span) * (H - 16)]);
   const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
   const col = up ? C.up : C.down;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 90, overflow: "visible" }} aria-hidden="true">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block", width: "100%", height: 90, overflow: "visible", ...(shown < 1 ? { clipPath: `inset(-20px ${((1 - shown) * 100).toFixed(2)}% -20px -20px)` } : {}) }} aria-hidden="true">
       <defs>
         <linearGradient id="wkfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={col} stopOpacity="0.35" /><stop offset="1" stopColor={col} stopOpacity="0" /></linearGradient>
       </defs>
@@ -285,7 +324,11 @@ export type WeeklyProps = {
 
 export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, lang, onBack }: WeeklyProps) {
   const shotRef = useRef<HTMLDivElement>(null);
-  const [shot, setShot] = useState<"" | "busy" | "copy-ok" | "copy-err" | "save-ok" | "save-err">("");
+  const [shot, setShot] = useState<"" | "busy" | "copy-ok" | "copy-err" | "save-ok" | "save-err" | "video-ok" | "video-err">("");
+  const [vt, setVt] = useState<number | null>(null); // video clock while a video is being made
+  const [videoPct, setVideoPct] = useState<number | null>(null);
+  const imgCacheRef = useRef(new Map<string, HTMLImageElement | null>());
+  const readyVideo = useRef<File | null>(null);
   const [note, setNote] = useState("");
   const [fmt, setFmtState] = useState<Fmt>(() => { try { const v = localStorage.getItem(FMT_KEY); return FORMATS.some(([f]) => f === v) ? (v as Fmt) : "1:1"; } catch (e) { return "1:1"; } });
   const setFmt = (f: Fmt) => { setFmtState(f); try { localStorage.setItem(FMT_KEY, f); } catch (e) {} };
@@ -295,6 +338,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const latest = sundayOf(todayISO());
   const [end, setEnd] = useState(latest);
   const start = addDays(end, -6);
+  const animStart = useMemo(() => performance.now(), [end, mode, fmt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const prev = document.title;
@@ -463,6 +507,205 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const W = 1080, EDGE = 4;
   const H = fmt === "9:16" ? 1920 : fmt === "3:4" ? 1440 : 1080;
   const SHOT_W = W + EDGE * 2, SHOT_H = H + EDGE * 2;
+  // Paints the card images onto a canvas made from the poster (see makeBlob). `off` shifts
+  // everything (the video drops the 4px edge); `at` is the video clock, for the top card's float.
+  const imgCache = imgCacheRef.current;
+  // The corner logo, painted onto a canvas made from the poster (Safari leaves pictures out of
+  // the HTML render). `off` shifts it (the video drops the 4px edge).
+  const paintLogo = async (ctx: CanvasRenderingContext2D, node: HTMLElement, PR: number, off: number) => {
+    const box = node.getBoundingClientRect();
+    const k = box.width / SHOT_W;
+    const logoEl = node.querySelector<HTMLImageElement>("img[data-logo]");
+    if (logoEl) {
+      const src = logoEl.getAttribute("src") || "";
+      const data = src.startsWith("data:") ? src : await toDataUrl(new URL(src, location.href).href);
+      if (data) {
+        const im = new Image(); im.src = data;
+        try {
+          await im.decode();
+          const r = logoEl.getBoundingClientRect();
+          const cx = ((r.left + r.right) / 2 - box.left) / k + off, cy = ((r.top + r.bottom) / 2 - box.top) / k + off;
+          const w = logoEl.offsetWidth, h = logoEl.offsetHeight;
+          ctx.save();
+          ctx.scale(PR, PR);
+          ctx.beginPath();
+          const R = 28, x0 = EDGE + off, y0 = EDGE + off, x1 = EDGE + W + off, y1 = EDGE + H + off;
+          ctx.moveTo(x0 + R, y0); ctx.arcTo(x1, y0, x1, y1, R); ctx.arcTo(x1, y1, x0, y1, R); ctx.arcTo(x0, y1, x0, y0, R); ctx.arcTo(x0, y0, x1, y0, R);
+          ctx.clip();
+          let alpha = 1;
+          for (let e: HTMLElement | null = logoEl; e && e !== node; e = e.parentElement) alpha *= parseFloat(getComputedStyle(e).opacity || "1");
+          ctx.globalAlpha = alpha;
+          ctx.translate(cx, cy);
+          ctx.drawImage(im, -w / 2, -h / 2, w, h);
+          ctx.restore();
+        } catch (e) {}
+      }
+    }
+  };
+  const paintCards = async (ctx: CanvasRenderingContext2D, node: HTMLElement, PR: number, off: number, at: number | null) => {
+    const box = node.getBoundingClientRect();
+    const k = box.width / SHOT_W; // on-screen scale of the poster
+    const imgs = [...node.querySelectorAll<HTMLImageElement>("img[data-card]")].filter((el) => getComputedStyle(el).visibility !== "hidden");
+    // Load every image first, then paint them one at a time (each paint sets its own
+    // transform and clip on the shared canvas).
+    const loaded = await Promise.all(imgs.map(async (el) => {
+      const src = el.dataset.card || "";
+      if (imgCache.has(src)) return imgCache.get(src) || null;
+      const data = src.startsWith("data:") ? src : await toDataUrl(src);
+      let im: HTMLImageElement | null = null;
+      if (data) { im = new Image(); im.src = data; try { await im.decode(); } catch (e) { im = null; } }
+      imgCache.set(src, im);
+      return im;
+    }));
+    imgs.forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      const cx = ((r.left + r.right) / 2 - box.left) / k + off, cy = ((r.top + r.bottom) / 2 - box.top) / k + off;
+      const w = el.offsetWidth, h = el.offsetHeight;
+      const floating = !!el.closest(".wk-float");
+      const tilt = floating ? ((at === null ? -4 : -4 + 2 * floatPhase(at)) * Math.PI) / 180 : 0;
+      // Fading tiles: the card takes the opacity of the boxes it sits in.
+      let alpha = 1;
+      for (let e: HTMLElement | null = el; e && e !== node; e = e.parentElement) alpha *= parseFloat(getComputedStyle(e).opacity || "1");
+      if (alpha <= 0.001) return;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.scale(PR, PR);
+      ctx.translate(cx, cy);
+      if (tilt) ctx.rotate(tilt);
+      const rx = w * 0.0472, ry = h * 0.0337;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + rx, -h / 2);
+      ctx.lineTo(w / 2 - rx, -h / 2); ctx.ellipse(w / 2 - rx, -h / 2 + ry, rx, ry, 0, -Math.PI / 2, 0);
+      ctx.lineTo(w / 2, h / 2 - ry); ctx.ellipse(w / 2 - rx, h / 2 - ry, rx, ry, 0, 0, Math.PI / 2);
+      ctx.lineTo(-w / 2 + rx, h / 2); ctx.ellipse(-w / 2 + rx, h / 2 - ry, rx, ry, 0, Math.PI / 2, Math.PI);
+      ctx.lineTo(-w / 2, -h / 2 + ry); ctx.ellipse(-w / 2 + rx, -h / 2 + ry, rx, ry, 0, Math.PI, Math.PI * 1.5);
+      ctx.closePath();
+      ctx.clip();
+      ctx.fillStyle = "#241a1f";
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      const im = loaded[i];
+      if (im) ctx.drawImage(im, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    });
+  };
+
+  // Video: the poster's intro animation (2.5s) then the finished poster held for 30s, as an MP4
+  // (H.264, 1080 wide, 30fps) made in the browser with WebCodecs. Each animation frame is the
+  // poster drawn at that moment of the clock; the hold reuses the last frame.
+  const canVideo = typeof window !== "undefined" && "VideoEncoder" in window && "VideoFrame" in window;
+  const makeVideo = async () => {
+    const node = shotRef.current;
+    if (!node || shot === "busy") return;
+    setNote("");
+    if (!canVideo) { setNote("This browser can't make videos. Try Chrome, or Safari 16.4 or newer."); return; }
+    setShot("busy");
+    setVideoPct(0);
+    let encoder: Any = null;
+    try {
+      await imgsReady.current;
+      const VE = (window as Any).VideoEncoder, VF = (window as Any).VideoFrame;
+      // H.264 first (what Instagram / X expect); VP9 in MP4 only where H.264 isn't available.
+      let config: Any = null, muxCodec: "avc" | "vp9" = "avc";
+      for (const [codec, mc] of [["avc1.640028", "avc"], ["avc1.4d0028", "avc"], ["avc1.42e028", "avc"], ["vp09.00.40.08", "vp9"]] as Array<[string, "avc" | "vp9"]>) {
+        const c = { codec, width: W, height: H, bitrate: 8_000_000, framerate: VIDEO_FPS };
+        try { const r = await VE.isConfigSupported(c); if (r && r.supported) { config = c; muxCodec = mc; break; } } catch (e) {}
+      }
+      if (!config) throw new Error("no video encoder");
+      const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: muxCodec, width: W, height: H }, fastStart: "in-memory" });
+      let failed: Any = null;
+      encoder = new VE({ output: (chunk: Any, meta: Any) => muxer.addVideoChunk(chunk, meta), error: (e: Any) => { failed = e; } });
+      encoder.configure(config);
+
+      node.classList.add("wk-shot"); // CSS animations off: the clock drives the poster now
+      const fontEmbedCSS = await getFontEmbedCSS(node).catch(() => undefined);
+      const out = document.createElement("canvas");
+      out.width = W; out.height = H;
+      const octx = out.getContext("2d");
+      if (!octx) throw new Error("no canvas");
+      const opts = { pixelRatio: 1, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506", fontEmbedCSS,
+        filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) };
+      // One frame: the poster as it is now (clock at `t`, or null = finished, exactly as the
+      // image export draws it), without the 4px edge.
+      const drawFrame = async (t: number | null) => {
+        const frame = await toCanvas(node, opts);
+        octx.fillStyle = "#060506";
+        octx.fillRect(0, 0, W, H);
+        octx.drawImage(frame, -EDGE, -EDGE);
+        await paintLogo(octx, node, 1, -EDGE);
+        await paintCards(octx, node, 1, -EDGE, t);
+      };
+      const step = 1e6 / VIDEO_FPS;
+      const animFrames = Math.round((VIDEO_ANIM_MS / 1000) * VIDEO_FPS);
+      const total = animFrames + Math.round((VIDEO_HOLD_MS / 1000) * VIDEO_FPS);
+      const encode = async (i: number) => {
+        if (failed) throw failed;
+        const f = new VF(out, { timestamp: Math.round(i * step), duration: Math.round(step) });
+        encoder.encode(f, { keyFrame: i % (VIDEO_FPS * 2) === 0 });
+        f.close();
+        while (encoder.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 4));
+      };
+      if (isSafari) await toCanvas(node, opts); // warm-up pass for Safari (fonts)
+      for (let i = 0; i < animFrames; i++) {
+        const t = (i * 1000) / VIDEO_FPS;
+        flushSync(() => setVt(t));
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+        await drawFrame(t);
+        await encode(i);
+        setVideoPct(Math.round((80 * (i + 1)) / animFrames));
+      }
+      // The held ending is the finished poster, drawn exactly as the image export draws it.
+      flushSync(() => setVt(null));
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      await drawFrame(null);
+      for (let i = animFrames; i < total; i++) {
+        await encode(i);
+        if (i % 30 === 0) setVideoPct(80 + Math.round((20 * (i - animFrames)) / (total - animFrames)));
+      }
+      await encoder.flush();
+      muxer.finalize();
+      const blob = new Blob([(muxer.target as ArrayBufferTarget).buffer], { type: "video/mp4" });
+      const name = fileName.replace(/\.png$/, ".mp4");
+      D.trackEvent("weekly_video", { week: end, mode, fmt });
+      if (shareFiles) {
+        const file = new File([blob], name, { type: "video/mp4" });
+        try { await navigator.share({ files: [file] }); }
+        catch (e: Any) {
+          if (!(e && e.name === "AbortError")) {
+            // Safari only opens the share sheet straight from a tap: keep the video for a second tap.
+            readyVideo.current = file;
+            setNote("Video ready. Tap the video button again to save it.");
+          }
+        }
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
+      setShot("video-ok"); window.setTimeout(() => setShot(""), 1800);
+    } catch (e: Any) {
+      console.error(e);
+      setNote(`Couldn't make the video${e && e.message ? ` (${e.message})` : ""}.`);
+      setShot("video-err"); window.setTimeout(() => setShot(""), 1800);
+      try { if (encoder && encoder.state !== "closed") encoder.close(); } catch (e2) {}
+    } finally {
+      setVt(null);
+      setVideoPct(null);
+      node.classList.remove("wk-shot");
+      node.classList.add("wk-still");
+    }
+  };
+  const videoButton = async () => {
+    const f = readyVideo.current;
+    if (f && shareFiles) {
+      readyVideo.current = null;
+      setNote("");
+      try { await navigator.share({ files: [f] }); } catch (e) {}
+      return;
+    }
+    makeVideo();
+  };
+
   const makeBlob = async () => {
     const node = shotRef.current;
     if (!node) throw new Error("no poster");
@@ -482,68 +725,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       if (!ctx) throw new Error("no canvas");
       const box = node.getBoundingClientRect();
       const k = box.width / SHOT_W; // on-screen scale of the poster
-      // The logo is painted in too (Safari leaves pictures out of the HTML render).
-      const logoEl = node.querySelector<HTMLImageElement>("img[data-logo]");
-      if (logoEl) {
-        const src = logoEl.getAttribute("src") || "";
-        const data = src.startsWith("data:") ? src : await toDataUrl(new URL(src, location.href).href);
-        if (data) {
-          const im = new Image(); im.src = data;
-          try {
-            await im.decode();
-            const r = logoEl.getBoundingClientRect();
-            const cx = ((r.left + r.right) / 2 - box.left) / k, cy = ((r.top + r.bottom) / 2 - box.top) / k;
-            const w = logoEl.offsetWidth, h = logoEl.offsetHeight;
-            ctx.save();
-            ctx.scale(PR, PR);
-            ctx.beginPath();
-            const R = 28, x0 = EDGE, y0 = EDGE, x1 = EDGE + W, y1 = EDGE + H;
-            ctx.moveTo(x0 + R, y0); ctx.arcTo(x1, y0, x1, y1, R); ctx.arcTo(x1, y1, x0, y1, R); ctx.arcTo(x0, y1, x0, y0, R); ctx.arcTo(x0, y0, x1, y0, R);
-            ctx.clip();
-            let alpha = 1;
-            for (let e: HTMLElement | null = logoEl; e && e !== node; e = e.parentElement) alpha *= parseFloat(getComputedStyle(e).opacity || "1");
-            ctx.globalAlpha = alpha;
-            ctx.translate(cx, cy);
-            ctx.drawImage(im, -w / 2, -h / 2, w, h);
-            ctx.restore();
-          } catch (e) {}
-        }
-      }
-      const imgs = [...node.querySelectorAll<HTMLImageElement>("img[data-card]")].filter((el) => getComputedStyle(el).visibility !== "hidden");
-      // Load every image first, then paint them one at a time (each paint sets its own
-      // transform and clip on the shared canvas).
-      const loaded = await Promise.all(imgs.map(async (el) => {
-        const src = el.dataset.card || "";
-        const data = src.startsWith("data:") ? src : await toDataUrl(src);
-        if (!data) return null;
-        const im = new Image();
-        im.src = data;
-        try { await im.decode(); return im; } catch (e) { return null; }
-      }));
-      imgs.forEach((el, i) => {
-        const r = el.getBoundingClientRect();
-        const cx = ((r.left + r.right) / 2 - box.left) / k, cy = ((r.top + r.bottom) / 2 - box.top) / k;
-        const w = el.offsetWidth, h = el.offsetHeight;
-        const tilt = el.closest(".wk-float") ? (-4 * Math.PI) / 180 : 0;
-        ctx.save();
-        ctx.scale(PR, PR);
-        ctx.translate(cx, cy);
-        if (tilt) ctx.rotate(tilt);
-        const rx = w * 0.0472, ry = h * 0.0337;
-        ctx.beginPath();
-        ctx.moveTo(-w / 2 + rx, -h / 2);
-        ctx.lineTo(w / 2 - rx, -h / 2); ctx.ellipse(w / 2 - rx, -h / 2 + ry, rx, ry, 0, -Math.PI / 2, 0);
-        ctx.lineTo(w / 2, h / 2 - ry); ctx.ellipse(w / 2 - rx, h / 2 - ry, rx, ry, 0, 0, Math.PI / 2);
-        ctx.lineTo(-w / 2 + rx, h / 2); ctx.ellipse(-w / 2 + rx, h / 2 - ry, rx, ry, 0, Math.PI / 2, Math.PI);
-        ctx.lineTo(-w / 2, -h / 2 + ry); ctx.ellipse(-w / 2 + rx, -h / 2 + ry, rx, ry, 0, Math.PI, Math.PI * 1.5);
-        ctx.closePath();
-        ctx.clip();
-        ctx.fillStyle = "#241a1f";
-        ctx.fillRect(-w / 2, -h / 2, w, h);
-        const im = loaded[i];
-        if (im) ctx.drawImage(im, -w / 2, -h / 2, w, h);
-        ctx.restore();
-      });
+      await paintLogo(ctx, node, PR, 0);
+      await paintCards(ctx, node, PR, 0, null);
       const b = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/png"));
       if (!b) throw new Error("no image");
       return b;
@@ -653,7 +836,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
 
   // i: position in its list (0 = no divider above); n: the number shown (defaults to i + 1).
   const MoverRow: React.FC<{ m: Any; i: number; n?: number; up: boolean; delay: number; hidden?: boolean; list: string }> = ({ m, i, n, up, delay, hidden, list }) => (
-    <div className="wk-in" data-row="1" data-slot={i === 0 && up ? "1" : undefined} style={{ visibility: hidden ? "hidden" : undefined, animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor(list)}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
+    <div className="wk-in" data-row="1" data-slot={i === 0 && up ? "1" : undefined} style={{ visibility: hidden ? "hidden" : undefined, animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor(list)}px 0`, borderTop: i ? `1px solid ${C.line}` : "none", ...fadeAt(vt, delay) }}>
       <span style={{ ...mono, color: C.faint }}>{n ?? i + 1}</span>
       <Img src={pic(m.card.image)} w={34} />
       <span style={{ minWidth: 0 }}>
@@ -663,20 +846,20 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           <Edition e={m.card.edition} />
         </span>
         <span style={{ display: "block", marginTop: 5, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-          <span className="wk-bar" style={{ display: "block", height: "100%", width: `${(Math.abs(m.pct) / maxPct) * 100}%`, background: up ? C.gain : C.down, boxShadow: `0 0 10px ${up ? C.gainGlow : C.downGlow}`, animationDelay: `${delay + 150}ms` }} />
+          <span className="wk-bar" style={{ display: "block", height: "100%", width: `${(Math.abs(m.pct) / maxPct) * 100}%`, background: up ? C.gain : C.down, boxShadow: `0 0 10px ${up ? C.gainGlow : C.downGlow}`, animationDelay: `${delay + 150}ms`, ...barAt(vt, delay + 150) }} />
         </span>
         <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{fmtUSD(m.from)} <span style={{ color: up ? C.gain : C.down }}>→</span> {fmtUSD(m.to)}</span>
       </span>
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-        <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: up ? C.gain : C.down, textShadow: `0 0 12px ${up ? C.gainGlow : C.downGlow}` }}>{fmtPct(m.pct)}</span>
-        <span style={{ marginTop: 3, fontFamily: "var(--font-data)", fontSize: 12, color: C.text }}>{m.to >= m.from ? "+" : "−"}{usd0.format(Math.abs(m.to - m.from))}</span>
+        <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: up ? C.gain : C.down, textShadow: `0 0 12px ${up ? C.gainGlow : C.downGlow}` }}><Num reserve v={m.pct} fmt={fmtPct} delay={delay} /></span>
+        <span style={{ marginTop: 3, fontFamily: "var(--font-data)", fontSize: 12, color: C.text }}><Num reserve v={m.to - m.from} fmt={(n) => `${m.to >= m.from ? "+" : "−"}${usd0.format(Math.abs(n))}`} delay={delay} /></span>
       </span>
     </div>
   );
   // A card back on the market after more than ~6 months: shown apart from the climbers/fallers.
   const ComebackRow: React.FC<{ m: Any; i: number; delay: number }> = ({ m, i, delay }) => {
     return (
-      <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor("climbers")}px 0`, borderTop: i ? `1px solid ${C.line}` : "none" }}>
+      <div className="wk-in" data-row="1" style={{ animationDelay: `${delay}ms`, display: "grid", gridTemplateColumns: "16px 34px minmax(0,1fr) auto", alignItems: "center", gap: 12, padding: `${padFor("climbers")}px 0`, borderTop: i ? `1px solid ${C.line}` : "none", ...fadeAt(vt, delay) }}>
         <span style={{ ...mono, color: C.faint }}>{i + 1}</span>
         <Img src={pic(m.card.image)} w={34} />
         <span style={{ minWidth: 0 }}>
@@ -686,20 +869,20 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
             <Edition e={m.card.edition} />
           </span>
           <span style={{ display: "block", marginTop: 5, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-            <span className="wk-bar" style={{ display: "block", height: "100%", width: `${Math.min(100, (Math.abs(m.pct) / maxPct) * 100)}%`, background: C.comeback, animationDelay: `${delay + 150}ms` }} />
+            <span className="wk-bar" style={{ display: "block", height: "100%", width: `${Math.min(100, (Math.abs(m.pct) / maxPct) * 100)}%`, background: C.comeback, animationDelay: `${delay + 150}ms`, ...barAt(vt, delay + 150) }} />
           </span>
           <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-data)", fontSize: 12, color: C.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {fmtUSD(m.from)} <span style={{ color: C.comeback }}>→</span> {fmtUSD(m.to)}
           </span>
         </span>
         <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-          <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: C.comeback }}>{fmtPct(m.pct)}</span>
+          <span style={{ fontFamily: "var(--font-data)", fontWeight: 600, fontSize: 17, color: C.comeback }}><Num reserve v={m.pct} fmt={fmtPct} delay={delay} /></span>
           <span style={{ marginTop: 3, fontFamily: "var(--font-data)", fontSize: 12, color: C.text, whiteSpace: "nowrap" }}>after {gapLabel(m.gap)}</span>
         </span>
       </div>
     );
   };
-  const Highlight: React.FC<{ label: string; img?: string; title: string; sub: string; line: string; delay: number }> = ({ label, img, title, sub, line, delay }) => (
+  const Highlight: React.FC<{ label: string; img?: string; title: React.ReactNode; sub: string; line: string; delay: number }> = ({ label, img, title, sub, line, delay }) => (
     <Tile label={label} delay={delay}>
       <div style={{ display: "flex", gap: 16, alignItems: "center", marginTop: 12 }}>
         <Img src={pic(img)} w={58} glow="rgba(196,155,255,0.35)" />
@@ -721,14 +904,14 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // Tucked into the poster's top-right corner (into the padding), in the poster's pink.
   const logo = <img data-logo="1" src={logoSrc} alt="mew.cards" draggable={false} style={{ position: "absolute", top: LOGO.inset - 52, right: LOGO.inset - 52, height: logoH, width: logoW, opacity: 0.9 }} />;
   const title = story ? (
-    <div className="wk-in" style={{ position: "relative" }}>
+    <div className="wk-in" style={{ position: "relative", ...fadeAt(vt, 0) }}>
       {logo}
       {kicker}
       <h1 style={{ margin: "12px 0 0", maxWidth: `calc(100% - ${beside}px)`, ...big, fontSize: 104 * tk, letterSpacing: "-0.03em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10</h1>
       <div style={{ marginTop: 18 }}>{dates}</div>
     </div>
   ) : (
-    <div className="wk-in" style={{ position: "relative" }}>
+    <div className="wk-in" style={{ position: "relative", ...fadeAt(vt, 0) }}>
       {logo}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, paddingRight: beside }}>{kicker}{dates}</div>
       <h1 style={{ margin: "8px 0 0", maxWidth: `calc(100% - ${beside}px)`, ...big, fontSize: 70 * tk, letterSpacing: "-0.02em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10</h1>
@@ -750,9 +933,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       <Tile label="Avg sale" delay={260}><Num v={week.avg} fmt={(n) => usd0.format(n)} style={{ display: "block", marginTop: 12, ...big, fontSize: 32 }} /><Delta now={week.avg} prev={prevWeek.avg} money /></Tile>
       <Tile label="Up vs down" delay={320}>
         <div style={{ marginTop: 12, display: "flex", alignItems: "baseline", gap: 10, ...big, fontSize: 36 }}>
-          <span style={{ color: C.gain }}>{week.up.length}<span style={{ fontSize: 18 }}> ▲</span></span>
+          <span style={{ color: C.gain }}><Num v={week.up.length} fmt={(n) => String(Math.round(n))} delay={320} /><span style={{ fontSize: 18 }}> ▲</span></span>
           <span style={{ color: C.faint, fontSize: 24 }}>/</span>
-          <span style={{ color: C.down }}>{week.down.length}<span style={{ fontSize: 18 }}> ▼</span></span>
+          <span style={{ color: C.down }}><Num v={week.down.length} fmt={(n) => String(Math.round(n))} delay={320} /><span style={{ fontSize: 18 }}> ▼</span></span>
         </div>
         <div style={{ marginTop: 8, fontFamily: "var(--font-data)", fontSize: 13, color: C.faint, whiteSpace: "nowrap" }}>last week {prevWeek.up.length} ▲ / {prevWeek.down.length} ▼</div>
       </Tile>
@@ -770,7 +953,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", height: 230, boxSizing: "border-box", background: heroBg }}>
       <div style={{ display: "flex", alignItems: "center", height: "calc(100% - 14px)", paddingLeft: ext ? ext.imgX + ext.imgW + 40 - 18 : 220 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
+          <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}><Num reserve v={hero.pct} fmt={fmtPct} delay={260} /></div>
           <div style={{ marginTop: 16, display: "flex", alignItems: "center", columnGap: 10, fontWeight: 600, fontSize: 24, lineHeight: 1.25, whiteSpace: "nowrap" }}>
             <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(hero.card)}</span>
             {hero.card.number && <span style={{ fontFamily: "var(--font-data)", fontWeight: 400, fontSize: 16, color: C.faint }}>{hero.card.number}</span>}
@@ -783,9 +966,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   ) : (
     <Tile label="Top climber" tag="hero" delay={260} style={{ position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", background: heroBg }}>
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 14 }}>
-        <span className="wk-float" style={{ display: "block" }}><Img src={pic(hero.card.image)} w={heroW} glow={C.upGlow} /></span>
+        <span className="wk-float" style={{ display: "block", ...floatAt(vt) }}><Img src={pic(hero.card.image)} w={heroW} glow={C.upGlow} /></span>
         <div data-hero-text="1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, maxWidth: "100%" }}>
-          <div style={{ ...big, fontSize: tall ? 60 : 54, color: C.up, textShadow: `0 0 24px ${C.upGlow}` }}>{fmtPct(hero.pct)}</div>
+          <div style={{ ...big, fontSize: tall ? 60 : 54, color: C.up, textShadow: `0 0 24px ${C.upGlow}` }}><Num reserve v={hero.pct} fmt={fmtPct} delay={260} /></div>
           <div style={{ maxWidth: "100%" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", columnGap: 8, rowGap: 4, fontWeight: 600, fontSize: 18, lineHeight: 1.25 }}>
               <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{name(hero.card)}</span>
@@ -843,9 +1026,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const nHigh = (sales && week.biggest ? 1 : 0) + (sales && week.busiest ? 1 : 0) + (week.bigGain ? 1 : 0);
   const highlights = nHigh > 0 && (
     <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: `repeat(${nHigh}, minmax(0, 1fr))` }}>
-      {sales && week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={fmtUSD(week.biggest.value)} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
-      {week.bigGain && <Highlight label="Biggest gain" delay={560} img={week.bigGain.card.image} title={`+${usd0.format(week.bigGain.to - week.bigGain.from)}`} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
-      {sales && week.busiest && <Highlight label="Most sold" delay={620} img={week.busiest.card.image} title={`${week.busiest.n} sales`} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
+      {sales && week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={<Num v={week.biggest.value} fmt={fmtUSD} delay={500} />} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
+      {week.bigGain && <Highlight label="Biggest gain" delay={560} img={week.bigGain.card.image} title={<Num v={week.bigGain.to - week.bigGain.from} fmt={(n) => `+${usd0.format(n)}`} delay={560} />} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
+      {sales && week.busiest && <Highlight label="Most sold" delay={620} img={week.busiest.card.image} title={<Num v={week.busiest.n} fmt={(n) => `${Math.round(n)} sales`} delay={620} />} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
     </div>
   );
 
@@ -892,6 +1075,11 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           <button type="button" className="wk-nav" onClick={downloadShot} disabled={shot === "busy"} aria-label={shareFiles ? "Save image" : "Download image"} title={shot === "save-err" ? "Couldn't save" : shareFiles ? "Save image (share sheet → Save Image)" : "Download image"} style={{ color: iconCol("save") }}>
             {shot === "save-ok" ? check : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11" /><path d="M7 10.5l5 5 5-5" /><path d="M5 20h14" /></svg>}
           </button>
+          <button type="button" className="wk-nav" onClick={videoButton} disabled={shot === "busy"} aria-label="Make video" title={shot === "video-err" ? "Couldn't make the video" : "Video: the intro animation, then 30s of the finished poster (MP4)"}
+            style={{ color: shot === "video-ok" ? GREEN : shot === "video-err" ? RED : C.text, width: videoPct !== null ? "auto" : undefined, padding: videoPct !== null ? "0 8px" : 0, gap: 6 }}>
+            {shot === "video-ok" ? check : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2" /><path d="M16 10.5l5-3v9l-5-3" /></svg>}
+            {videoPct !== null && <span style={{ ...mono, fontSize: 10 }}>{videoPct}%</span>}
+          </button>
         </span>
       </div>
 
@@ -899,6 +1087,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
 
       {/* the poster (inside a 4px edge, which is what gets copied / downloaded) */}
       <div style={{ width: SHOT_W * scale, height: SHOT_H * scale, flex: "0 0 auto" }}>
+       <AnimStart.Provider value={animStart}>
+       <VT.Provider value={vt}>
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
         <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
@@ -914,8 +1104,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
                     <div ref={moversRef} style={{ position: "relative", flex: 1, minHeight: 0, display: "grid", gap: 16, gridTemplateColumns: "1fr 1fr", gridTemplateRows: "minmax(0, 1fr)" }}>{climbersTile}{fallersTile}</div>
                     {hero && ext && (
                       <>
-                        <div className="wk-in" style={{ animationDelay: "300ms", position: "absolute", zIndex: 3, left: ext.imgX, top: ext.imgY }}>
-                          <span className="wk-float" style={{ display: "block" }}><Img src={pic(hero.card.image)} w={ext.imgW} glow={C.upGlow} /></span>
+                        <div className="wk-in" style={{ animationDelay: "300ms", position: "absolute", zIndex: 3, left: ext.imgX, top: ext.imgY, ...fadeAt(vt, 300) }}>
+                          <span className="wk-float" style={{ display: "block", ...floatAt(vt) }}><Img src={pic(hero.card.image)} w={ext.imgW} glow={C.upGlow} /></span>
                         </div>
                       </>
                     )}
@@ -940,6 +1130,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           )}
         </div>
        </div>
+       </VT.Provider>
+       </AnimStart.Provider>
       </div>
     </div>
   );
