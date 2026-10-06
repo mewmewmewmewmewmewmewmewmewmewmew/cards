@@ -29,11 +29,11 @@ const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", 
 const REEL_EXTRA = 1920 - 1440; // reel cover: the space under the 3:4 layout
 // Reel: the 9:16 layout reworked for a reel playing full screen on a phone (measured from an
 // iPhone screenshot). Instagram zooms 9:16 to fill the taller screen, cropping ~47px off each
-// side, puts its header ("Your reels") over the top ~250px, the name / caption over the bottom
-// from ~1700, and the like / comment / share buttons at the right from ~1460. Everything sits in
-// the clear box below at full size; the bottom row (which reaches the buttons' height) also
-// stops short of them.
-const REEL = { x: 64, y: 262, w: 952, h: 1363, buttons: 120 };
+// side, and puts its header ("Your reels") over the top ~250px; the like / comment / share
+// buttons sit at the right from ~1460. So the 9:16 layout starts below the header and keeps
+// clear of the side crop, running to the usual bottom margin; the bottom row stops short of the
+// buttons.
+const REEL = { x: 64, y: 262, w: 952, h: 1920 - 52 - 262, buttons: 120 };
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -708,7 +708,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         f.close();
         while (encoder.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 4));
       };
-      if (isSafari) await toCanvas(node, opts); // warm-up pass for Safari (fonts)
+      for (let i = 0; i < (isSafari ? 2 : 1); i++) await toCanvas(node, opts); // warm-up passes, so fonts are ready
       for (let i = 0; i < animFrames; i++) {
         const t = ((i * 1000) / VIDEO_FPS) * (VIDEO_ANIM_MS / VIDEO_LEN_MS); // the poster's clock, slowed
         flushSync(() => setVt(t));
@@ -784,7 +784,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       const fontEmbedCSS = (await posterFontCSS(node)) || undefined;
       const opts = { pixelRatio: PR, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506", fontEmbedCSS,
         filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) };
-      for (let i = 0; i < (isSafari ? 2 : 0); i++) await toCanvas(node, opts); // warm-up passes for Safari (fonts)
+      for (let i = 0; i < (isSafari ? 2 : 1); i++) await toCanvas(node, opts); // warm-up passes, so fonts are ready
       const canvas = await toCanvas(node, opts);
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("no canvas");
@@ -969,7 +969,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const logoH = LOGO.h[fmt], logoW = Math.round((logoH * 200) / 211), beside = Math.max(0, logoW + (reelSafe ? 0 : LOGO.inset - 52) + 16); // room kept beside the logo
   // Tucked into the poster's top-right corner (into the padding), in the poster's pink.
   const logo = <img data-logo="1" src={logoSrc} alt="mew.cards" draggable={false} style={{ position: "absolute", top: reelSafe ? 0 : LOGO.inset - 52, right: reelSafe ? 0 : LOGO.inset - 52, height: logoH, width: logoW, opacity: 0.9 }} />;
-  const title = story && !reelSafe ? (
+  const title = story ? (
     <div className="wk-in" style={{ position: "relative", ...fadeAt(vt, 0) }}>
       {logo}
       {kicker}
@@ -989,7 +989,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         <Num v={week.index[week.index.length - 1] || 0} fmt={(n) => usd0.format(n)} style={{ ...big, fontSize: story ? 56 : 46 }} />
         <span style={{ fontFamily: "var(--font-data)", fontWeight: 700, fontSize: story ? 24 : 20, color: idxUp ? C.up : C.down, textShadow: `0 0 14px ${idxUp ? C.upGlow : C.downGlow}` }}>{idxUp ? "▲" : "▼"} {fmtPct(week.idxPct)}</span>
       </div>
-      <div style={{ marginTop: 12 }}><IndexLine pts={week.index} up={idxUp} h={reelSafe ? 56 : 90} /></div>
+      <div style={{ marginTop: 12 }}><IndexLine pts={week.index} up={idxUp} /></div>
     </Tile>
   );
   const statTiles = sales ? (
@@ -1016,10 +1016,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // Story: the top climber's box spans the width; its card is drawn over it and reaches down
   // over the climbers list's empty #1 slot (the boxes themselves stay as they are).
   const heroTile = hero && (story ? (
-    <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", height: reelSafe ? 196 : 230, boxSizing: "border-box", background: heroBg }}>
+    <Tile label="Top climber" tag="hero-top" delay={260} style={{ position: "relative", height: 230, boxSizing: "border-box", background: heroBg }}>
       <div style={{ display: "flex", alignItems: "center", height: "calc(100% - 14px)", paddingLeft: ext ? ext.imgX + ext.imgW + 40 - 18 : 220 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ ...big, fontSize: reelSafe ? 68 : 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}><Num reserve v={hero.pct} fmt={fmtPct} delay={260} /></div>
+          <div style={{ ...big, fontSize: 84, color: C.up, textShadow: `0 0 28px ${C.upGlow}` }}><Num reserve v={hero.pct} fmt={fmtPct} delay={260} /></div>
           <div style={{ marginTop: 16, display: "flex", alignItems: "center", columnGap: 10, fontWeight: 600, fontSize: 24, lineHeight: 1.25, whiteSpace: "nowrap" }}>
             <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(hero.card)}</span>
             {hero.card.number && <span style={{ fontFamily: "var(--font-data)", fontWeight: 400, fontSize: 16, color: C.faint }}>{hero.card.number}</span>}
@@ -1156,7 +1156,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
        <AnimStart.Provider value={animStart}>
        <VT.Provider value={vt}>
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28 }}>
+        {/* An explicit line height everywhere: the default ("normal") depends on the font, so a font
+            drawn differently in the export would change row heights and card images (painted at
+            their on-screen spots) would drift off their rows. */}
+        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, lineHeight: 1.3 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
           {fmt === "reel" && (
             // Reel cover: big text in the space under the poster, to catch the eye in the feed.
