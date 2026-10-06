@@ -24,8 +24,9 @@ const FMT_KEY = "mew_weekly_fmt";
 // Poster formats (all 1080 wide): square post, portrait post, Instagram story.
 // "reel": a reel cover: the 3:4 poster at the top of a 9:16 frame, big title below.
 // "reelsafe": a reel: 9:16 with everything inside what a full-screen reel leaves visible.
-type Fmt = "1:1" | "3:4" | "9:16" | "reel" | "reelsafe";
-const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"], ["reel", "Reel cover"], ["reelsafe", "Reel"]];
+// "cover2": a reel cover: the 9:16 poster, dimmed, with a big banner across it for the dates.
+type Fmt = "1:1" | "3:4" | "9:16" | "reel" | "reelsafe" | "cover2";
+const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"], ["reel", "Reel cover"], ["reelsafe", "Reel"], ["cover2", "Reel cover 2"]];
 const REEL_EXTRA = 1920 - 1440; // reel cover: the space under the 3:4 layout
 // Reel: the 9:16 layout reworked for a reel playing full screen on a phone (measured from an
 // iPhone screenshot). Instagram zooms 9:16 to fill the taller screen, cropping ~47px off each
@@ -191,7 +192,7 @@ const C = {
   gainGlow: "rgba(126,226,168,0.35)",
 };
 // The Mew logo in the title's top-right corner (height in px; the PNG is 200×211).
-const LOGO = { h: { "1:1": 64, "3:4": 64, "9:16": 84, reel: 64, reelsafe: 64 } as Record<string, number>, inset: 28 };
+const LOGO = { h: { "1:1": 64, "3:4": 64, "9:16": 84, reel: 64, reelsafe: 64, cover2: 84 } as Record<string, number>, inset: 28 };
 /** The logo recoloured in the poster's pink (made once, as a data URL). */
 let tintedLogo: Promise<string> | null = null;
 function getTintedLogo(): Promise<string> {
@@ -567,7 +568,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // Poster formats: 1080 wide, height by ratio. The copied/downloaded image is the poster plus
   // a 4px edge, rendered from the unscaled layout at 2x with animations frozen in their end state.
   const W = 1080, EDGE = 4;
-  const H = fmt === "9:16" || fmt === "reel" || fmt === "reelsafe" ? 1920 : fmt === "3:4" ? 1440 : 1080;
+  const H = fmt === "9:16" || fmt === "reel" || fmt === "reelsafe" || fmt === "cover2" ? 1920 : fmt === "3:4" ? 1440 : 1080;
   const SHOT_W = W + EDGE * 2, SHOT_H = H + EDGE * 2;
   // Paints the card images onto a canvas made from the poster (see makeBlob). `off` shifts
   // everything (the video drops the 4px edge); `at` is the video clock, for the top card's float.
@@ -590,6 +591,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     const k = box.width / SHOT_W;
     const clone = node.cloneNode(true) as HTMLElement;
     clone.style.transform = "none";
+    clone.querySelectorAll("[data-overlay]").forEach((e) => e.remove()); // it would tint the blocks
     const host = document.createElement("div");
     host.style.cssText = "position:fixed;left:-30000px;top:0;pointer-events:none;";
     host.appendChild(clone);
@@ -640,6 +642,15 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     const sx = ((r.left + r.right) / 2 - box.left) / k, sy = ((r.top + r.bottom) / 2 - box.top) / k;
     const l = locs && locs.get(el);
     return l ? { x: l.x + (sx - l.sx), y: l.y + (sy - l.sy) } : { x: sx, y: sy };
+  };
+
+  /** A cover overlay (Reel cover 2), drawn on top of everything; `at` = its spot in the canvas. */
+  const paintOverlay = async (ctx: CanvasRenderingContext2D, node: HTMLElement, PR: number, at: number, fontEmbedCSS: string | undefined) => {
+    const el = node.querySelector<HTMLElement>("[data-overlay]");
+    if (!el) return;
+    const c = await toCanvas(el, { pixelRatio: PR, width: W, height: H, fontEmbedCSS, style: { position: "static", transform: "none" } });
+    ctx.drawImage(c, at * PR, at * PR);
+    c.width = 0; c.height = 0;
   };
 
   // The corner logo, painted onto a canvas made from the poster (Safari leaves pictures out of
@@ -753,7 +764,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       const octx = out.getContext("2d");
       if (!octx) throw new Error("no canvas");
       const opts = { pixelRatio: 1, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506", fontEmbedCSS,
-        filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) };
+        filter: (n: HTMLElement) => !((n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) || (n.dataset && n.dataset.overlay)) };
       // One frame: the poster as it is now (clock at `t`, or null = finished, exactly as the
       // image export draws it), without the 4px edge.
       let locs: Map<Element, Loc> | null = null;
@@ -765,6 +776,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         frame.width = 0; frame.height = 0; // free it now (browsers cap total canvas memory)
         await paintLogo(octx, node, 1, -EDGE, locs);
         await paintCards(octx, node, 1, -EDGE, t, locs);
+        await paintOverlay(octx, node, 1, 0, fontEmbedCSS);
       };
       const step = 1e6 / VIDEO_FPS;
       const animFrames = Math.round((VIDEO_LEN_MS / 1000) * VIDEO_FPS) - 1;
@@ -852,7 +864,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       const PR = 2;
       const fontEmbedCSS = (await posterFontCSS(node)) || undefined;
       const opts = { pixelRatio: PR, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506", fontEmbedCSS,
-        filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) };
+        filter: (n: HTMLElement) => !((n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) || (n.dataset && n.dataset.overlay)) };
       for (let i = 0; i < (isSafari ? 2 : 1); i++) await toCanvas(node, opts); // warm-up passes, so fonts are ready
       const canvas = await toCanvas(node, opts);
       const ctx = canvas.getContext("2d");
@@ -860,6 +872,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       const locs = await locatePictures(node, fontEmbedCSS);
       await paintLogo(ctx, node, PR, 0, locs);
       await paintCards(ctx, node, PR, 0, null, locs);
+      await paintOverlay(ctx, node, PR, EDGE, fontEmbedCSS);
       const b = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/png"));
       if (!b) throw new Error("no image");
       return b;
@@ -946,7 +959,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   };
 
   const reelSafe = fmt === "reelsafe";
-  const story = fmt === "9:16" || reelSafe, tall = fmt !== "1:1"; // the reel uses the stacked 9:16 layout
+  const story = fmt === "9:16" || reelSafe || fmt === "cover2", tall = fmt !== "1:1"; // the reel uses the stacked 9:16 layout
   const hero = week.up[0] || null;
   const rowsMax = story ? 10 : 14; // story shows the top 10; otherwise the measured fit decides
   const fitNow = fit && fit.key === `${shotKey}|${vw[0]}|${fontsTick}` ? fit : null;
@@ -1199,7 +1212,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         </span>
         <span style={{ display: "flex", gap: 4 }}>
           {FORMATS.map(([f, label]) => (
-            <button key={f} type="button" onClick={() => setFmt(f)} aria-pressed={fmt === f} title={f === "9:16" ? "Instagram story" : f === "3:4" ? "Portrait post" : f === "reel" ? "Reel cover: the 3:4 poster on a 9:16 frame, title below" : f === "reelsafe" ? "Reel: 9:16, kept clear of Instagram's crop and buttons" : "Square post"} style={pill(fmt === f)}>{label}</button>
+            <button key={f} type="button" onClick={() => setFmt(f)} aria-pressed={fmt === f} title={f === "9:16" ? "Instagram story" : f === "3:4" ? "Portrait post" : f === "reel" ? "Reel cover: the 3:4 poster on a 9:16 frame, title below" : f === "reelsafe" ? "Reel: 9:16, kept clear of Instagram's crop and buttons" : f === "cover2" ? "Reel cover 2: the 9:16 poster with a big date banner" : "Square post"} style={pill(fmt === f)}>{label}</button>
           ))}
         </span>
         <span style={{ display: "flex", gap: 6 }}>
@@ -1277,6 +1290,23 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
             </>
           )}
           </div>
+          {fmt === "cover2" && (
+            // Reel cover 2: the poster dimmed behind a banner that leads with the dates. Exports
+            // draw this layer last, on top of the painted card images.
+            <div data-overlay="1" style={{ position: "absolute", left: 0, top: 0, width: W, height: H, ...fadeAt(vt, 200) }}>
+              <div style={{ position: "absolute", inset: 0, background: "rgba(8,6,8,0.6)" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: 560, height: 120, background: "linear-gradient(180deg, rgba(10,7,10,0), #0a070a)" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: 680, height: 560, background: "#0a070a" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: 1240, height: 120, background: "linear-gradient(180deg, #0a070a, rgba(10,7,10,0))" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: 640, height: 640, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+                <div style={{ ...mono, fontSize: 40, letterSpacing: "0.18em", color: C.up, whiteSpace: "nowrap" }}>Weekly market report</div>
+                <div style={{ marginTop: 22, width: 760, height: 3, background: `linear-gradient(90deg, transparent, ${C.up}, #c49bff, transparent)` }} />
+                <div style={{ marginTop: 34, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: C.text, whiteSpace: "nowrap", textShadow: `0 0 40px ${C.upGlow}` }}>{fmtMD(start)} – {fmtMD(end)}</div>
+                <div style={{ marginTop: 30, ...big, fontSize: 84, letterSpacing: "-0.02em", lineHeight: 1, ...gradTitle, whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
+                <div style={{ marginTop: 34, width: 760, height: 3, background: `linear-gradient(90deg, transparent, #c49bff, ${C.up}, transparent)` }} />
+              </div>
+            </div>
+          )}
         </div>
        </div>
        </VT.Provider>
