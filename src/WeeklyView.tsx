@@ -571,11 +571,79 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // Paints the card images onto a canvas made from the poster (see makeBlob). `off` shifts
   // everything (the video drops the 4px edge); `at` is the video clock, for the top card's float.
   const imgCache = imgCacheRef.current;
-  // The corner logo, painted onto a canvas made from the poster (Safari leaves pictures out of
-  // the HTML render). `off` shifts it (the video drops the 4px edge).
-  const paintLogo = async (ctx: CanvasRenderingContext2D, node: HTMLElement, PR: number, off: number) => {
+  /**
+   * Where each picture (cards, logo) lands in the exported image. The export is drawn without
+   * pictures and they're painted on afterwards; their on-screen positions can't be trusted for
+   * that (a phone's text-size / zoom settings change the on-screen layout but not the export's).
+   * So a hidden copy of the poster is drawn the same way with every picture replaced by a block
+   * of its own exact colour, and the blocks are found in the result. Positions are in poster px
+   * (with the 4px edge); `sx, sy` is the on-screen centre at the time, so later animation
+   * offsets (the video's fade-ins) can be added on.
+   */
+  type Loc = { x: number; y: number; sx: number; sy: number };
+  const locatePictures = async (node: HTMLElement, fontEmbedCSS: string | undefined): Promise<Map<Element, Loc>> => {
+    const out = new Map<Element, Loc>();
+    const live = [...node.querySelectorAll<HTMLImageElement>("img[data-card], img[data-logo]")];
+    if (!live.length) return out;
     const box = node.getBoundingClientRect();
     const k = box.width / SHOT_W;
+    const clone = node.cloneNode(true) as HTMLElement;
+    clone.style.transform = "none";
+    const host = document.createElement("div");
+    host.style.cssText = "position:fixed;left:-30000px;top:0;pointer-events:none;";
+    host.appendChild(clone);
+    document.body.appendChild(host);
+    try {
+      const BLANK = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+      const imgs = [...clone.querySelectorAll<HTMLImageElement>("img[data-card], img[data-logo]")];
+      imgs.forEach((el, i) => {
+        el.src = BLANK; el.alt = "";
+        // Codes 8 shades apart (red, then blue), so colour handling that nudges a shade can't mix them up.
+        el.style.background = `rgb(${8 * (i % 32) + 4}, 254, ${8 * Math.floor(i / 32) + 4})`;
+        el.style.boxShadow = "none"; el.style.opacity = "1"; el.style.borderRadius = "0";
+      });
+      const opts = { pixelRatio: 1, width: SHOT_W, height: SHOT_H, backgroundColor: "#060506", fontEmbedCSS };
+      for (let i = 0; i < (isSafari ? 2 : 1); i++) await toCanvas(clone, opts); // fonts ready (they shape the layout)
+      const c = await toCanvas(clone, opts);
+      const ctx = c.getContext("2d");
+      if (!ctx) return out;
+      const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+      c.width = 0; c.height = 0;
+      const bb = new Map<number, [number, number, number, number]>();
+      for (let y = 0; y < height; y++) {
+        for (let x = 0, o = y * width * 4; x < width; x++, o += 4) {
+          if (data[o + 1] < 250 || data[o + 3] !== 255) continue;
+          const rr = data[o] - 4, bl = data[o + 2] - 4;
+          if (Math.abs(rr - 8 * Math.round(rr / 8)) > 2 || Math.abs(bl - 8 * Math.round(bl / 8)) > 2) continue;
+          const id = Math.round(rr / 8) + 32 * Math.round(bl / 8);
+          const b = bb.get(id);
+          if (!b) bb.set(id, [x, y, x, y]);
+          else { if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; }
+        }
+      }
+      live.forEach((el, i) => {
+        const b = bb.get(i);
+        if (!b || b[2] - b[0] < 4) return;
+        const r = el.getBoundingClientRect();
+        out.set(el, { x: (b[0] + b[2] + 1) / 2, y: (b[1] + b[3] + 1) / 2, sx: ((r.left + r.right) / 2 - box.left) / k, sy: ((r.top + r.bottom) / 2 - box.top) / k });
+      });
+    } catch (e) { console.error(e); }
+    finally { host.remove(); }
+    return out;
+  };
+  /** The picture's centre in the export: located (see above) plus any movement since, else on-screen. */
+  const centreOf = (el: Element, node: HTMLElement, locs: Map<Element, Loc> | null) => {
+    const box = node.getBoundingClientRect();
+    const k = box.width / SHOT_W;
+    const r = el.getBoundingClientRect();
+    const sx = ((r.left + r.right) / 2 - box.left) / k, sy = ((r.top + r.bottom) / 2 - box.top) / k;
+    const l = locs && locs.get(el);
+    return l ? { x: l.x + (sx - l.sx), y: l.y + (sy - l.sy) } : { x: sx, y: sy };
+  };
+
+  // The corner logo, painted onto a canvas made from the poster (Safari leaves pictures out of
+  // the HTML render). `off` shifts it (the video drops the 4px edge).
+  const paintLogo = async (ctx: CanvasRenderingContext2D, node: HTMLElement, PR: number, off: number, locs: Map<Element, Loc> | null = null) => {
     const logoEl = node.querySelector<HTMLImageElement>("img[data-logo]");
     if (logoEl) {
       const src = logoEl.getAttribute("src") || "";
@@ -584,8 +652,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         const im = new Image(); im.src = data;
         try {
           await im.decode();
-          const r = logoEl.getBoundingClientRect();
-          const cx = ((r.left + r.right) / 2 - box.left) / k + off, cy = ((r.top + r.bottom) / 2 - box.top) / k + off;
+          const p = centreOf(logoEl, node, locs);
+          const cx = p.x + off, cy = p.y + off;
           const sc = Number((logoEl.closest("[data-scale]") as HTMLElement | null)?.dataset.scale || 1);
           const w = logoEl.offsetWidth * sc, h = logoEl.offsetHeight * sc;
           ctx.save();
@@ -604,9 +672,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       }
     }
   };
-  const paintCards = async (ctx: CanvasRenderingContext2D, node: HTMLElement, PR: number, off: number, at: number | null) => {
-    const box = node.getBoundingClientRect();
-    const k = box.width / SHOT_W; // on-screen scale of the poster
+  const paintCards = async (ctx: CanvasRenderingContext2D, node: HTMLElement, PR: number, off: number, at: number | null, locs: Map<Element, Loc> | null = null) => {
     const imgs = [...node.querySelectorAll<HTMLImageElement>("img[data-card]")].filter((el) => getComputedStyle(el).visibility !== "hidden");
     // Load every image first, then paint them one at a time (each paint sets its own
     // transform and clip on the shared canvas).
@@ -620,8 +686,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       return im;
     }));
     imgs.forEach((el, i) => {
-      const r = el.getBoundingClientRect();
-      const cx = ((r.left + r.right) / 2 - box.left) / k + off, cy = ((r.top + r.bottom) / 2 - box.top) / k + off;
+      const p = centreOf(el, node, locs);
+      const cx = p.x + off, cy = p.y + off;
       const sc = Number((el.closest("[data-scale]") as HTMLElement | null)?.dataset.scale || 1);
       const w = el.offsetWidth * sc, h = el.offsetHeight * sc;
       const floating = !!el.closest(".wk-float");
@@ -689,14 +755,15 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) };
       // One frame: the poster as it is now (clock at `t`, or null = finished, exactly as the
       // image export draws it), without the 4px edge.
+      let locs: Map<Element, Loc> | null = null;
       const drawFrame = async (t: number | null) => {
         const frame = await toCanvas(node, opts);
         octx.fillStyle = "#060506";
         octx.fillRect(0, 0, W, H);
         octx.drawImage(frame, -EDGE, -EDGE);
         frame.width = 0; frame.height = 0; // free it now (browsers cap total canvas memory)
-        await paintLogo(octx, node, 1, -EDGE);
-        await paintCards(octx, node, 1, -EDGE, t);
+        await paintLogo(octx, node, 1, -EDGE, locs);
+        await paintCards(octx, node, 1, -EDGE, t, locs);
       };
       const step = 1e6 / VIDEO_FPS;
       const animFrames = Math.round((VIDEO_LEN_MS / 1000) * VIDEO_FPS) - 1;
@@ -709,6 +776,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         while (encoder.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 4));
       };
       for (let i = 0; i < (isSafari ? 2 : 1); i++) await toCanvas(node, opts); // warm-up passes, so fonts are ready
+      locs = await locatePictures(node, fontEmbedCSS); // in the finished layout, before the clock starts
       for (let i = 0; i < animFrames; i++) {
         const t = ((i * 1000) / VIDEO_FPS) * (VIDEO_ANIM_MS / VIDEO_LEN_MS); // the poster's clock, slowed
         flushSync(() => setVt(t));
@@ -788,10 +856,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       const canvas = await toCanvas(node, opts);
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("no canvas");
-      const box = node.getBoundingClientRect();
-      const k = box.width / SHOT_W; // on-screen scale of the poster
-      await paintLogo(ctx, node, PR, 0);
-      await paintCards(ctx, node, PR, 0, null);
+      const locs = await locatePictures(node, fontEmbedCSS);
+      await paintLogo(ctx, node, PR, 0, locs);
+      await paintCards(ctx, node, PR, 0, null, locs);
       const b = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/png"));
       if (!b) throw new Error("no image");
       return b;
