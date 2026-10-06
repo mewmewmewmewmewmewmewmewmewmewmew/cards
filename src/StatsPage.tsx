@@ -374,26 +374,95 @@ export default function StatsPage() {
     setRefreshing(false);
   };
 
+  /**
+   * The sheet through Apps Script: slow (seconds) and rate-limited, so retried a couple of times
+   * (an empty result counts as a failure). Throws Error("auth") on a wrong password.
+   */
+  const fetchSheet = async (password: string) => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const cards = await D.fetchAllSheets(password, { forStats: true });
+        if (cards.length) {
+          const v = { cards, hidden: D.sheetExtras.hidden, diag: { ...D.sheetDiag } };
+          AC.saveSheet(v);
+          return v;
+        }
+        if (attempt >= 2) return { cards, hidden: D.sheetExtras.hidden, diag: { ...D.sheetDiag } };
+      } catch (e: Any) {
+        if ((e && e.message === "auth") || attempt >= 2) throw e;
+      }
+      await new Promise((r) => setTimeout(r, attempt ? 4000 : 1500));
+    }
+  };
+  const applySheet = (v: { cards: Any[]; hidden: Any; diag: Any }) => {
+    setCards(v.cards);
+    setSheets(v.diag || {});
+    const hl = v.hidden;
+    setHiddenLists(hl ? { all: new Set(hl.all), personal: new Set(hl.personal) } : null);
+  };
+  const certsOf = (all: Any[]) => {
+    const certs = [...new Set(all.map((c: Any) => D.certOf(c)).filter(Boolean))] as string[];
+    const pairs: Array<{ cert: string; grade: number }> = [];
+    const seen = new Set<string>();
+    for (const c of all) {
+      const cert = D.certOf(c), g = D.pcGrade(c);
+      if (!cert || !g || g === 10 || seen.has(cert)) continue;
+      seen.add(cert); pairs.push({ cert, grade: g });
+    }
+    return { certs, pairs };
+  };
+  /**
+   * After opening from the saved sheet: ask Apps Script for the current one in the background.
+   * If it changed, show it and fetch ALT data for any certs that are new.
+   */
+  const refreshSheet = async (password: string, prev: string) => {
+    let v: { cards: Any[]; hidden: Any; diag: Any };
+    try { v = await fetchSheet(password); }
+    catch (e: Any) {
+      if (e && e.message === "auth") { rememberPw(""); AC.saveSheet(null); setPw(""); setPhase("password"); }
+      return; // otherwise keep showing the saved sheet
+    }
+    if (!v.cards.length) return;
+    setHiddenLists(v.hidden ? { all: new Set(v.hidden.all), personal: new Set(v.hidden.personal) } : null);
+    if (JSON.stringify(v.cards) === prev) return;
+    applySheet(v);
+    const { certs, pairs } = certsOf(v.cards);
+    altJob.current = { certs, pairs };
+    const saved = await AC.readAll();
+    const miss10 = certs.filter((c) => !saved.map.has(AC.keyOf(c, 10)));
+    const missP = pairs.filter((p) => !saved.map.has(AC.keyOf(p.cert, p.grade)));
+    setHist((cur) => { const n = new Map(cur); certs.forEach((c) => { const r = saved.map.get(AC.keyOf(c, 10)); if (r && !n.has(c)) n.set(c, r); }); return n; });
+    setHistP((cur) => { const n = new Map(cur); pairs.forEach((p) => { const r = saved.map.get(AC.keyOf(p.cert, p.grade)); if (r) n.set(p.cert, r); }); return n; });
+    try {
+      if (miss10.length) {
+        const got = await D.fetchAltHistories(miss10);
+        await AC.save(got, 10);
+        setHist((cur) => new Map([...cur, ...got]));
+      }
+      if (missP.length) {
+        const gradeOf = new Map(missP.map((p) => [p.cert, p.grade]));
+        const got = await D.fetchAltByGrade(missP);
+        await AC.save(got, (c) => gradeOf.get(c) || 10);
+        setHistP((cur) => new Map([...cur, ...got]));
+      }
+    } catch (e) { console.error(e); }
+  };
+
   const load = async (password: string) => {
     setPhase("loading");
     try {
-      const all = await D.fetchAllSheets(password, { forStats: true });
+      // The saved sheet opens the page at once (the current one is checked in the background,
+      // below); with nothing saved, wait for Apps Script.
+      // (Only for a password that has already worked here, or a public page.)
+      const savedSheet = !password || password === savedPw() ? await AC.readSheet() : null;
+      const sheet = savedSheet || (await fetchSheet(password));
+      const all = sheet.cards;
       pwRef.current = password;
       if (password) rememberPw(password);
-      setCards(all);
-      setSheets({ ...D.sheetDiag });
-      const hl = D.sheetExtras.hidden;
-      setHiddenLists(hl ? { all: new Set(hl.all), personal: new Set(hl.personal) } : null);
+      applySheet(sheet);
       setPhase("ready");
-      const certs = [...new Set(all.map((c: Any) => D.certOf(c)).filter(Boolean))] as string[];
       // Personal: owned PSA 10s reuse the grade-10 data; other owned grades are fetched at that grade.
-      const pairs: Array<{ cert: string; grade: number }> = [];
-      const seen = new Set<string>();
-      for (const c of all) {
-        const cert = D.certOf(c), g = D.pcGrade(c);
-        if (!cert || !g || g === 10 || seen.has(cert)) continue;
-        seen.add(cert); pairs.push({ cert, grade: g });
-      }
+      const { certs, pairs } = certsOf(all);
       altJob.current = { certs, pairs };
       // Saved ALT data (alt-cache): open from it, fetch only what it lacks (cards new to the sheet,
       // changed owned grades, earlier failures), and refresh everything in the background once
@@ -446,8 +515,9 @@ export default function StatsPage() {
         im.src = u;
       })));
       setImgs({ done: urls.length, total: urls.length, finished: true });
+      if (savedSheet) refreshSheet(password, JSON.stringify(savedSheet.cards));
     } catch (e: Any) {
-      if (e && e.message === "auth") { setPw(""); rememberPw(""); setPhase("password"); }
+      if (e && e.message === "auth") { setPw(""); rememberPw(""); AC.saveSheet(null); setPhase("password"); }
       else { console.error(e); setPhase("error"); }
     }
   };

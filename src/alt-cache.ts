@@ -58,3 +58,26 @@ export async function save(results: Map<string, Any>, grade: number | ((cert: st
     await done(t);
   } catch (e) { /* storage full or unavailable: the page still works, it just fetches again */ }
 }
+
+/* ---------- the sheet (card list + hidden lists), saved like the ALT data ---------- */
+
+export type SavedSheet = { at: number; cards: Any[]; hidden: { all: string[]; personal: string[] } | null; diag: Any };
+
+export async function readSheet(): Promise<SavedSheet | null> {
+  try {
+    const d = await db();
+    const t = d.transaction(META, "readonly");
+    const v: Any = await new Promise((ok) => { const r = t.objectStore(META).get("sheet"); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); });
+    return v && Array.isArray(v.cards) && v.cards.length ? (v as SavedSheet) : null;
+  } catch (e) { return null; }
+}
+
+export async function saveSheet(v: Omit<SavedSheet, "at"> | null) {
+  try {
+    const d = await db();
+    const t = d.transaction(META, "readwrite");
+    if (v) t.objectStore(META).put({ k: "sheet", at: Date.now(), ...v });
+    else t.objectStore(META).delete("sheet");
+    await done(t);
+  } catch (e) {}
+}
