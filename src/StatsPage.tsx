@@ -18,7 +18,7 @@ type Any = any;
 type Pt = { date: string; value: number; house?: string };
 type Mode = "sales" | "alt";
 
-const RANGES: Array<[string, number]> = [["1D", 1], ["1W", 7], ["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["3Y", 1096], ["5Y", 1826], ["All", 0]];
+const RANGES: Array<[string, number]> = [["3D", 3], ["1W", 7], ["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["3Y", 1096], ["5Y", 1826], ["All", 0]];
 const STATS_CONFIG_KEY = "mew_stats_config_v1";
 // The stats password, remembered on this device for 30 days so a reload (iPhone Safari reloads
 // tabs after switching apps) goes straight back in. Cleared when the password stops working.
