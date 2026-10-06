@@ -1295,15 +1295,15 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
             // draw this layer last, on top of the painted card images.
             <div data-overlay="1" style={{ position: "absolute", left: 0, top: 0, width: W, height: H, ...fadeAt(vt, 200) }}>
               <div style={{ position: "absolute", inset: 0, background: "rgba(8,6,8,0.6)" }} />
-              <div style={{ position: "absolute", left: 0, right: 0, top: 560, height: 120, background: "linear-gradient(180deg, rgba(10,7,10,0), #0a070a)" }} />
-              <div style={{ position: "absolute", left: 0, right: 0, top: 680, height: 560, background: "#0a070a" }} />
-              <div style={{ position: "absolute", left: 0, right: 0, top: 1240, height: 120, background: "linear-gradient(180deg, #0a070a, rgba(10,7,10,0))" }} />
-              <div style={{ position: "absolute", left: 0, right: 0, top: 640, height: 640, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-                <div style={{ ...mono, fontSize: 40, letterSpacing: "0.18em", color: C.up, whiteSpace: "nowrap" }}>Weekly market report</div>
-                <div style={{ marginTop: 22, width: 760, height: 3, background: `linear-gradient(90deg, transparent, ${C.up}, #c49bff, transparent)` }} />
-                <div style={{ marginTop: 34, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: C.text, whiteSpace: "nowrap", textShadow: `0 0 40px ${C.upGlow}` }}>{fmtMD(start)} – {fmtMD(end)}</div>
-                <div style={{ marginTop: 30, ...big, fontSize: 84, letterSpacing: "-0.02em", lineHeight: 1, ...gradTitle, whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
-                <div style={{ marginTop: 34, width: 760, height: 3, background: `linear-gradient(90deg, transparent, #c49bff, ${C.up}, transparent)` }} />
+              {/* a pink sash across the poster, tilted */}
+              <div style={{ position: "absolute", left: -260, top: 960 - 250, width: W + 520, height: 500, transform: "rotate(-8deg)", transformOrigin: "50% 50%",
+                background: `linear-gradient(90deg, ${C.up} 0%, #ff9cc8 45%, #c49bff 100%)`, boxShadow: `0 0 80px ${C.upGlow}, 0 30px 80px rgba(0,0,0,0.6)`,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#1a0a12" }}>
+                <div style={{ height: 4, width: 820, background: "rgba(26,10,18,0.35)" }} />
+                <div style={{ marginTop: 26, ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#1a0a12", whiteSpace: "nowrap" }}>Weekly market report</div>
+                <div style={{ marginTop: 18, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: "#1a0a12", whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
+                <div style={{ marginTop: 18, ...big, fontSize: 72, letterSpacing: "-0.02em", lineHeight: 1, color: "#3a1428", whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
+                <div style={{ marginTop: 26, height: 4, width: 820, background: "rgba(26,10,18,0.35)" }} />
               </div>
             </div>
           )}
