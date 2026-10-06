@@ -22,8 +22,10 @@ type Mode = "sales" | "alt";
 
 const FMT_KEY = "mew_weekly_fmt";
 // Poster formats (all 1080 wide): square post, portrait post, Instagram story.
-type Fmt = "1:1" | "3:4" | "9:16";
-const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"]];
+// "reel": a reel cover: the 3:4 poster at the top of a 9:16 frame, blank below.
+type Fmt = "1:1" | "3:4" | "9:16" | "reel";
+const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"], ["reel", "Reel cover"]];
+const REEL_EXTRA = 1920 - 1440; // the blank space under the 3:4 layout
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -178,7 +180,7 @@ const C = {
   gainGlow: "rgba(126,226,168,0.35)",
 };
 // The Mew logo in the title's top-right corner (height in px; the PNG is 200×211).
-const LOGO = { h: { "1:1": 64, "3:4": 64, "9:16": 84 } as Record<string, number>, inset: 28 };
+const LOGO = { h: { "1:1": 64, "3:4": 64, "9:16": 84, reel: 64 } as Record<string, number>, inset: 28 };
 /** The logo recoloured in the poster's pink (made once, as a data URL). */
 let tintedLogo: Promise<string> | null = null;
 function getTintedLogo(): Promise<string> {
@@ -554,7 +556,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // Poster formats: 1080 wide, height by ratio. The copied/downloaded image is the poster plus
   // a 4px edge, rendered from the unscaled layout at 2x with animations frozen in their end state.
   const W = 1080, EDGE = 4;
-  const H = fmt === "9:16" ? 1920 : fmt === "3:4" ? 1440 : 1080;
+  const H = fmt === "9:16" || fmt === "reel" ? 1920 : fmt === "3:4" ? 1440 : 1080;
   const SHOT_W = W + EDGE * 2, SHOT_H = H + EDGE * 2;
   // Paints the card images onto a canvas made from the poster (see makeBlob). `off` shifts
   // everything (the video drops the 4px edge); `at` is the video clock, for the top card's float.
@@ -1116,7 +1118,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         </span>
         <span style={{ display: "flex", gap: 4 }}>
           {FORMATS.map(([f, label]) => (
-            <button key={f} type="button" onClick={() => setFmt(f)} aria-pressed={fmt === f} title={f === "9:16" ? "Instagram story" : f === "3:4" ? "Portrait post" : "Square post"} style={pill(fmt === f)}>{label}</button>
+            <button key={f} type="button" onClick={() => setFmt(f)} aria-pressed={fmt === f} title={f === "9:16" ? "Instagram story" : f === "3:4" ? "Portrait post" : f === "reel" ? "Reel cover: the 3:4 poster on a 9:16 frame, blank below" : "Square post"} style={pill(fmt === f)}>{label}</button>
           ))}
         </span>
         <span style={{ display: "flex", gap: 6 }}>
@@ -1141,7 +1143,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
        <AnimStart.Provider value={animStart}>
        <VT.Provider value={vt}>
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: fmt === "reel" ? `52px 52px ${52 + REEL_EXTRA}px` : 52, display: "flex", flexDirection: "column", gap: 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
           {title}
           {story ? (
