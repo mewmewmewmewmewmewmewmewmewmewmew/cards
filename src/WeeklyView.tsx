@@ -152,8 +152,8 @@ const C = {
   gain: "#7ee2a8",                     // climbers list (fallers use down)
   gainGlow: "rgba(126,226,168,0.35)",
 };
-// Background logo (top right, cut off by the poster's edges).
-const LOGO = { w: { "1:1": 560, "3:4": 600, "9:16": 680 } as Record<string, number>, right: -150, top: -110, opacity: 0.07, rot: 14 };
+// The Mew logo in the title's top-right corner (height in px; the PNG is 200×211).
+const LOGO = { h: { "1:1": 100, "3:4": 100, "9:16": 150 } as Record<string, number> };
 const mono: React.CSSProperties = { fontFamily: "var(--font-data)", letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11 };
 
 /**
@@ -458,8 +458,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       if (!ctx) throw new Error("no canvas");
       const box = node.getBoundingClientRect();
       const k = box.width / SHOT_W; // on-screen scale of the poster
-      // The background logo is painted too (faint enough that drawing it over the boxes looks the
-      // same as behind them), clipped to the poster's rounded edge like on screen.
+      // The logo is painted in too (Safari leaves pictures out of the HTML render).
       const logoEl = node.querySelector<HTMLImageElement>("img[data-logo]");
       if (logoEl) {
         const data = await toDataUrl(new URL(logoEl.getAttribute("src") || "", location.href).href);
@@ -476,9 +475,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
             const R = 28, x0 = EDGE, y0 = EDGE, x1 = EDGE + W, y1 = EDGE + H;
             ctx.moveTo(x0 + R, y0); ctx.arcTo(x1, y0, x1, y1, R); ctx.arcTo(x1, y1, x0, y1, R); ctx.arcTo(x0, y1, x0, y0, R); ctx.arcTo(x0, y0, x1, y0, R);
             ctx.clip();
-            ctx.globalAlpha = LOGO.opacity;
+            let alpha = 1;
+            for (let e: HTMLElement | null = logoEl; e && e !== node; e = e.parentElement) alpha *= parseFloat(getComputedStyle(e).opacity || "1");
+            ctx.globalAlpha = alpha;
             ctx.translate(cx, cy);
-            ctx.rotate((LOGO.rot * Math.PI) / 180);
             ctx.drawImage(im, -w / 2, -h / 2, w, h);
             ctx.restore();
           } catch (e) {}
@@ -692,16 +692,20 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const kicker = <div style={{ ...mono, fontSize: story ? 18 : 14, color: C.up }}>Week {weekNo(end)}{sales ? "" : " · ALT value"}</div>;
   const dates = <div style={{ fontFamily: "var(--font-data)", fontSize: story ? 22 : 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>;
   const tk = titleFit && titleFit.key === `${fmt}|${end}|${fontsTick}` ? titleFit.k : 1;
+  const logoH = LOGO.h[fmt], logoW = Math.round((logoH * 200) / 211), beside = logoW + 24; // room kept beside the logo
+  const logo = <img data-logo="1" src="/assets/mew-logo.png" alt="mew.cards" draggable={false} style={{ position: "absolute", top: 0, right: 0, height: logoH, width: logoW }} />;
   const title = story ? (
     <div className="wk-in" style={{ position: "relative" }}>
+      {logo}
       {kicker}
-      <h1 style={{ margin: "12px 0 0", ...big, fontSize: 104 * tk, letterSpacing: "-0.03em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10</h1>
+      <h1 style={{ margin: "12px 0 0", maxWidth: `calc(100% - ${beside}px)`, ...big, fontSize: 104 * tk, letterSpacing: "-0.03em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10</h1>
       <div style={{ marginTop: 18 }}>{dates}</div>
     </div>
   ) : (
     <div className="wk-in" style={{ position: "relative" }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>{kicker}{dates}</div>
-      <h1 style={{ margin: "8px 0 0", ...big, fontSize: 70 * tk, letterSpacing: "-0.02em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10</h1>
+      {logo}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, paddingRight: beside }}>{kicker}{dates}</div>
+      <h1 style={{ margin: "8px 0 0", maxWidth: `calc(100% - ${beside}px)`, ...big, fontSize: 70 * tk, letterSpacing: "-0.02em", lineHeight: 1.05, ...gradTitle, whiteSpace: "nowrap", overflow: "hidden" }} ref={titleRef}>JP Mews ・ PSA10</h1>
     </div>
   );
   const indexTile = (
@@ -872,9 +876,6 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
         <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
-          {/* the Mew logo, big and faint, running off the top-right corner */}
-          <img data-logo="1" src="/assets/mew-logo.png" alt="" aria-hidden="true" draggable={false}
-            style={{ position: "absolute", pointerEvents: "none", width: LOGO.w[fmt], right: LOGO.right, top: LOGO.top, opacity: LOGO.opacity, transform: `rotate(${LOGO.rot}deg)` }} />
           {title}
           {story ? (
             <>
