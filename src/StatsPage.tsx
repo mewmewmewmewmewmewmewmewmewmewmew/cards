@@ -196,7 +196,7 @@ const SortArrow: React.FC<{ dir: SortDir | null }> = ({ dir }) => (
 
 /** A small, quiet pill for the card's edition (e.g. 1st / UED) from the sheet's edition column. */
 const Edition: React.FC<{ e?: string }> = ({ e }) => (D.editionLabel(e) ? (
-  <span style={{ display: "inline-block", marginLeft: 6, padding: "0 4px", borderRadius: 3, border: "1px solid currentColor", fontSize: 9, lineHeight: 1.4, letterSpacing: "0.04em", color: "var(--text-faint)", verticalAlign: "1px" }}>{D.editionLabel(e)}</span>
+  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", height: 14, marginLeft: 6, padding: "0 4px", borderRadius: 3, border: "1px solid currentColor", fontSize: 9, lineHeight: 1, letterSpacing: "0.04em", color: "var(--text-faint)", verticalAlign: "middle", ...({ textBoxTrim: "trim-both", textBoxEdge: "cap alphabetic" } as unknown as React.CSSProperties) }}>{D.editionLabel(e)}</span>
 ) : null);
 
 const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "var(--web-small)" }) => (
