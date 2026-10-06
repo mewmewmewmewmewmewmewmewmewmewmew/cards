@@ -1006,8 +1006,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       <Img src={pic(m.card.image)} w={34} />
       <span style={{ minWidth: 0 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: "3.2em", flex: "0 1 auto" }}>{name(m.card)}</span>
-          {m.card.number && <span style={{ flex: "0 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{m.card.number}</span>}
+          <span style={{ fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: name(m.card).length > 6 ? "3.2em" : undefined, flex: name(m.card).length > 6 ? "0 1 auto" : "0 0 auto" }}>{name(m.card)}</span>
+          {m.card.number && <span style={{ flex: "0 60 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{m.card.number}</span>}
           <Edition e={m.card.edition} />
         </span>
         <span style={{ display: "block", marginTop: 5, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
@@ -1029,8 +1029,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         <Img src={pic(m.card.image)} w={34} />
         <span style={{ minWidth: 0 }}>
           <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <span style={{ fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: "3.2em", flex: "0 1 auto" }}>{name(m.card)}</span>
-            {m.card.number && <span style={{ flex: "0 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{m.card.number}</span>}
+            <span style={{ fontWeight: 600, fontSize: 16, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: name(m.card).length > 6 ? "3.2em" : undefined, flex: name(m.card).length > 6 ? "0 1 auto" : "0 0 auto" }}>{name(m.card)}</span>
+            {m.card.number && <span style={{ flex: "0 60 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-data)", fontSize: 12, color: C.faint }}>{m.card.number}</span>}
             <Edition e={m.card.edition} />
           </span>
           <span style={{ display: "block", marginTop: 5, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
