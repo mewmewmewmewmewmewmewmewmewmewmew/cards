@@ -138,7 +138,9 @@ const barAt = (vt: number | null, delay: number): React.CSSProperties => (vt ===
 // (The top card no longer floats: it holds a still -4° tilt, set in CSS.)
 const floatPhase = (_vt: number) => 0;
 const floatAt = (_vt: number | null): React.CSSProperties => ({});
-const VIDEO_ANIM_MS = 2500, VIDEO_HOLD_MS = 30000, VIDEO_FPS = 30;
+// The on-screen intro is done by 2.5s; the video plays it slowed down to fill 4s (the last frame
+// is the finished poster).
+const VIDEO_ANIM_MS = 2500, VIDEO_LEN_MS = 4000, VIDEO_FPS = 30;
 
 // When the poster (this week / mode / size) appeared: every count-up is timed from here, so a
 // number that gets re-created mid-animation carries on instead of starting again from 0.
@@ -589,7 +591,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     });
   };
 
-  // Video: the poster's intro animation (2.5s) then the finished poster held for 30s, as an MP4
+  // Video: the poster's intro animation, slowed to fill 4s and ending on the finished poster, as an MP4
   // (H.264, 1080 wide, 30fps) made in the browser with WebCodecs. Each animation frame is the
   // poster drawn at that moment of the clock; the hold reuses the last frame.
   const canVideo = typeof window !== "undefined" && "VideoEncoder" in window && "VideoFrame" in window;
@@ -635,8 +637,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         await paintCards(octx, node, 1, -EDGE, t);
       };
       const step = 1e6 / VIDEO_FPS;
-      const animFrames = Math.round((VIDEO_ANIM_MS / 1000) * VIDEO_FPS);
-      const total = animFrames + Math.round((VIDEO_HOLD_MS / 1000) * VIDEO_FPS);
+      const animFrames = Math.round((VIDEO_LEN_MS / 1000) * VIDEO_FPS) - 1;
+      const total = animFrames + 1; // the last frame: the finished poster
       const encode = async (i: number) => {
         if (failed) throw failed;
         const f = new VF(out, { timestamp: Math.round(i * step), duration: Math.round(step) });
@@ -646,7 +648,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       };
       if (isSafari) await toCanvas(node, opts); // warm-up pass for Safari (fonts)
       for (let i = 0; i < animFrames; i++) {
-        const t = (i * 1000) / VIDEO_FPS;
+        const t = ((i * 1000) / VIDEO_FPS) * (VIDEO_ANIM_MS / VIDEO_LEN_MS); // the poster's clock, slowed
         flushSync(() => setVt(t));
         await new Promise((r) => requestAnimationFrame(() => r(null)));
         await drawFrame(t);
@@ -1075,7 +1077,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           <button type="button" className="wk-nav" onClick={downloadShot} disabled={shot === "busy"} aria-label={shareFiles ? "Save image" : "Download image"} title={shot === "save-err" ? "Couldn't save" : shareFiles ? "Save image (share sheet → Save Image)" : "Download image"} style={{ color: iconCol("save") }}>
             {shot === "save-ok" ? check : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11" /><path d="M7 10.5l5 5 5-5" /><path d="M5 20h14" /></svg>}
           </button>
-          <button type="button" className="wk-nav" onClick={videoButton} disabled={shot === "busy"} aria-label="Make video" title={shot === "video-err" ? "Couldn't make the video" : "Video: the intro animation, then 30s of the finished poster (MP4)"}
+          <button type="button" className="wk-nav" onClick={videoButton} disabled={shot === "busy"} aria-label="Make video" title={shot === "video-err" ? "Couldn't make the video" : "Video of the intro animation (MP4)"}
             style={{ color: shot === "video-ok" ? GREEN : shot === "video-err" ? RED : C.text, width: videoPct !== null ? "auto" : undefined, padding: videoPct !== null ? "0 8px" : 0, gap: 6 }}>
             {shot === "video-ok" ? check : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2" /><path d="M16 10.5l5-3v9l-5-3" /></svg>}
             {videoPct !== null && <span style={{ ...mono, fontSize: 10 }}>{videoPct}%</span>}
