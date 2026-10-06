@@ -27,7 +27,7 @@ const FMT_KEY = "mew_weekly_fmt";
 // "cover2": a reel cover: the 9:16 poster, dimmed, with a big banner across it for the dates.
 type Fmt = "1:1" | "3:4" | "9:16" | "reel" | "reelsafe" | "cover2";
 const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"], ["reel", "Reel cover"], ["reelsafe", "Reel"], ["cover2", "Reel cover 2"]];
-const SASH = { w: 1080 + 520, h: 460, cy: 960, rot: -8, blur: 26 }; // Reel cover 2's banner
+const SASH = { w: 1080 + 520, h: 460, cy: 960, rot: -8, blur: 14 }; // Reel cover 2's banner
 const REEL_EXTRA = 1920 - 1440; // reel cover: the space under the 3:4 layout
 // Reel: the 9:16 layout reworked for a reel playing full screen on a phone (measured from an
 // iPhone screenshot). Instagram zooms 9:16 to fill the taller screen, cropping ~47px off each
@@ -1313,20 +1313,20 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           {fmt === "cover2" && (
             // Reel cover 2: the poster dimmed behind a banner that leads with the dates. Exports
             // draw this layer last, on top of the painted card images.
-            <div data-overlay="1" style={{ position: "absolute", left: 0, top: 0, width: W, height: H, ...fadeAt(vt, 200) }}>
-              <div style={{ position: "absolute", inset: 0, background: "rgba(8,6,8,0.6)" }} />
+            <div data-overlay="1" style={{ position: "absolute", left: 0, top: 0, width: W, height: H, zIndex: 20, ...fadeAt(vt, 200) }}>
+              <div style={{ position: "absolute", inset: 0, background: "rgba(8,6,8,0.45)" }} />
               {/* a pink sash across the poster, tilted */}
               {/* a frosted sash: 30% white over a blur of the poster (exports draw the blur themselves) */}
               <div style={{ position: "absolute", left: (W - SASH.w) / 2, top: SASH.cy - SASH.h / 2, width: SASH.w, height: SASH.h, transform: `rotate(${SASH.rot}deg)`, transformOrigin: "50% 50%",
                 // light pink glass: a pink tint with a soft white sheen toward the top edge
-                background: "linear-gradient(170deg, rgba(255,240,247,0.86) 0%, rgba(255,212,232,0.80) 40%, rgba(255,182,216,0.76) 100%)",
+                background: "linear-gradient(172deg, rgba(255,245,250,0.42) 0%, rgba(255,215,234,0.26) 30%, rgba(255,170,212,0.22) 70%, rgba(255,150,200,0.30) 100%)",
                 backdropFilter: `blur(${SASH.blur}px)`, WebkitBackdropFilter: `blur(${SASH.blur}px)`,
-                borderTop: "2px solid rgba(255,230,242,0.75)", borderBottom: "2px solid rgba(255,180,215,0.55)", boxSizing: "border-box",
-                boxShadow: "0 0 60px rgba(255,126,182,0.28)",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#4a0f2e", textShadow: "0 1px 0 rgba(255,255,255,0.5)" }}>
-                <div style={{ ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#c2306f", whiteSpace: "nowrap" }}>Weekly market report</div>
-                <div style={{ marginTop: 20, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: "#4a0f2e", whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
-                <div style={{ marginTop: 20, ...big, fontSize: 72, letterSpacing: "-0.02em", lineHeight: 1, color: "#8a1f52", whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
+                borderTop: "2px solid rgba(255,240,248,0.9)", borderBottom: "2px solid rgba(255,190,222,0.7)", boxSizing: "border-box",
+                boxShadow: "0 0 60px rgba(255,126,182,0.3), inset 0 18px 40px rgba(255,255,255,0.14), inset 0 -18px 40px rgba(255,126,182,0.16)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#fff", textShadow: "0 2px 4px rgba(90,10,50,0.45), 0 6px 30px rgba(90,10,50,0.6)" }}>
+                <div style={{ ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#ffd3e6", whiteSpace: "nowrap" }}>Weekly market report</div>
+                <div style={{ marginTop: 20, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: "#fff", whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
+                <div style={{ marginTop: 20, ...big, fontSize: 72, letterSpacing: "-0.02em", lineHeight: 1, color: "#ffe3ef", whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
               </div>
             </div>
           )}
