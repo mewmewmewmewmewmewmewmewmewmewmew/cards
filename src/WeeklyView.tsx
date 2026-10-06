@@ -27,6 +27,7 @@ const FMT_KEY = "mew_weekly_fmt";
 // "cover2": a reel cover: the 9:16 poster, dimmed, with a big banner across it for the dates.
 type Fmt = "1:1" | "3:4" | "9:16" | "reel" | "reelsafe" | "cover2";
 const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"], ["reel", "Reel cover"], ["reelsafe", "Reel"], ["cover2", "Reel cover 2"]];
+const SASH = { w: 1080 + 520, h: 460, cy: 960, rot: -8, blur: 26 }; // Reel cover 2's banner
 const REEL_EXTRA = 1920 - 1440; // reel cover: the space under the 3:4 layout
 // Reel: the 9:16 layout reworked for a reel playing full screen on a phone (measured from an
 // iPhone screenshot). Instagram zooms 9:16 to fill the taller screen, cropping ~47px off each
@@ -648,6 +649,25 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const paintOverlay = async (ctx: CanvasRenderingContext2D, node: HTMLElement, PR: number, at: number, fontEmbedCSS: string | undefined) => {
     const el = node.querySelector<HTMLElement>("[data-overlay]");
     if (!el) return;
+    // The sash's blur (the export can't do backdrop blur): blur what's drawn so far, by scaling
+    // it down and back up, and paint that inside the sash's (rotated) shape.
+    const cv = ctx.canvas;
+    const small = (src: CanvasImageSource, w: number, h: number) => { const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); const x = c.getContext("2d")!; x.imageSmoothingQuality = "high"; x.drawImage(src, 0, 0, c.width, c.height); return c; };
+    const f = Math.max(2, (SASH.blur * PR) / 3);
+    const s1 = small(cv, cv.width / Math.sqrt(f), cv.height / Math.sqrt(f));
+    const s2 = small(s1, cv.width / f, cv.height / f);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.translate((at + W / 2) * PR, (at + SASH.cy) * PR);
+    ctx.rotate((SASH.rot * Math.PI) / 180);
+    ctx.beginPath();
+    ctx.rect((-SASH.w / 2) * PR, (-SASH.h / 2) * PR, SASH.w * PR, SASH.h * PR);
+    ctx.clip();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(s2, 0, 0, cv.width, cv.height);
+    ctx.restore();
+    s1.width = s2.width = 0;
     const c = await toCanvas(el, { pixelRatio: PR, width: W, height: H, fontEmbedCSS, style: { position: "static", transform: "none" } });
     ctx.drawImage(c, at * PR, at * PR);
     c.width = 0; c.height = 0;
@@ -1296,14 +1316,14 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
             <div data-overlay="1" style={{ position: "absolute", left: 0, top: 0, width: W, height: H, ...fadeAt(vt, 200) }}>
               <div style={{ position: "absolute", inset: 0, background: "rgba(8,6,8,0.6)" }} />
               {/* a pink sash across the poster, tilted */}
-              <div style={{ position: "absolute", left: -260, top: 960 - 250, width: W + 520, height: 500, transform: "rotate(-8deg)", transformOrigin: "50% 50%",
-                background: `linear-gradient(90deg, ${C.up} 0%, #ff9cc8 45%, #c49bff 100%)`, boxShadow: `0 0 80px ${C.upGlow}, 0 30px 80px rgba(0,0,0,0.6)`,
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#1a0a12" }}>
-                <div style={{ height: 4, width: 820, background: "rgba(26,10,18,0.35)" }} />
-                <div style={{ marginTop: 26, ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#1a0a12", whiteSpace: "nowrap" }}>Weekly market report</div>
-                <div style={{ marginTop: 18, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: "#1a0a12", whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
-                <div style={{ marginTop: 18, ...big, fontSize: 72, letterSpacing: "-0.02em", lineHeight: 1, color: "#3a1428", whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
-                <div style={{ marginTop: 26, height: 4, width: 820, background: "rgba(26,10,18,0.35)" }} />
+              {/* a frosted sash: 30% white over a blur of the poster (exports draw the blur themselves) */}
+              <div style={{ position: "absolute", left: (W - SASH.w) / 2, top: SASH.cy - SASH.h / 2, width: SASH.w, height: SASH.h, transform: `rotate(${SASH.rot}deg)`, transformOrigin: "50% 50%",
+                background: "rgba(255,255,255,0.3)", backdropFilter: `blur(${SASH.blur}px)`, WebkitBackdropFilter: `blur(${SASH.blur}px)`,
+                borderTop: "2px solid rgba(255,255,255,0.45)", borderBottom: "2px solid rgba(255,255,255,0.45)", boxSizing: "border-box",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#fff", textShadow: "0 2px 18px rgba(0,0,0,0.35)" }}>
+                <div style={{ ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#fff", whiteSpace: "nowrap" }}>Weekly market report</div>
+                <div style={{ marginTop: 20, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: "#fff", whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
+                <div style={{ marginTop: 20, ...big, fontSize: 72, letterSpacing: "-0.02em", lineHeight: 1, color: "rgba(255,255,255,0.92)", whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
               </div>
             </div>
           )}
