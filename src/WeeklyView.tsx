@@ -33,8 +33,7 @@ const REEL_EXTRA = 1920 - 1440; // reel cover: the space under the 3:4 layout
 // iPhone screenshot). Instagram zooms 9:16 to fill the taller screen, cropping ~47px off each
 // side; its header ("Your reels") covers the top ~250px and the like / comment / share buttons
 // sit at the right from ~1460. The 9:16 layout keeps clear of the side crop and is centred
-// vertically (equal space above and below; the header may overlap the top of the title); the
-// bottom row stops short of the buttons.
+// vertically (equal space above and below; the header may overlap the top of the title).
 const REEL_H = 1920 - 52 - 262; // the content height (from below the header to the usual bottom margin)
 const REEL = { x: 64, y: Math.round((1920 - REEL_H) / 2), w: 952, h: REEL_H, buttons: 120 }; // centred vertically
 
@@ -1192,7 +1191,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   );
   const nHigh = (sales && week.biggest ? 1 : 0) + (sales && week.busiest ? 1 : 0) + (week.bigGain ? 1 : 0);
   const highlights = nHigh > 0 && (
-    <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: `repeat(${nHigh}, minmax(0, 1fr))`, paddingRight: reelSafe ? REEL.buttons : 0 }}>
+    <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: `repeat(${nHigh}, minmax(0, 1fr))` }}>
       {sales && week.biggest && <Highlight label="Biggest sale" delay={500} img={week.biggest.card.image} title={<Num v={week.biggest.value} fmt={fmtUSD} delay={500} />} sub={name(week.biggest.card)} line={[fmtDay(week.biggest.date), week.biggest.house].filter(Boolean).join(" · ")} />}
       {week.bigGain && <Highlight label="Biggest gain" delay={560} img={week.bigGain.card.image} title={<Num v={week.bigGain.to - week.bigGain.from} fmt={(n) => `+${usd0.format(n)}`} delay={560} />} sub={name(week.bigGain.card)} line={`${fmtUSD(week.bigGain.from)} → ${fmtUSD(week.bigGain.to)}`} />}
       {sales && week.busiest && <Highlight label="Most sold" delay={620} img={week.busiest.card.image} title={<Num v={week.busiest.n} fmt={(n) => `${Math.round(n)} sales`} delay={620} />} sub={name(week.busiest.card)} line={`avg ${fmtUSD(week.busiest.sum / week.busiest.n)}`} />}
