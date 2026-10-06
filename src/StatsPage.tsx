@@ -31,10 +31,11 @@ function savedPw(): string {
   } catch (e) { return ""; }
 }
 const rememberPw = (pw: string) => { try { if (pw) localStorage.setItem(STATS_PW_KEY, JSON.stringify({ pw, at: Date.now() })); else localStorage.removeItem(STATS_PW_KEY); } catch (e) {} };
-const SORTS = ["value", "change", "release"] as const;
+const SORTS = ["value", "change", "dchange", "release"] as const;
+const SORT_LABEL: Record<string, string> = { value: "Value", change: "% Change", dchange: "$ Change", release: "Release" };
 type SortDir = "asc" | "desc";
 // Direction a sort starts in when picked: highest value/change first, oldest release first.
-const SORT_START: Record<string, SortDir> = { value: "desc", change: "desc", release: "asc" };
+const SORT_START: Record<string, SortDir> = { value: "desc", change: "desc", dchange: "desc", release: "asc" };
 type SortKey = typeof SORTS[number];
 const MODE_KEY = "mew_stats_mode";
 
@@ -597,17 +598,20 @@ export default function StatsPage() {
       // (however old), or from the range's first point when nothing comes before it.
       const base = before ? before.value : pts.length > 1 ? pts[0].value : null;
       const change = pts.length && base && base > 0 ? ((pts[pts.length - 1].value - base) / base) * 100 : null;
-      charted.push({ card, cert, grade, r, series, pts, lead, tail, last, value, change, domain: [start, today] as [string, string] });
+      const dchange = change === null || base === null ? null : pts[pts.length - 1].value - base; // in dollars
+      charted.push({ card, cert, grade, r, series, pts, lead, tail, last, value, change, dchange, domain: [start, today] as [string, string] });
     });
     // Ascending comparators; cards with no change ("—") always go last.
     const cmp: Record<SortKey, (a: Any, b: Any) => number> = {
       value: (a, b) => a.value - b.value,
       change: (a, b) => (a.change ?? 0) - (b.change ?? 0),
+      dchange: (a, b) => (a.dchange ?? 0) - (b.dchange ?? 0),
       release: (a, b) => D.releaseTs(a.card) - D.releaseTs(b.card),
     };
     const sign = dir === "asc" ? 1 : -1;
     charted.sort((a, b) => {
-      if (sort === "change" && (a.change === null) !== (b.change === null)) return a.change === null ? 1 : -1;
+      const key = sort === "dchange" ? "dchange" : "change";
+      if ((sort === "change" || sort === "dchange") && (a[key] === null) !== (b[key] === null)) return a[key] === null ? 1 : -1;
       return sign * cmp[sort](a, b);
     });
     hiddenRows.sort((a, b) => name(a.card).localeCompare(name(b.card), "ja"));
@@ -830,8 +834,8 @@ export default function StatsPage() {
               <span style={{ ...eyebrow, marginRight: 4 }}>Sort</span>
               {SORTS.map((k) => (
                 <button key={k} type="button" onClick={() => pickSort(k)} aria-pressed={sort === k}
-                  aria-label={`Sort by ${k}${sort === k ? (dir === "asc" ? ", ascending" : ", descending") : ""}`} style={pill(sort === k)}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{k[0].toUpperCase() + k.slice(1)}<SortArrow dir={sort === k ? dir : null} /></span>
+                  aria-label={`Sort by ${SORT_LABEL[k]}${sort === k ? (dir === "asc" ? ", ascending" : ", descending") : ""}`} style={pill(sort === k)}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{SORT_LABEL[k]}<SortArrow dir={sort === k ? dir : null} /></span>
                 </button>
               ))}
               <label data-search-field="1" style={{ display: "flex", alignItems: "center", gap: 6, boxSizing: "border-box", height: 28, padding: "0 8px", flex: narrow ? "1 1 100%" : "0 1 220px", minWidth: 0, order: narrow ? 10 : 0, background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: "var(--web-radius-sm)", transition: "background var(--dur) var(--ease), border-color var(--dur) var(--ease)" }}>

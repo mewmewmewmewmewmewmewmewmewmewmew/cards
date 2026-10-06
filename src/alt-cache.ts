@@ -46,7 +46,6 @@ export async function readAll(): Promise<{ at: number | null; map: Map<string, A
   }
 }
 
-/** A result worth keeping: anything but a failed lookup (those are retried next time). */
 /**
  * A result worth keeping / reusing: it has sales or ALT values, and its sales weren't thrown out
  * for being the wrong grade. Anything else is fetched again rather than shown as an empty card.
