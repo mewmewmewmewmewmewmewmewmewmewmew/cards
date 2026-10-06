@@ -753,13 +753,18 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   // Two boxes. The gap between them is sized so the Fallers box's top edge, padding and label
   // take exactly one row of the climbers' grid, so every faller lines up with a climber.
   const rh = fitNow && fitNow.rowH.climbers ? fitNow.rowH.climbers : 0;
-  const cbGap = rh ? Math.max(6, rh - 44 - (fitNow ? fitNow.labelH : 13)) : 16;
+  // The boxes keep the usual 16px gap; the Fallers box's top padding absorbs the difference
+  // (if a row is too short for that, the gap gives way instead).
+  const GAP = 16;
+  const fallersTop = rh ? rh - 26 - GAP - (fitNow ? fitNow.labelH : 13) : 18;
+  const cbGap = fallersTop >= 6 ? GAP : Math.max(4, GAP + fallersTop - 6);
+  const fallersPadTop = Math.max(6, fallersTop);
   const fallersTile = comebacks.length ? (
     <div style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: cbGap }}>
       <Tile label="Comebacks · 6mo+ since last sale" delay={380} style={{ flex: "0 0 auto" }}>
         <div style={{ marginTop: 8 }}>{comebacks.map((m, i) => <ComebackRow key={m.cert} m={m} i={i} delay={440 + i * 60} />)}</div>
       </Tile>
-      <Tile label="Fallers" delay={460} style={{ flex: 1 }}>
+      <Tile label="Fallers" delay={460} style={{ flex: 1, paddingTop: fallersPadTop }}>
         <div style={{ marginTop: 8 }}>
           {fallers.length ? fallers.map((m, i) => <MoverRow key={m.cert} m={m} i={i} up={false} list="climbers" delay={520 + i * 60} />)
             : <div style={{ marginTop: 10, fontSize: 15, color: C.faint }}>Nothing went down.</div>}
@@ -837,12 +842,12 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       {/* the poster (inside a 4px edge, which is what gets copied / downloaded) */}
       <div style={{ width: SHOT_W * scale, height: SHOT_H * scale, flex: "0 0 auto" }}>
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: story ? "76px 56px 80px" : 52, display: "flex", flexDirection: "column", gap: story ? 20 : 16 }}>
+        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
           {title}
           {story ? (
             <>
-              <div style={{ position: "relative", marginTop: 10 }}>{indexTile}</div>
+              <div style={{ position: "relative" }}>{indexTile}</div>
               <div style={{ position: "relative", display: "grid", gap: 16, gridTemplateColumns: sales ? "repeat(4, 1fr)" : "1fr 1fr" }}>{statTiles}</div>
               {nothing ? quiet : (
                 <>
