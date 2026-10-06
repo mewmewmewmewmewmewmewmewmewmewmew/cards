@@ -1318,12 +1318,15 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
               {/* a pink sash across the poster, tilted */}
               {/* a frosted sash: 30% white over a blur of the poster (exports draw the blur themselves) */}
               <div style={{ position: "absolute", left: (W - SASH.w) / 2, top: SASH.cy - SASH.h / 2, width: SASH.w, height: SASH.h, transform: `rotate(${SASH.rot}deg)`, transformOrigin: "50% 50%",
-                background: "rgba(255,255,255,0.3)", backdropFilter: `blur(${SASH.blur}px)`, WebkitBackdropFilter: `blur(${SASH.blur}px)`,
-                borderTop: "2px solid rgba(255,255,255,0.45)", borderBottom: "2px solid rgba(255,255,255,0.45)", boxSizing: "border-box",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#fff", textShadow: "0 2px 18px rgba(0,0,0,0.35)" }}>
-                <div style={{ ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#fff", whiteSpace: "nowrap" }}>Weekly market report</div>
-                <div style={{ marginTop: 20, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: "#fff", whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
-                <div style={{ marginTop: 20, ...big, fontSize: 72, letterSpacing: "-0.02em", lineHeight: 1, color: "rgba(255,255,255,0.92)", whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
+                // light pink glass: a pink tint with a soft white sheen toward the top edge
+                background: "linear-gradient(170deg, rgba(255,240,247,0.86) 0%, rgba(255,212,232,0.80) 40%, rgba(255,182,216,0.76) 100%)",
+                backdropFilter: `blur(${SASH.blur}px)`, WebkitBackdropFilter: `blur(${SASH.blur}px)`,
+                borderTop: "2px solid rgba(255,230,242,0.75)", borderBottom: "2px solid rgba(255,180,215,0.55)", boxSizing: "border-box",
+                boxShadow: "0 0 60px rgba(255,126,182,0.28)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#4a0f2e", textShadow: "0 1px 0 rgba(255,255,255,0.5)" }}>
+                <div style={{ ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#c2306f", whiteSpace: "nowrap" }}>Weekly market report</div>
+                <div style={{ marginTop: 20, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: "#4a0f2e", whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
+                <div style={{ marginTop: 20, ...big, fontSize: 72, letterSpacing: "-0.02em", lineHeight: 1, color: "#8a1f52", whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
               </div>
             </div>
           )}
