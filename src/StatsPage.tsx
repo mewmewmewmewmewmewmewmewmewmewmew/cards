@@ -269,13 +269,17 @@ export default function StatsPage() {
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
+  // Only step back when this page load opened the weekly view itself: history.state survives a
+  // reload, and going "back" across a reload would load the whole page again.
+  const openedHere = useRef(false);
   const closeWeekly = () => {
-    if (history.state && history.state.fromStats) history.back();
+    if (openedHere.current && history.state && history.state.fromStats) { openedHere.current = false; history.back(); }
     else { history.replaceState(null, "", location.pathname + location.search); setWeekly(false); }
   };
   const openWeekly = (e: React.MouseEvent) => {
     e.preventDefault();
     history.pushState({ fromStats: true }, "", "#weekly");
+    openedHere.current = true;
     setWeekly(true);
   };
 
