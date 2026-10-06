@@ -29,11 +29,12 @@ const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", 
 const REEL_EXTRA = 1920 - 1440; // reel cover: the space under the 3:4 layout
 // Reel: the 9:16 layout reworked for a reel playing full screen on a phone (measured from an
 // iPhone screenshot). Instagram zooms 9:16 to fill the taller screen, cropping ~47px off each
-// side, and puts its header ("Your reels") over the top ~250px; the like / comment / share
-// buttons sit at the right from ~1460. So the 9:16 layout starts below the header and keeps
-// clear of the side crop, running to the usual bottom margin; the bottom row stops short of the
-// buttons.
-const REEL = { x: 64, y: 262, w: 952, h: 1920 - 52 - 262, buttons: 120 };
+// side; its header ("Your reels") covers the top ~250px and the like / comment / share buttons
+// sit at the right from ~1460. The 9:16 layout keeps clear of the side crop and is centred
+// vertically (equal space above and below; the header may overlap the top of the title); the
+// bottom row stops short of the buttons.
+const REEL_H = 1920 - 52 - 262; // the content height (from below the header to the usual bottom margin)
+const REEL = { x: 64, y: Math.round((1920 - REEL_H) / 2), w: 952, h: REEL_H, buttons: 120 }; // centred vertically
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
