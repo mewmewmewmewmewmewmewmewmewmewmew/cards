@@ -152,6 +152,8 @@ const C = {
   gain: "#7ee2a8",                     // climbers list (fallers use down)
   gainGlow: "rgba(126,226,168,0.35)",
 };
+// Background logo (top right, cut off by the poster's edges).
+const LOGO = { w: { "1:1": 560, "3:4": 600, "9:16": 680 } as Record<string, number>, right: -150, top: -110, opacity: 0.07, rot: 14 };
 const mono: React.CSSProperties = { fontFamily: "var(--font-data)", letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11 };
 
 /**
@@ -449,13 +451,39 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       // place on the poster: same position, size, rounded corners and tilt.
       const PR = 2;
       const opts = { pixelRatio: PR, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506",
-        filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && n.dataset.card) };
+        filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) };
       for (let i = 0; i < (isSafari ? 2 : 0); i++) await toCanvas(node, opts); // warm-up passes for Safari (fonts)
       const canvas = await toCanvas(node, opts);
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("no canvas");
       const box = node.getBoundingClientRect();
       const k = box.width / SHOT_W; // on-screen scale of the poster
+      // The background logo is painted too (faint enough that drawing it over the boxes looks the
+      // same as behind them), clipped to the poster's rounded edge like on screen.
+      const logoEl = node.querySelector<HTMLImageElement>("img[data-logo]");
+      if (logoEl) {
+        const data = await toDataUrl(new URL(logoEl.getAttribute("src") || "", location.href).href);
+        if (data) {
+          const im = new Image(); im.src = data;
+          try {
+            await im.decode();
+            const r = logoEl.getBoundingClientRect();
+            const cx = ((r.left + r.right) / 2 - box.left) / k, cy = ((r.top + r.bottom) / 2 - box.top) / k;
+            const w = logoEl.offsetWidth, h = logoEl.offsetHeight;
+            ctx.save();
+            ctx.scale(PR, PR);
+            ctx.beginPath();
+            const R = 28, x0 = EDGE, y0 = EDGE, x1 = EDGE + W, y1 = EDGE + H;
+            ctx.moveTo(x0 + R, y0); ctx.arcTo(x1, y0, x1, y1, R); ctx.arcTo(x1, y1, x0, y1, R); ctx.arcTo(x0, y1, x0, y0, R); ctx.arcTo(x0, y0, x1, y0, R);
+            ctx.clip();
+            ctx.globalAlpha = LOGO.opacity;
+            ctx.translate(cx, cy);
+            ctx.rotate((LOGO.rot * Math.PI) / 180);
+            ctx.drawImage(im, -w / 2, -h / 2, w, h);
+            ctx.restore();
+          } catch (e) {}
+        }
+      }
       const imgs = [...node.querySelectorAll<HTMLImageElement>("img[data-card]")].filter((el) => getComputedStyle(el).visibility !== "hidden");
       // Load every image first, then paint them one at a time (each paint sets its own
       // transform and clip on the shared canvas).
@@ -844,6 +872,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
         <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
+          {/* the Mew logo, big and faint, running off the top-right corner */}
+          <img data-logo="1" src="/assets/mew-logo.png" alt="" aria-hidden="true" draggable={false}
+            style={{ position: "absolute", pointerEvents: "none", width: LOGO.w[fmt], right: LOGO.right, top: LOGO.top, opacity: LOGO.opacity, transform: `rotate(${LOGO.rot}deg)` }} />
           {title}
           {story ? (
             <>
