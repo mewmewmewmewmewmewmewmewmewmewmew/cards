@@ -154,7 +154,7 @@ const C = {
 };
 // The Mew logo in the title's top-right corner (height in px; the PNG is 200×211).
 const LOGO = { h: { "1:1": 64, "3:4": 64, "9:16": 84 } as Record<string, number>, inset: 28 };
-/** The logo recoloured with the title's pink → lavender gradient (made once, as a data URL). */
+/** The logo recoloured in the poster's pink (made once, as a data URL). */
 let tintedLogo: Promise<string> | null = null;
 function getTintedLogo(): Promise<string> {
   if (!tintedLogo) {
@@ -167,9 +167,7 @@ function getTintedLogo(): Promise<string> {
         if (!x) return ok("/assets/mew-logo.png");
         x.drawImage(im, 0, 0);
         x.globalCompositeOperation = "source-in";
-        const g = x.createLinearGradient(0, 0, c.width, c.height);
-        g.addColorStop(0, "#ff7eb6"); g.addColorStop(1, "#c49bff");
-        x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+        x.fillStyle = C.up; x.fillRect(0, 0, c.width, c.height);
         ok(c.toDataURL("image/png"));
       };
       im.onerror = () => ok("/assets/mew-logo.png");
@@ -720,7 +718,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const dates = <div style={{ fontFamily: "var(--font-data)", fontSize: story ? 22 : 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>;
   const tk = titleFit && titleFit.key === `${fmt}|${end}|${fontsTick}` ? titleFit.k : 1;
   const logoH = LOGO.h[fmt], logoW = Math.round((logoH * 200) / 211), beside = Math.max(0, logoW + LOGO.inset - 52 + 16); // room kept beside the logo
-  // Tucked into the poster's top-right corner (into the padding), in the title's colours.
+  // Tucked into the poster's top-right corner (into the padding), in the poster's pink.
   const logo = <img data-logo="1" src={logoSrc} alt="mew.cards" draggable={false} style={{ position: "absolute", top: LOGO.inset - 52, right: LOGO.inset - 52, height: logoH, width: logoW, opacity: 0.9 }} />;
   const title = story ? (
     <div className="wk-in" style={{ position: "relative" }}>
