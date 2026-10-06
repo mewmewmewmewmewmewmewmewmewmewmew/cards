@@ -1150,8 +1150,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           {fmt === "reel" && (
             // Reel cover: big text in the space under the poster, to catch the eye in the feed.
             <div className="wk-in" style={{ position: "absolute", left: 52, right: 52, bottom: 52, height: REEL_EXTRA - 52, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", ...fadeAt(vt, 200) }}>
-              <div style={{ ...mono, fontSize: 40, letterSpacing: "0.16em", color: C.up, whiteSpace: "nowrap" }}>PSA 10 · weekly report</div>
-              <div style={{ marginTop: 18, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, ...gradTitle, whiteSpace: "nowrap" }}>JP Mews</div>
+              <div style={{ ...mono, fontSize: 40, letterSpacing: "0.16em", color: C.up, whiteSpace: "nowrap" }}>Weekly market report</div>
+              <div style={{ marginTop: 18, ...big, fontSize: 124, letterSpacing: "-0.03em", lineHeight: 1, ...gradTitle, whiteSpace: "nowrap" }}>PSA10 JP Mews</div>
               <div style={{ marginTop: 18, ...big, fontSize: 92, letterSpacing: "-0.02em", lineHeight: 1, color: C.text, whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
             </div>
           )}
