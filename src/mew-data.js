@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "28.4";
+export const APP_VERSION = "28.5";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -423,6 +423,15 @@ export async function fetchAltByGrade(pairs, onBatch, opts) {
 /** Every cert at PSA 10 (the "All" view). */
 export function fetchAltHistories(certs, onBatch, opts) {
   return fetchAltByGrade([...new Set(certs.filter(Boolean))].map((cert) => ({ cert, grade: 10 })), onBatch, opts);
+}
+
+/** Short edition label for the pills: 1st edition → "1ED", unlimited → "UED", else as written. */
+export function editionLabel(e) {
+  const v = String(e || "").trim();
+  if (!v) return "";
+  if (/^1(st)?\b|first/i.test(v)) return "1ED";
+  if (/^unl|^ued$/i.test(v)) return "UED";
+  return v.toUpperCase();
 }
 
 /** The PSA grade you own (from the sheet's pc column), 1–10, or null (blank, N/A, RAW). */

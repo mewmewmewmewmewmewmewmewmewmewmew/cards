@@ -195,8 +195,8 @@ const SortArrow: React.FC<{ dir: SortDir | null }> = ({ dir }) => (
 );
 
 /** A small, quiet pill for the card's edition (e.g. 1st / UED) from the sheet's edition column. */
-const Edition: React.FC<{ e?: string }> = ({ e }) => (e ? (
-  <span style={{ display: "inline-block", marginLeft: 6, padding: "0 4px", borderRadius: 3, border: "1px solid var(--line-hairline)", fontSize: 9, lineHeight: 1.4, letterSpacing: "0.04em", color: "var(--text-faint)", verticalAlign: "1px" }}>{e}</span>
+const Edition: React.FC<{ e?: string }> = ({ e }) => (D.editionLabel(e) ? (
+  <span style={{ display: "inline-block", marginLeft: 6, padding: "0 4px", borderRadius: 3, border: "1px solid currentColor", fontSize: 9, lineHeight: 1.4, letterSpacing: "0.04em", color: "var(--text-faint)", verticalAlign: "1px" }}>{D.editionLabel(e)}</span>
 ) : null);
 
 const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "var(--web-small)" }) => (
@@ -632,7 +632,8 @@ export default function StatsPage() {
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <a href="/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Catalog</a>
-          <a href="#weekly" onClick={openWeekly} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>This week ✦</a>
+          <span aria-hidden="true" style={{ ...eyebrow, marginLeft: -4, marginRight: -4 }}>・</span>
+          <a href="#weekly" onClick={openWeekly} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>Weekly Report ✦</a>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
             <button type="button" onClick={() => setLang(lang === "JP" ? "EN" : "JP")} data-hover-pink="1" style={iconBtn} aria-label="Toggle language">{lang === "JP" ? "JA" : "EN"}</button>
             <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">

@@ -26,3 +26,4 @@ export const sheetExtras: { hidden: { all: string[]; personal: string[] } | null
 export function setCardHidden(password: string, cert: string, hide: boolean, name?: string, list?: "all" | "personal"): Promise<{ all: string[]; personal: string[] }>;
 export function fetchAltByGrade(pairs: Array<{ cert: string; grade: number }>, onBatch?: ((results: Map<string, any>, diag: { requests: number; ok: number; errors: string[] }) => void) | null, opts?: { fresh?: boolean }): Promise<Map<string, any>>;
 export function pcGrade(card: any): number | null;
+export function editionLabel(e?: string): string;

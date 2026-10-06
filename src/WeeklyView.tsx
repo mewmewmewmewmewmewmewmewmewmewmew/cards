@@ -192,8 +192,8 @@ const Delta: React.FC<{ now: number; prev: number; money?: boolean; invert?: boo
 };
 
 /** A small, quiet pill for the card's edition (e.g. 1st / UED) from the sheet's edition column. */
-const Edition: React.FC<{ e?: string; size?: number }> = ({ e, size = 10 }) => (e ? (
-  <span style={{ flex: "0 0 auto", display: "inline-block", marginLeft: 6, padding: "1px 5px", borderRadius: 4, border: `1px solid ${C.line}`, fontFamily: "var(--font-data)", fontWeight: 500, fontSize: size, lineHeight: 1.3, letterSpacing: "0.04em", color: C.faint, verticalAlign: "middle" }}>{e}</span>
+const Edition: React.FC<{ e?: string; size?: number }> = ({ e, size = 10 }) => (D.editionLabel(e) ? (
+  <span style={{ flex: "0 0 auto", display: "inline-block", marginLeft: 6, padding: "1px 5px", borderRadius: 4, border: "1px solid currentColor", fontFamily: "var(--font-data)", fontWeight: 500, fontSize: size, lineHeight: 1.3, letterSpacing: "0.04em", color: C.faint, verticalAlign: "middle" }}>{D.editionLabel(e)}</span>
 ) : null);
 
 const Num: React.FC<{ v: number; fmt: (n: number) => string; style?: React.CSSProperties }> = ({ v, fmt, style }) => {
