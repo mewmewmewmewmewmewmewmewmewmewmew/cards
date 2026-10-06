@@ -12,9 +12,11 @@ let dbp: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
   if (!dbp) {
     dbp = new Promise((ok, bad) => {
-      const req = indexedDB.open(DB, 1);
-      req.onupgradeneeded = () => {
+      // Version 2 starts the saved results over (records from v1 could hold results with no data).
+      const req = indexedDB.open(DB, 2);
+      req.onupgradeneeded = (ev) => {
         const d = req.result;
+        if (ev.oldVersion > 0 && d.objectStoreNames.contains(STORE)) d.deleteObjectStore(STORE);
         if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: "k" });
         if (!d.objectStoreNames.contains(META)) d.createObjectStore(META, { keyPath: "k" });
       };
@@ -37,7 +39,7 @@ export async function readAll(): Promise<{ at: number | null; map: Map<string, A
     const t = d.transaction([STORE, META], "readonly");
     const rows: Any[] = await new Promise((ok, bad) => { const r = t.objectStore(STORE).getAll(); r.onsuccess = () => ok(r.result || []); r.onerror = () => bad(r.error); });
     const meta: Any = await new Promise((ok) => { const r = t.objectStore(META).get("refreshed"); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); });
-    rows.forEach((row) => map.set(row.k, row.r));
+    rows.forEach((row) => { if (keepable(row.r)) map.set(row.k, row.r); });
     return { at: meta && typeof meta.at === "number" ? meta.at : null, map };
   } catch (e) {
     return { at: null, map };
@@ -45,7 +47,13 @@ export async function readAll(): Promise<{ at: number | null; map: Map<string, A
 }
 
 /** A result worth keeping: anything but a failed lookup (those are retried next time). */
-export const keepable = (r: Any) => !!r && (!r.error || (Array.isArray(r.history) && r.history.length > 0));
+/**
+ * A result worth keeping / reusing: it has sales or ALT values, and its sales weren't thrown out
+ * for being the wrong grade. Anything else is fetched again rather than shown as an empty card.
+ */
+export const keepable = (r: Any) => !!r
+  && ((Array.isArray(r.sales) && r.sales.length > 0) || (Array.isArray(r.history) && r.history.length > 0))
+  && !/filtered as/i.test(String(r.salesError || ""));
 
 /** Save results (cert → result) for one grade; optionally mark a full refresh as finished. */
 export async function save(results: Map<string, Any>, grade: number | ((cert: string) => number), refreshedAt?: number) {

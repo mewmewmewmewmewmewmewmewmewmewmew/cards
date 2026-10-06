@@ -329,13 +329,12 @@ const Delta: React.FC<{ now: number; prev: number; money?: boolean; invert?: boo
   );
 };
 
-// Trims the text box to the capitals so they sit dead centre in the pill (browsers without
-// text-box-trim fall back to the font's own centring).
-const PILL_TRIM = { textBoxTrim: "trim-both", textBoxEdge: "cap alphabetic" } as unknown as React.CSSProperties;
 
+// Centred with a fixed height, line height and a small top nudge (capitals sit high in their
+// line box); this renders the same on screen and in exports.
 /** A small, quiet pill for the card's edition (e.g. 1st / UED) from the sheet's edition column. */
 const Edition: React.FC<{ e?: string; size?: number }> = ({ e, size = 10 }) => (D.editionLabel(e) ? (
-  <span style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", height: Math.round(size * 1.6), marginLeft: 6, padding: "0 5px", borderRadius: 4, border: "1px solid currentColor", fontFamily: "var(--font-data)", fontWeight: 500, fontSize: size, lineHeight: 1, letterSpacing: "0.04em", color: C.faint, verticalAlign: "middle", ...PILL_TRIM }}>{D.editionLabel(e)}</span>
+  <span style={{ flex: "0 0 auto", display: "inline-block", boxSizing: "border-box", height: Math.round(size * 1.6), marginLeft: 6, padding: `${Math.round(size * 0.14)}px 5px 0`, lineHeight: `${Math.round(size * 1.6) - 2 - Math.round(size * 0.14)}px`, borderRadius: 4, border: "1px solid currentColor", fontFamily: "var(--font-data)", fontWeight: 500, fontSize: size, letterSpacing: "0.04em", color: C.faint, verticalAlign: "middle", textAlign: "center" }}>{D.editionLabel(e)}</span>
 ) : null);
 
 /** A number that counts up from 0 (after `delay` ms), on screen and in the video. */
