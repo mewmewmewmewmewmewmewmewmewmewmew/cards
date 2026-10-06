@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { toCanvas, getFontEmbedCSS } from "html-to-image";
+import { toCanvas } from "html-to-image";
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import * as D from "./mew-data";
 import Loader from "./Loader";
@@ -241,6 +241,53 @@ function toDataUrl(url: string): Promise<string | null> {
   }
   return p;
 }
+/**
+ * The page's web fonts as embeddable CSS, limited to the pieces that cover the characters on the
+ * poster. (The exporter otherwise inlines every piece of every font into every frame; the
+ * Japanese body font alone comes in ~120 pieces, which ran browsers out of memory mid-video.)
+ * Faces/weights the poster doesn't use are dropped too. Cached per character set.
+ */
+const fontCssCache = new Map<string, Promise<string>>();
+const inRange = (cp: number, range: string) => range.split(",").some((part) => {
+  const m = part.trim().replace(/^U\+/i, "");
+  if (m.includes("?")) { const lo = parseInt(m.replace(/\?/g, "0"), 16), hi = parseInt(m.replace(/\?/g, "F"), 16); return cp >= lo && cp <= hi; }
+  const [a, b] = m.split("-"); const lo = parseInt(a, 16), hi = b ? parseInt(b, 16) : lo;
+  return cp >= lo && cp <= hi;
+});
+function posterFontCSS(node: HTMLElement): Promise<string> {
+  const cps = [...new Set([...(node.textContent || "")].map((ch) => ch.codePointAt(0) || 0))].sort((a, b) => a - b);
+  const key = cps.join(",");
+  let p = fontCssCache.get(key);
+  if (!p) {
+    p = (async () => {
+      const links = [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href*="fonts.googleapis.com"]')];
+      const out: string[] = [];
+      for (const link of links) {
+        const css = await (await fetch(link.href)).text();
+        const blocks = css.match(/@font-face\s*{[^}]*}/g) || [];
+        const keep = blocks.filter((b) => {
+          const r = /unicode-range:\s*([^;}]+)/i.exec(b);
+          return !r || cps.some((cp) => inRange(cp, r[1]));
+        });
+        const done = await Promise.all(keep.map(async (b) => {
+          const u = /url\(([^)]+)\)/.exec(b);
+          if (!u) return b;
+          const url = u[1].replace(/["']/g, "");
+          try {
+            const blob = await (await fetch(url)).blob();
+            const data: string = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = bad; r.readAsDataURL(blob); });
+            return b.replace(u[0], `url(${data})`);
+          } catch (e) { return ""; }
+        }));
+        out.push(...done.filter(Boolean));
+      }
+      return out.join("\n");
+    })().catch(() => "");
+    fontCssCache.set(key, p);
+  }
+  return p;
+}
+
 const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
 
 const Tile: React.FC<{ label: string; children: React.ReactNode; delay?: number; style?: React.CSSProperties; tag?: string; list?: string; labelRight?: boolean }> = ({ label, children, delay = 0, style, tag, list, labelRight }) => {
@@ -619,7 +666,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       encoder.configure(config);
 
       node.classList.add("wk-shot"); // CSS animations off: the clock drives the poster now
-      const fontEmbedCSS = await getFontEmbedCSS(node).catch(() => undefined);
+      const fontEmbedCSS = (await posterFontCSS(node)) || undefined;
       const out = document.createElement("canvas");
       out.width = W; out.height = H;
       const octx = out.getContext("2d");
@@ -633,6 +680,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         octx.fillStyle = "#060506";
         octx.fillRect(0, 0, W, H);
         octx.drawImage(frame, -EDGE, -EDGE);
+        frame.width = 0; frame.height = 0; // free it now (browsers cap total canvas memory)
         await paintLogo(octx, node, 1, -EDGE);
         await paintCards(octx, node, 1, -EDGE, t);
       };
@@ -719,7 +767,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       // of render, whatever their source), then each card is painted onto the canvas at its
       // place on the poster: same position, size, rounded corners and tilt.
       const PR = 2;
-      const opts = { pixelRatio: PR, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506",
+      const fontEmbedCSS = (await posterFontCSS(node)) || undefined;
+      const opts = { pixelRatio: PR, width: SHOT_W, height: SHOT_H, style: { transform: "none" }, backgroundColor: "#060506", fontEmbedCSS,
         filter: (n: HTMLElement) => !(n instanceof HTMLImageElement && (n.dataset.card || n.dataset.logo)) };
       for (let i = 0; i < (isSafari ? 2 : 0); i++) await toCanvas(node, opts); // warm-up passes for Safari (fonts)
       const canvas = await toCanvas(node, opts);
