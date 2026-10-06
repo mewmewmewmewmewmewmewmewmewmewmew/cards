@@ -20,6 +20,17 @@ type Mode = "sales" | "alt";
 
 const RANGES: Array<[string, number]> = [["1D", 1], ["1W", 7], ["1M", 30], ["3M", 91], ["6M", 182], ["1Y", 365], ["3Y", 1096], ["5Y", 1826], ["All", 0]];
 const STATS_CONFIG_KEY = "mew_stats_config_v1";
+// The stats password, remembered on this device for 30 days so a reload (iPhone Safari reloads
+// tabs after switching apps) goes straight back in. Cleared when the password stops working.
+const STATS_PW_KEY = "mew_stats_pw";
+const PW_DAYS = 30;
+function savedPw(): string {
+  try {
+    const v = JSON.parse(localStorage.getItem(STATS_PW_KEY) || "null");
+    return v && typeof v.pw === "string" && Date.now() - v.at < PW_DAYS * 864e5 ? v.pw : "";
+  } catch (e) { return ""; }
+}
+const rememberPw = (pw: string) => { try { if (pw) localStorage.setItem(STATS_PW_KEY, JSON.stringify({ pw, at: Date.now() })); else localStorage.removeItem(STATS_PW_KEY); } catch (e) {} };
 const SORTS = ["value", "change", "release"] as const;
 type SortDir = "asc" | "desc";
 // Direction a sort starts in when picked: highest value/change first, oldest release first.
@@ -364,6 +375,7 @@ export default function StatsPage() {
     try {
       const all = await D.fetchAllSheets(password, { forStats: true });
       pwRef.current = password;
+      if (password) rememberPw(password);
       setCards(all);
       setSheets({ ...D.sheetDiag });
       const hl = D.sheetExtras.hidden;
@@ -431,12 +443,15 @@ export default function StatsPage() {
       })));
       setImgs({ done: urls.length, total: urls.length, finished: true });
     } catch (e: Any) {
-      if (e && e.message === "auth") { setPw(""); setPhase("password"); }
+      if (e && e.message === "auth") { setPw(""); rememberPw(""); setPhase("password"); }
       else { console.error(e); setPhase("error"); }
     }
   };
 
   useEffect(() => {
+    // Remembered password: go straight in (a wrong/changed one falls back to the password box).
+    const remembered = savedPw();
+    if (remembered) { load(remembered); return; }
     let cached: Any = null;
     try { cached = localStorage.getItem(STATS_CONFIG_KEY); } catch (e) {}
     if (cached === "private") setPhase("password");
