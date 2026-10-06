@@ -720,14 +720,12 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         @keyframes wkIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
         .wk-bar { animation: wkBar 900ms cubic-bezier(.2,.7,.2,1) both; transform-origin: left; }
         @keyframes wkBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-        .wk-float { animation: wkFl 6s ease-in-out infinite; }
-        @keyframes wkFl { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(-2deg); } }
+        .wk-float { transform: rotate(-4deg); } /* a still tilt (no float: the poster ends up as a picture) */
         .wk-nav { background: none; border: 1px solid ${C.line}; color: ${C.text}; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
         .wk-nav:disabled { opacity: .25; cursor: default; }
         .wk-nav:not(:disabled):hover { border-color: ${C.up}; color: ${C.up}; }
-        .wk-shot .wk-in, .wk-shot .wk-bar, .wk-shot .wk-float, .wk-still .wk-in, .wk-still .wk-bar { animation: none !important; }
-        .wk-shot .wk-float { transform: rotate(-4deg); }
-        @media (prefers-reduced-motion: reduce) { .wk-in, .wk-bar, .wk-float { animation: none !important; } }
+        .wk-shot .wk-in, .wk-shot .wk-bar, .wk-still .wk-in, .wk-still .wk-bar { animation: none !important; }
+        @media (prefers-reduced-motion: reduce) { .wk-in, .wk-bar { animation: none !important; } }
       `}</style>
 
       {/* controls (outside the poster, so images of it stay clean) */}
