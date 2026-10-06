@@ -153,7 +153,31 @@ const C = {
   gainGlow: "rgba(126,226,168,0.35)",
 };
 // The Mew logo in the title's top-right corner (height in px; the PNG is 200×211).
-const LOGO = { h: { "1:1": 100, "3:4": 100, "9:16": 150 } as Record<string, number> };
+const LOGO = { h: { "1:1": 64, "3:4": 64, "9:16": 84 } as Record<string, number>, inset: 28 };
+/** The logo recoloured with the title's pink → lavender gradient (made once, as a data URL). */
+let tintedLogo: Promise<string> | null = null;
+function getTintedLogo(): Promise<string> {
+  if (!tintedLogo) {
+    tintedLogo = new Promise((ok) => {
+      const im = new Image();
+      im.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = im.naturalWidth; c.height = im.naturalHeight;
+        const x = c.getContext("2d");
+        if (!x) return ok("/assets/mew-logo.png");
+        x.drawImage(im, 0, 0);
+        x.globalCompositeOperation = "source-in";
+        const g = x.createLinearGradient(0, 0, c.width, c.height);
+        g.addColorStop(0, "#ff7eb6"); g.addColorStop(1, "#c49bff");
+        x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+        ok(c.toDataURL("image/png"));
+      };
+      im.onerror = () => ok("/assets/mew-logo.png");
+      im.src = "/assets/mew-logo.png";
+    });
+  }
+  return tintedLogo;
+}
 const mono: React.CSSProperties = { fontFamily: "var(--font-data)", letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11 };
 
 /**
@@ -267,6 +291,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const [note, setNote] = useState("");
   const [fmt, setFmtState] = useState<Fmt>(() => { try { const v = localStorage.getItem(FMT_KEY); return FORMATS.some(([f]) => f === v) ? (v as Fmt) : "1:1"; } catch (e) { return "1:1"; } });
   const setFmt = (f: Fmt) => { setFmtState(f); try { localStorage.setItem(FMT_KEY, f); } catch (e) {} };
+  const [logoSrc, setLogoSrc] = useState("/assets/mew-logo.png");
+  useEffect(() => { getTintedLogo().then(setLogoSrc); }, []);
   const [vw, setVw] = useState(() => [window.innerWidth, window.innerHeight]);
   const latest = sundayOf(todayISO());
   const [end, setEnd] = useState(latest);
@@ -461,7 +487,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       // The logo is painted in too (Safari leaves pictures out of the HTML render).
       const logoEl = node.querySelector<HTMLImageElement>("img[data-logo]");
       if (logoEl) {
-        const data = await toDataUrl(new URL(logoEl.getAttribute("src") || "", location.href).href);
+        const src = logoEl.getAttribute("src") || "";
+        const data = src.startsWith("data:") ? src : await toDataUrl(new URL(src, location.href).href);
         if (data) {
           const im = new Image(); im.src = data;
           try {
@@ -692,8 +719,9 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const kicker = <div style={{ ...mono, fontSize: story ? 18 : 14, color: C.up }}>Week {weekNo(end)}{sales ? "" : " · ALT value"}</div>;
   const dates = <div style={{ fontFamily: "var(--font-data)", fontSize: story ? 22 : 16, color: C.muted }}>{fmtDay(start)} – {fmtDay(end, true)}</div>;
   const tk = titleFit && titleFit.key === `${fmt}|${end}|${fontsTick}` ? titleFit.k : 1;
-  const logoH = LOGO.h[fmt], logoW = Math.round((logoH * 200) / 211), beside = logoW + 24; // room kept beside the logo
-  const logo = <img data-logo="1" src="/assets/mew-logo.png" alt="mew.cards" draggable={false} style={{ position: "absolute", top: 0, right: 0, height: logoH, width: logoW }} />;
+  const logoH = LOGO.h[fmt], logoW = Math.round((logoH * 200) / 211), beside = Math.max(0, logoW + LOGO.inset - 52 + 16); // room kept beside the logo
+  // Tucked into the poster's top-right corner (into the padding), in the title's colours.
+  const logo = <img data-logo="1" src={logoSrc} alt="mew.cards" draggable={false} style={{ position: "absolute", top: LOGO.inset - 52, right: LOGO.inset - 52, height: logoH, width: logoW, opacity: 0.9 }} />;
   const title = story ? (
     <div className="wk-in" style={{ position: "relative" }}>
       {logo}
