@@ -1324,7 +1324,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
                 borderTop: "2px solid rgba(255,240,248,0.9)", borderBottom: "2px solid rgba(255,190,222,0.7)", boxSizing: "border-box",
                 boxShadow: "0 22px 48px rgba(0,0,0,0.38), 0 6px 14px rgba(0,0,0,0.22), inset 0 18px 40px rgba(255,255,255,0.14), inset 0 -18px 40px rgba(255,126,182,0.16)",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#fff", textShadow: "0 2px 4px rgba(90,10,50,0.45), 0 6px 30px rgba(90,10,50,0.6)" }}>
-                <div style={{ ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#ffd3e6", whiteSpace: "nowrap", textShadow: "none" }}>Weekly market report</div>
+                <div style={{ ...mono, fontSize: 40, fontWeight: 700, letterSpacing: "0.2em", color: "#ffd3e6", whiteSpace: "nowrap", textShadow: "none" }}>Weekly market report {end.slice(0, 4)}</div>
                 <div style={{ marginTop: 20, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, color: "#fff", whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
                 <div style={{ marginTop: 20, ...big, fontSize: 72, letterSpacing: "-0.02em", lineHeight: 1, color: "#ffe3ef", whiteSpace: "nowrap" }}>JP Mews ・ PSA10</div>
               </div>
