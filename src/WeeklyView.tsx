@@ -25,7 +25,11 @@ const FMT_KEY = "mew_weekly_fmt";
 // "reel": a reel cover: the 3:4 poster at the top of a 9:16 frame, blank below.
 type Fmt = "1:1" | "3:4" | "9:16" | "reel";
 const FORMATS: Array<[Fmt, string]> = [["1:1", "1:1"], ["3:4", "3:4"], ["9:16", "9:16"], ["reel", "Reel cover"]];
-const REEL_EXTRA = 1920 - 1440; // the blank space under the 3:4 layout
+// Reel cover, laid out for a reel playing full screen on a phone: Instagram zooms 9:16 to fill
+// the taller screen (cropping ~100px off each side) and covers the top ~230px (header), the
+// bottom ~400px (name/caption) and the lower right (buttons). So the 3:4 poster is scaled down
+// into the clear area, with the title just above it.
+const REEL = { s: 0.72, x: 104, y: 470, textTop: 238, textW: 778 };
 
 const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -578,7 +582,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           await im.decode();
           const r = logoEl.getBoundingClientRect();
           const cx = ((r.left + r.right) / 2 - box.left) / k + off, cy = ((r.top + r.bottom) / 2 - box.top) / k + off;
-          const w = logoEl.offsetWidth, h = logoEl.offsetHeight;
+          const sc = Number((logoEl.closest("[data-scale]") as HTMLElement | null)?.dataset.scale || 1);
+          const w = logoEl.offsetWidth * sc, h = logoEl.offsetHeight * sc;
           ctx.save();
           ctx.scale(PR, PR);
           ctx.beginPath();
@@ -613,7 +618,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     imgs.forEach((el, i) => {
       const r = el.getBoundingClientRect();
       const cx = ((r.left + r.right) / 2 - box.left) / k + off, cy = ((r.top + r.bottom) / 2 - box.top) / k + off;
-      const w = el.offsetWidth, h = el.offsetHeight;
+      const sc = Number((el.closest("[data-scale]") as HTMLElement | null)?.dataset.scale || 1);
+      const w = el.offsetWidth * sc, h = el.offsetHeight * sc;
       const floating = !!el.closest(".wk-float");
       const tilt = floating ? ((at === null ? -4 : -4 + 2 * floatPhase(at)) * Math.PI) / 180 : 0;
       // Fading tiles: the card takes the opacity of the boxes it sits in.
@@ -1145,16 +1151,20 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
        <AnimStart.Provider value={animStart}>
        <VT.Provider value={vt}>
        <div ref={shotRef} style={{ width: SHOT_W, height: SHOT_H, padding: EDGE, boxSizing: "border-box", background: "#060506", transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28, boxSizing: "border-box", padding: fmt === "reel" ? `52px 52px ${52 + REEL_EXTRA}px` : 52, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div key={`${end}-${mode}-${fmt}`} style={{ width: W, height: H, position: "relative", overflow: "hidden", background: C.bg, borderRadius: 28 }}>
           <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(60% ${story ? 30 : 50}% at 90% 0%, rgba(255,126,182,0.24), transparent 70%), radial-gradient(55% ${story ? 28 : 45}% at 0% 100%, rgba(159,120,255,0.18), transparent 70%)` }} />
           {fmt === "reel" && (
-            // Reel cover: big text in the space under the poster, to catch the eye in the feed.
-            <div className="wk-in" style={{ position: "absolute", left: 52, right: 52, bottom: 52, height: REEL_EXTRA - 52, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", ...fadeAt(vt, 200) }}>
-              <div style={{ ...mono, fontSize: 40, letterSpacing: "0.16em", color: C.up, whiteSpace: "nowrap" }}>Weekly market report</div>
-              <div style={{ marginTop: 18, ...big, fontSize: 150, letterSpacing: "-0.03em", lineHeight: 1, ...gradTitle, whiteSpace: "nowrap" }}>JP Mews</div>
-              <div style={{ marginTop: 18, ...big, fontSize: 92, letterSpacing: "-0.02em", lineHeight: 1, color: C.text, whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
+            // Reel cover: the title above the (scaled-down) poster.
+            <div className="wk-in" style={{ position: "absolute", left: REEL.x, width: REEL.textW, top: REEL.textTop, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", ...fadeAt(vt, 200) }}>
+              <div style={{ ...mono, fontSize: 30, letterSpacing: "0.16em", color: C.up, whiteSpace: "nowrap" }}>Weekly market report</div>
+              <div style={{ marginTop: 14, display: "flex", alignItems: "baseline", justifyContent: "center", gap: 24, whiteSpace: "nowrap" }}>
+                <span style={{ ...big, fontSize: 104, letterSpacing: "-0.03em", lineHeight: 1, ...gradTitle }}>JP Mews</span>
+              </div>
+              <div style={{ marginTop: 12, ...big, fontSize: 56, letterSpacing: "-0.02em", lineHeight: 1, color: C.text, whiteSpace: "nowrap" }}>{fmtMD(start)} – {fmtMD(end)}</div>
             </div>
           )}
+          <div data-scale={fmt === "reel" ? REEL.s : undefined} style={{ width: W, height: fmt === "reel" ? 1440 : H, boxSizing: "border-box", padding: 52, display: "flex", flexDirection: "column", gap: 16, position: fmt === "reel" ? "absolute" : "relative",
+            ...(fmt === "reel" ? { left: REEL.x, top: REEL.y, transform: `scale(${REEL.s})`, transformOrigin: "0 0" } : {}) }}>
           {title}
           {story ? (
             <>
@@ -1191,6 +1201,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
               {highlights}
             </>
           )}
+          </div>
         </div>
        </div>
        </VT.Provider>
