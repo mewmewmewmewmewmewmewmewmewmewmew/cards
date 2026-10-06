@@ -508,7 +508,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       if (!row || !label) return;
       const avail = tile.clientHeight - 36 - label.offsetHeight - 8; // padding, label, list margin
       const content = row.offsetHeight - 2 * (parseFloat(getComputedStyle(row).paddingTop) || 0);
-      const n = Math.max(1, Math.min(fmt === "9:16" ? 10 : 99, Math.floor((avail + 1) / (content + 8 + 1)))); // story: top 10
+      const n = Math.max(1, Math.min(fmt === "9:16" || fmt === "cover2" || fmt === "reelsafe" ? 10 : 99, Math.floor((avail + 1) / (content + 8 + 1)))); // story: top 10
       rows[name] = n;
       pads[name] = Math.max(4, Math.min(16, Math.floor(((avail + 1) / n - 1 - content) / 2)));
       rowH[name] = content + 2 * pads[name];
