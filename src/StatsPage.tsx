@@ -384,7 +384,10 @@ export default function StatsPage() {
       try {
         const cards = await D.fetchAllSheets(password, { forStats: true });
         if (cards.length) {
-          const v = { cards, hidden: D.sheetExtras.hidden, diag: { ...D.sheetDiag } };
+          // A response without the hidden lists (the script's older fallback path) keeps the saved ones.
+          let hidden = D.sheetExtras.hidden;
+          if (!hidden) { const prev = await AC.readSheet(); if (prev && prev.hidden) hidden = prev.hidden; }
+          const v = { cards, hidden, diag: { ...D.sheetDiag } };
           AC.saveSheet(v);
           return v;
         }

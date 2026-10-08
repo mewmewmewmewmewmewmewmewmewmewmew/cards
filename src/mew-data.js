@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "32.9";
+export const APP_VERSION = "33.0";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -374,7 +374,21 @@ async function altBatches(certs, extra, label, results, diag, onBatch) {
   return pending;
 }
 
-const isGradeFilter = (f, grade) => !!f && parseFloat(f.gradeNumber) === grade && String(f.gradingCompany || "").toUpperCase() === "PSA";
+/**
+ * Does the API's salesFilter say the sales are PSA `grade`? Accepts the field names the Worker has
+ * used (gradeNumber / grade, gradingCompany / grader, …). A filter that names neither a grade nor
+ * a grader can't contradict the request, so it's trusted; one that names a different grade or
+ * grader is not.
+ */
+const pickField = (f, keys) => { for (const k of keys) { const v = f[k]; if (v !== undefined && v !== null && v !== "") return v; } return undefined; };
+const isGradeFilter = (f, grade) => {
+  if (!f || typeof f !== "object") return true;
+  const g = pickField(f, ["gradeNumber", "grade", "gradeValue", "number"]);
+  const co = pickField(f, ["gradingCompany", "grader", "company", "gradingService"]);
+  if (g !== undefined && parseFloat(g) !== grade) return false;
+  if (co !== undefined && String(co).toUpperCase() !== "PSA") return false;
+  return true;
+};
 
 /** Validate one API result: sales are only kept when the API says it filtered them at `grade` (PSA). */
 function checkResult(r, grade) {
@@ -383,7 +397,8 @@ function checkResult(r, grade) {
   const sales = Array.isArray(out.sales) ? out.sales : [];
   if (out.salesFilter && !isGradeFilter(out.salesFilter, grade)) {
     out.sales = [];
-    out.salesError = `sales came back filtered as ${out.salesFilter.gradingCompany || "?"} ${out.salesFilter.gradeNumber || "?"}`;
+    const f = out.salesFilter;
+    out.salesError = `sales came back filtered as ${pickField(f, ["gradingCompany", "grader", "company", "gradingService"]) || "?"} ${pickField(f, ["gradeNumber", "grade", "gradeValue", "number"]) || "?"}`;
   } else {
     out.sales = sales;
     if (!sales.length) out.salesError = out.error || `no PSA ${grade} sales on ALT`;
