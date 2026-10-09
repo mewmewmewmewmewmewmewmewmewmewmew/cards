@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "33.1";
+export const APP_VERSION = "33.2";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -346,7 +346,7 @@ async function altBatches(certs, extra, label, results, diag, onBatch) {
       const batch = pending.slice(i, i + 20);
       diag.requests++;
       try {
-        const res = await fetch(`${ALT_BASE}/alt-history?certs=${batch.join(",")}${extra}`);
+        const res = await fetch(`${ALT_BASE}/alt-history?certs=${batch.join(",")}${extra}`, { cache: "no-store" }); // never a reused browser copy
         let json = null;
         try { json = await res.json(); } catch (e) {}
         if (!json || !Array.isArray(json.results)) {
@@ -376,16 +376,16 @@ async function altBatches(certs, extra, label, results, diag, onBatch) {
 
 /**
  * Does the API's salesFilter say the sales are PSA `grade`? Accepts the field names the Worker has
- * used (gradeNumber / grade, gradingCompany / grader, …). A filter that names neither a grade nor
- * a grader can't contradict the request, so it's trusted; one that names a different grade or
- * grader is not.
+ * used (gradeNumber / grade, gradingCompany / grader, …). It must name the grade: an empty filter
+ * means the Worker sent no grade filter at all (its schema discovery failed), so the sales could
+ * be any grade and aren't kept.
  */
 const pickField = (f, keys) => { for (const k of keys) { const v = f[k]; if (v !== undefined && v !== null && v !== "") return v; } return undefined; };
 const isGradeFilter = (f, grade) => {
-  if (!f || typeof f !== "object") return true;
+  if (!f || typeof f !== "object") return false;
   const g = pickField(f, ["gradeNumber", "grade", "gradeValue", "number"]);
   const co = pickField(f, ["gradingCompany", "grader", "company", "gradingService"]);
-  if (g !== undefined && parseFloat(g) !== grade) return false;
+  if (g === undefined || parseFloat(g) !== grade) return false;
   if (co !== undefined && String(co).toUpperCase() !== "PSA") return false;
   return true;
 };
