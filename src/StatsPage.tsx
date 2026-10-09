@@ -344,25 +344,36 @@ export default function StatsPage() {
    * than 6h ago (the Worker doesn't always flag old copies, so the age is checked here too).
    */
   const OLD_MS = 6 * 60 * 60 * 1000;
+  // What the last background refresh of old data did (shown in the Data check).
+  const [oldRun, setOldRun] = useState<{ asked: number; got: number; newer: number; unusable: number } | null>(null);
   const isOld = (r: Any) => !!r && (r.cache === "stale" || (r.cachedAt && Date.now() - Date.parse(r.cachedAt) > OLD_MS));
   /** On every load (in the background): fetch fresh from ALT any card whose data is too old. */
   const refreshOld = async (have10: Map<string, Any>, haveP: Map<string, Any>, pairs: Array<{ cert: string; grade: number }>) => {
     const old10 = [...have10].filter(([, r]) => isOld(r)).map(([c]) => c);
     const oldP = pairs.filter((p) => isOld(haveP.get(p.cert)));
-    if (!old10.length && !oldP.length) return;
+    if (!old10.length && !oldP.length) { setOldRun({ asked: 0, got: 0, newer: 0, unusable: 0 }); return; }
+    const tally = { asked: old10.length + oldP.length, got: 0, newer: 0, unusable: 0 };
+    const count = (got: Map<string, Any>, before: (c: string) => Any) => got.forEach((r, c) => {
+      tally.got++;
+      if (!AC.keepable(r)) tally.unusable++;
+      else if (r.cachedAt && (!before(c) || !before(c).cachedAt || Date.parse(r.cachedAt) > Date.parse(before(c).cachedAt))) tally.newer++;
+    });
     try {
       if (old10.length) {
         const got = await D.fetchAltHistories(old10, null, { fresh: true });
+        count(got, (c) => have10.get(c));
         setHist((cur) => { const n = new Map(cur); got.forEach((r, c) => { if (AC.keepable(r)) n.set(c, r); }); return n; });
         await AC.save(got, 10);
       }
       if (oldP.length) {
         const gradeOf = new Map(oldP.map((p) => [p.cert, p.grade]));
         const got = await D.fetchAltByGrade(oldP, null, { fresh: true });
+        count(got, (c) => haveP.get(c));
         setHistP((cur) => { const n = new Map(cur); got.forEach((r, c) => { if (AC.keepable(r)) n.set(c, r); }); return n; });
         await AC.save(got, (c) => gradeOf.get(c) || 10);
       }
     } catch (e) { console.error(e); }
+    setOldRun(tally);
   };
 
   /**
@@ -699,6 +710,16 @@ export default function StatsPage() {
     return ago(hi) === ago(lo) ? `from ${ago(lo)}` : `from ${ago(hi)} to ${ago(lo)}`;
   }, [hist, histP]);
 
+  // The cards with the oldest data (for the Data check).
+  const oldest = useMemo(() => {
+    const byCert = new Map<string, Any>();
+    cards.forEach((c: Any) => { const k = D.certOf(c); if (k && !byCert.has(k)) byCert.set(k, c); });
+    const rows: Array<{ cert: string; card: Any; t: number }> = [];
+    hist.forEach((r: Any, cert: string) => { const t = r && r.cachedAt ? Date.parse(r.cachedAt) : NaN; if (isFinite(t)) rows.push({ cert, card: byCert.get(cert), t }); });
+    rows.sort((a, b) => a.t - b.t);
+    return { over12: rows.filter((x) => Date.now() - x.t > 12 * 3600e3).length, list: rows.slice(0, 5) };
+  }, [hist, cards]);
+
   /* ---------- gate: password, then loading until all ALT data is in ---------- */
   const allLoaded = histDone && histPDone && imgs.finished;
   if ((phase !== "ready" && phase !== "error") || (phase === "ready" && !allLoaded)) {
@@ -1029,6 +1050,8 @@ export default function StatsPage() {
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
                     {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out)</div>}
+                    {oldRun && <div style={line}>Old-data refresh this visit · {oldRun.asked ? `${oldRun.asked} asked for fresh, ${oldRun.got} answered, ${oldRun.newer} came back newer, ${oldRun.unusable} unusable (kept the old copy)` : "nothing over 6h old"}</div>}
+                    {oldest.over12 > 0 && <div style={line}>Over 12h old · {oldest.over12} · oldest: {oldest.list.filter((x) => Date.now() - x.t > 12 * 3600e3).map((x) => `${x.card ? name(x.card) : "?"}${x.card && x.card.number ? ` ${x.card.number}` : ""} (cert ${x.cert}, ${ago(x.t)})`).join(" · ")}</div>}
                     {!anyCertCol && tabs.length > 0 && <div style={hint}>The page looks for a column named "All Cert" (or "Cert", "Certs", "Cert Number") in the {tabs.join(", ")} tabs.</div>}
                     {netErr && <div style={hint}>The browser couldn't reach the API. If it works from elsewhere, the Worker may be refusing requests from this site (CORS or an origin allowlist).</div>}
                   </div>
