@@ -1017,7 +1017,9 @@ export default function StatsPage() {
               const netErr = diag && (diag.errors as string[]).some((e) => e.startsWith("network error"));
               const withSales = [...hist.values()].filter((r: Any) => r && Array.isArray(r.sales) && r.sales.length).length;
               const withHist = [...hist.values()].filter((r: Any) => r && Array.isArray(r.history) && r.history.length).length;
-              const mismatch = [...hist.values()].filter((r: Any) => r && /filtered as/.test(String(r.salesError || ""))).length;
+              const mismatchCerts = [...hist.entries()].filter(([, r]: [string, Any]) => r && /filtered as/.test(String(r.salesError || ""))).map(([c]) => c);
+              const mismatch = mismatchCerts.length;
+              const cardOf = (cert: string) => cards.find((c: Any) => D.certOf(c) === cert);
               const line: React.CSSProperties = { fontFamily: "var(--font-data)", fontSize: "var(--web-label)", lineHeight: 1.6, color: "var(--text-body)", overflowWrap: "anywhere" };
               const hint: React.CSSProperties = { ...line, color: "var(--text-accent)" };
               return (
@@ -1049,7 +1051,7 @@ export default function StatsPage() {
                     <div style={line}>Personal · {cards.filter((c: Any) => D.pcGrade(c) !== null).length} sheet rows with a PSA grade in pc</div>
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
-                    {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out)</div>}
+                    {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out) · {mismatchCerts.slice(0, 6).map((c) => { const k = cardOf(c); const why = String((hist.get(c) as Any)?.salesError || "").replace(/^sales came back /, ""); return `${k ? `${name(k)}${k.number ? ` ${k.number}` : ""}` : "?"} (cert ${c}, ${why})`; }).join(" · ")}</div>}
                     {oldRun && <div style={line}>Old-data refresh this visit · {oldRun.asked ? `${oldRun.asked} asked for fresh, ${oldRun.got} answered, ${oldRun.newer} came back newer, ${oldRun.unusable} unusable (kept the old copy)` : "nothing over 6h old"}</div>}
                     {oldest.over12 > 0 && <div style={line}>Over 12h old · {oldest.over12} · oldest: {oldest.list.filter((x) => Date.now() - x.t > 12 * 3600e3).map((x) => `${x.card ? name(x.card) : "?"}${x.card && x.card.number ? ` ${x.card.number}` : ""} (cert ${x.cert}, ${ago(x.t)})`).join(" · ")}</div>}
                     {!anyCertCol && tabs.length > 0 && <div style={hint}>The page looks for a column named "All Cert" (or "Cert", "Certs", "Cert Number") in the {tabs.join(", ")} tabs.</div>}
