@@ -340,6 +340,32 @@ export default function StatsPage() {
   }, []);
 
   /**
+   * Too old to trust: the Worker flagged it stale, or the data it holds was fetched from ALT more
+   * than 6h ago (the Worker doesn't always flag old copies, so the age is checked here too).
+   */
+  const OLD_MS = 6 * 60 * 60 * 1000;
+  const isOld = (r: Any) => !!r && (r.cache === "stale" || (r.cachedAt && Date.now() - Date.parse(r.cachedAt) > OLD_MS));
+  /** On every load (in the background): fetch fresh from ALT any card whose data is too old. */
+  const refreshOld = async (have10: Map<string, Any>, haveP: Map<string, Any>, pairs: Array<{ cert: string; grade: number }>) => {
+    const old10 = [...have10].filter(([, r]) => isOld(r)).map(([c]) => c);
+    const oldP = pairs.filter((p) => isOld(haveP.get(p.cert)));
+    if (!old10.length && !oldP.length) return;
+    try {
+      if (old10.length) {
+        const got = await D.fetchAltHistories(old10, null, { fresh: true });
+        setHist((cur) => { const n = new Map(cur); got.forEach((r, c) => { if (AC.keepable(r)) n.set(c, r); }); return n; });
+        await AC.save(got, 10);
+      }
+      if (oldP.length) {
+        const gradeOf = new Map(oldP.map((p) => [p.cert, p.grade]));
+        const got = await D.fetchAltByGrade(oldP, null, { fresh: true });
+        setHistP((cur) => { const n = new Map(cur); got.forEach((r, c) => { if (AC.keepable(r)) n.set(c, r); }); return n; });
+        await AC.save(got, (c) => gradeOf.get(c) || 10);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  /**
    * Fetch every cert's ALT data again (in the background) and save it. The Worker keeps its own
    * 12h copy: "Refresh now" (force) asks it to go to ALT for everything; the automatic 12h
    * refresh takes the Worker's copy and only forces the ones it reports as stale.
@@ -349,7 +375,7 @@ export default function StatsPage() {
     if (!job || refreshing) return;
     setRefreshing(true);
     const withStale = async (first: Map<string, Any>, again: (stale: string[]) => Promise<Map<string, Any>>) => {
-      const stale = [...first].filter(([, r]) => r && r.cache === "stale").map(([c]) => c);
+      const stale = [...first].filter(([, r]) => isOld(r)).map(([c]) => c);
       if (force || !stale.length) return first;
       const fresh = await again(stale);
       const out = new Map(first);
@@ -505,6 +531,7 @@ export default function StatsPage() {
       setHistPDone(true);
       if (first) setAltAt(Date.now());
       else if (saved.at === null || Date.now() - saved.at > AC.ALT_MAX_AGE) refreshAlt(); // in the background
+      else refreshOld(have10, haveP, pairs); // anything over 6h old, fresh from ALT (in the background)
       // Card images too, so the grid (and the weekly poster) open fully drawn. A slow or broken
       // image gives up after 8s rather than holding the page.
       const urls = [...new Set(all.filter((c: Any) => D.certOf(c)).map((c: Any) => c.image).filter((u: Any) => typeof u === "string" && /^https?:/i.test(u)))] as string[];
