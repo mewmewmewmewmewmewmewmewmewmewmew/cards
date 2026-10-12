@@ -224,7 +224,7 @@ const mono: React.CSSProperties = { fontFamily: "var(--font-data)", letterSpacin
  */
 const Img: React.FC<{ src?: string; w: number; glow?: string }> = ({ src, w, glow }) => (
   <span style={{ flex: "0 0 auto", position: "relative", display: "block", width: w, aspectRatio: "63 / 88" }}>
-    {glow && <span aria-hidden="true" style={{ position: "absolute", left: "-45%", right: "-45%", top: "-25%", bottom: "-35%", background: `radial-gradient(closest-side, ${glow}, transparent)`, pointerEvents: "none" }} />}
+    {glow && <span aria-hidden="true" data-glow="1" style={{ position: "absolute", left: "-45%", right: "-45%", top: "-25%", bottom: "-35%", background: `radial-gradient(closest-side, ${glow}, transparent)`, pointerEvents: "none" }} />}
     {src
       ? <img src={src} data-card={src} alt="" draggable={false} style={{ position: "relative", display: "block", width: "100%", height: "100%", objectFit: "fill", borderRadius: "4.72% / 3.37%", background: "#241a1f", boxShadow: "0 0 0 1px rgba(255,255,255,0.08)" }} />
       : <span style={{ position: "relative", display: "block", width: "100%", height: "100%", borderRadius: "4.72% / 3.37%", background: "#241a1f", boxShadow: "0 0 0 1px rgba(255,255,255,0.08)" }} />}
@@ -590,7 +590,8 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
     const k = box.width / SHOT_W;
     const clone = node.cloneNode(true) as HTMLElement;
     clone.style.transform = "none";
-    clone.querySelectorAll("[data-overlay]").forEach((e) => e.remove()); // it would tint the blocks
+    // Overlays and glows would tint the blocks (a glow over a block hides part of it).
+    clone.querySelectorAll("[data-overlay], [data-glow]").forEach((e) => e.remove());
     const host = document.createElement("div");
     host.style.cssText = "position:fixed;left:-30000px;top:0;pointer-events:none;";
     host.appendChild(clone);
@@ -627,7 +628,16 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
         const b = bb.get(i);
         if (!b || b[2] - b[0] < 4) return;
         const r = el.getBoundingClientRect();
-        out.set(el, { x: (b[0] + b[2] + 1) / 2, y: (b[1] + b[3] + 1) / 2, sx: ((r.left + r.right) / 2 - box.left) / k, sy: ((r.top + r.bottom) / 2 - box.top) / k });
+        const sx = ((r.left + r.right) / 2 - box.left) / k, sy = ((r.top + r.bottom) / 2 - box.top) / k;
+        // A block found smaller than its picture was partly covered by something drawn over it:
+        // place it from whichever found edge is nearer where it sits on screen.
+        const fit = (lo: number, hi: number, size: number, screen: number) => {
+          const mid = (lo + hi + 1) / 2;
+          if (hi - lo + 1 >= size - 2) return mid;
+          const fromLo = lo + size / 2, fromHi = hi + 1 - size / 2;
+          return Math.abs(fromLo - screen) <= Math.abs(fromHi - screen) ? fromLo : fromHi;
+        };
+        out.set(el, { x: fit(b[0], b[2], el.offsetWidth, sx), y: fit(b[1], b[3], el.offsetHeight, sy), sx, sy });
       });
     } catch (e) { console.error(e); }
     finally { host.remove(); }
