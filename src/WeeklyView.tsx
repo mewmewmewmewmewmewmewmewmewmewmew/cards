@@ -637,7 +637,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
           const fromLo = lo + size / 2, fromHi = hi + 1 - size / 2;
           return Math.abs(fromLo - screen) <= Math.abs(fromHi - screen) ? fromLo : fromHi;
         };
-        out.set(el, { x: fit(b[0], b[2], el.offsetWidth, sx), y: fit(b[1], b[3], el.offsetHeight, sy), sx, sy });
+        // The tilted top card's block never matches its untilted size, so it's always placed by its
+        // middle (as before); the edge rule is only for the flat thumbnails.
+        if (el.closest(".wk-float")) out.set(el, { x: (b[0] + b[2] + 1) / 2, y: (b[1] + b[3] + 1) / 2, sx, sy });
+        else out.set(el, { x: fit(b[0], b[2], el.offsetWidth, sx), y: fit(b[1], b[3], el.offsetHeight, sy), sx, sy });
       });
     } catch (e) { console.error(e); }
     finally { host.remove(); }
