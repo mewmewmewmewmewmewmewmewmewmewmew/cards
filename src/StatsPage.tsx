@@ -32,11 +32,11 @@ function savedPw(): string {
   } catch (e) { return ""; }
 }
 const rememberPw = (pw: string) => { try { if (pw) localStorage.setItem(STATS_PW_KEY, JSON.stringify({ pw, at: Date.now() })); else localStorage.removeItem(STATS_PW_KEY); } catch (e) {} };
-const SORTS = ["value", "change", "dchange", "release", "paid"] as const;
-const SORT_LABEL: Record<string, string> = { value: "Value", change: "% Change", dchange: "$ Change", release: "Release", paid: "vs Paid" };
+const SORTS = ["value", "change", "dchange", "release"] as const;
+const SORT_LABEL: Record<string, string> = { value: "Value", change: "% Change", dchange: "$ Change", release: "Release" };
 type SortDir = "asc" | "desc";
 // Direction a sort starts in when picked: highest value/change first, oldest release first.
-const SORT_START: Record<string, SortDir> = { value: "desc", change: "desc", dchange: "desc", release: "asc", paid: "desc" };
+const SORT_START: Record<string, SortDir> = { value: "desc", change: "desc", dchange: "desc", release: "asc" };
 type SortKey = typeof SORTS[number];
 const MODE_KEY = "mew_stats_mode";
 
@@ -270,7 +270,6 @@ export default function StatsPage() {
   const [dir, setDir] = useState<SortDir>(() => readPref("mew_stats_dir", SORT_START[sort], (v) => v === "asc" || v === "desc"));
   const [q, setQ] = useState("");
   useEffect(() => { savePref("mew_stats_sort", sort); }, [sort]);
-  useEffect(() => { if (list !== "personal" && sort === "paid") { setSort("value"); setDir(SORT_START.value); } }, [list, sort]);
   useEffect(() => { savePref("mew_stats_dir", dir); }, [dir]);
   // Click the active sort to flip its direction; a new sort starts in its natural direction.
   const pickSort = (k: SortKey) => {
@@ -672,17 +671,13 @@ export default function StatsPage() {
       value: (a, b) => a.value - b.value,
       change: (a, b) => (a.change ?? 0) - (b.change ?? 0),
       dchange: (a, b) => (a.dchange ?? 0) - (b.dchange ?? 0),
-      paid: (a, b) => (a.vsPaid ?? 0) - (b.vsPaid ?? 0),
       release: (a, b) => D.releaseTs(a.card) - D.releaseTs(b.card),
     };
     const sign = dir === "asc" ? 1 : -1;
-    // "vs paid" (today's price minus what you paid) only exists on Personal; elsewhere sort by value.
-    charted.forEach((x: Any) => { x.vsPaid = x.paid !== null && x.paid !== undefined ? x.value - x.paid : null; });
-    const by: SortKey = sort === "paid" && list !== "personal" ? "value" : sort;
     charted.sort((a, b) => {
-      const key = by === "dchange" ? "dchange" : by === "paid" ? "vsPaid" : "change";
-      if ((by === "change" || by === "dchange" || by === "paid") && (a[key] === null) !== (b[key] === null)) return a[key] === null ? 1 : -1;
-      return sign * cmp[by](a, b);
+      const key = sort === "dchange" ? "dchange" : "change";
+      if ((sort === "change" || sort === "dchange") && (a[key] === null) !== (b[key] === null)) return a[key] === null ? 1 : -1;
+      return sign * cmp[sort](a, b);
     });
     hiddenRows.sort((a, b) => name(a.card).localeCompare(name(b.card), "ja"));
     return { charted, failed, pending, noCert, hidden: hiddenRows };
@@ -922,7 +917,7 @@ export default function StatsPage() {
           <>
             <div style={{ marginTop: narrow ? 24 : 36, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 12, borderBottom: "1px solid var(--line-hairline)" }}>
               <span style={{ ...eyebrow, marginRight: 4 }}>Sort</span>
-              {SORTS.filter((k) => k !== "paid" || showPaid).map((k) => (
+              {SORTS.map((k) => (
                 <button key={k} type="button" onClick={() => pickSort(k)} aria-pressed={sort === k}
                   aria-label={`Sort by ${SORT_LABEL[k]}${sort === k ? (dir === "asc" ? ", ascending" : ", descending") : ""}`} style={pill(sort === k)}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{SORT_LABEL[k]}<SortArrow dir={sort === k ? dir : null} /></span>
@@ -994,7 +989,7 @@ export default function StatsPage() {
                   <span style={{ textAlign: "right" }}>{sales ? "Last sale" : "Value"}</span>
                   <span style={{ textAlign: "right" }}>Change</span>
                   {sales && !narrow && <span style={{ textAlign: "right" }}>Sold</span>}
-                  {showPaid && <button type="button" onClick={() => pickSort("paid")} aria-label="Sort by vs paid" style={{ ...eyebrow, justifySelf: "end", display: "inline-flex", alignItems: "center", gap: 4, padding: 0, border: "none", background: "none", cursor: "pointer", color: sort === "paid" ? "var(--text-title)" : undefined }}>vs paid<SortArrow dir={sort === "paid" ? dir : null} /></button>}
+                  {showPaid && <span style={{ textAlign: "right" }}>vs paid</span>}
                 </div>
               )}
               {shown.map((x: Any) => {
