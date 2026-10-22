@@ -68,6 +68,9 @@ export async function save(results: Map<string, Any>, grade: number | ((cert: st
 
 /* ---------- the sheet (card list + hidden lists), saved like the ALT data ---------- */
 
+// Bumped when the way the sheet is read changes (v2: what you paid), so an older saved copy is
+// fetched again instead of shown without the new fields.
+const SHEET_VERSION = 2;
 export type SavedSheet = { at: number; cards: Any[]; hidden: { all: string[]; personal: string[] } | null; diag: Any };
 
 export async function readSheet(): Promise<SavedSheet | null> {
@@ -75,7 +78,7 @@ export async function readSheet(): Promise<SavedSheet | null> {
     const d = await db();
     const t = d.transaction(META, "readonly");
     const v: Any = await new Promise((ok) => { const r = t.objectStore(META).get("sheet"); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); });
-    return v && Array.isArray(v.cards) && v.cards.length ? (v as SavedSheet) : null;
+    return v && v.version === SHEET_VERSION && Array.isArray(v.cards) && v.cards.length ? (v as SavedSheet) : null;
   } catch (e) { return null; }
 }
 
@@ -83,7 +86,7 @@ export async function saveSheet(v: Omit<SavedSheet, "at"> | null) {
   try {
     const d = await db();
     const t = d.transaction(META, "readwrite");
-    if (v) t.objectStore(META).put({ k: "sheet", at: Date.now(), ...v });
+    if (v) t.objectStore(META).put({ k: "sheet", at: Date.now(), version: SHEET_VERSION, ...v });
     else t.objectStore(META).delete("sheet");
     await done(t);
   } catch (e) {}
