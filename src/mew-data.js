@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "33.7";
+export const APP_VERSION = "33.8";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -133,7 +133,14 @@ export function parseCSV(csv) {
     bgsBL: findIdx("bgsBL", ["bgs bl", "bgs_black_label"]),
     pc: findIdx("pc"),
     certs: findIdx(CERT_HEADERS[0], CERT_HEADERS.slice(1)),
+    paid: findIdx("price paid", ["paid", "purchase price", "bought for", "buy price", "cost", "price"]),
+    paidDate: findIdx("purchase date", ["date purchased", "bought", "purchased", "date bought", "buy date", "date"]),
+    paidCur: findIdx("currency", ["ccy", "cur", "paid currency", "purchase currency"]),
   };
+  // What you paid: column B and the purchase date column C when they aren't named as above.
+  const used = new Set(Object.values(I).filter((j) => j >= 0));
+  if (I.paid < 0 && headers.length > 1 && !used.has(1)) I.paid = 1;
+  if (I.paidDate < 0 && headers.length > 2 && !used.has(2)) I.paidDate = 2;
 
   const out = [];
   for (let r = 1; r < rows.length; r++) {
@@ -178,9 +185,11 @@ export function parseCSV(csv) {
       population: hasPop ? pop : undefined,
       pc: normalizePC(get(I.pc)),
       certs: get(I.certs) || undefined,
+      paid: parsePaid(get(I.paid), get(I.paidCur), get(I.paidDate)),
     });
   }
   out.headers = headers;
+  out.paidColumn = I.paid >= 0 ? headers[I.paid] || "column B" : null;
   out.certColumn = I.certs >= 0;
   return out;
 }
@@ -447,6 +456,45 @@ export function editionLabel(e) {
   if (/^1(st)?\b|first/i.test(v)) return "1ED";
   if (/^unl|^ued$/i.test(v)) return "UED";
   return v.toUpperCase();
+}
+
+/* ---------- what you paid (Personal) ---------- */
+
+// Currency from a code / symbol in the price or the currency column. ¥ is read as yen.
+const CUR_WORDS = [
+  [/\bHKD\b|HK\$/i, "HKD"], [/\bUSD\b|US\$/i, "USD"], [/\bJPY\b|円|\byen\b/i, "JPY"], [/\bCNY\b|\bRMB\b|元|人民币/i, "CNY"],
+  [/\bKRW\b|₩|원/i, "KRW"], [/\bEUR\b|€/i, "EUR"], [/\bGBP\b|£/i, "GBP"], [/\bSGD\b|S\$/i, "SGD"], [/\bAUD\b|A\$/i, "AUD"],
+  [/\bCAD\b|C\$/i, "CAD"], [/\bTWD\b|NT\$/i, "TWD"], [/\bTHB\b|฿/i, "THB"], [/\bCHF\b/i, "CHF"], [/\bMYR\b|\bRM\b/i, "MYR"],
+  [/\bPHP\b|₱/i, "PHP"], [/\bINR\b|₹/i, "INR"], [/\bNZD\b|NZ\$/i, "NZD"], [/¥|￥/, "JPY"], [/\$/, "USD"],
+];
+export function currencyOf(text) {
+  const t = String(text || "");
+  for (const [re, code] of CUR_WORDS) if (re.test(t)) return code;
+  const m = /\b([A-Za-z]{3})\b/.exec(t);
+  return m ? m[1].toUpperCase() : null;
+}
+const MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+const ymd = (y, m, d) => (y > 1990 && m >= 1 && m <= 12 && d >= 1 && d <= 31 ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null);
+/** A purchase date as YYYY-MM-DD: 2024-03-05, 2024/3/5, 3/5/2024 (US), or a sheet date ("Tue Mar 05 2024 …"). */
+export function parseDateCell(text) {
+  const t = String(text || "").trim();
+  if (!t) return null;
+  let m = /(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/.exec(t);
+  if (m) return ymd(+m[1], +m[2], +m[3]);
+  m = /\b([A-Za-z]{3})[a-z]*\.? (\d{1,2}),? (\d{4})/.exec(t);
+  if (m && MON[m[1].toLowerCase()]) return ymd(+m[3], MON[m[1].toLowerCase()], +m[2]);
+  m = /\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b/.exec(t);
+  if (m) return ymd(+m[3], +m[1], +m[2]);
+  return null;
+}
+/** Column B (+ currency column, + date): { amount, currency, date, raw } or undefined. */
+function parsePaid(raw, curCell, dateCell) {
+  const text = String(raw || "").trim();
+  if (!text) return undefined;
+  const num = parseFloat(text.replace(/[^0-9.]/g, "").replace(/^\.+|\.(?=.*\.)/g, ""));
+  if (!isFinite(num) || num <= 0) return undefined;
+  const currency = currencyOf(curCell) || currencyOf(text) || "USD";
+  return { amount: num, currency, date: parseDateCell(dateCell), raw: text };
 }
 
 /** The PSA grade you own (from the sheet's pc column), 1–10, or null (blank, N/A, RAW). */

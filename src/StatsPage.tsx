@@ -4,6 +4,7 @@ import { MewIcon, CameoIcon, IntlIcon } from "./icons";
 import WeeklyView from "./WeeklyView";
 import Loader from "./Loader";
 import * as AC from "./alt-cache";
+import { loadFx, paidUSD, type Fx } from "./fx";
 
 /* ------------------------------------------------------------------ *
  * /stats — PSA 10 prices for every card in the sheet.
@@ -211,6 +212,16 @@ const Edition: React.FC<{ e?: string }> = ({ e }) => (D.editionLabel(e) ? (
   <span style={{ display: "inline-block", boxSizing: "border-box", height: 14, marginLeft: 6, padding: "1px 4px 0", borderRadius: 3, border: "1px solid currentColor", fontSize: 9, lineHeight: "11px", letterSpacing: "0.04em", color: "var(--text-faint)", verticalAlign: "middle", textAlign: "center" }}>{D.editionLabel(e)}</span>
 ) : null);
 
+/** Personal: the difference between today's price and what you paid, green when up, red when down. */
+const PaidLine: React.FC<{ paid: number; value: number }> = ({ paid, value }) => {
+  const d = value - paid, pct = paid > 0 ? (d / paid) * 100 : null;
+  return (
+    <span title={`paid ${fmtUSD(paid)}`} style={{ marginTop: -4, fontFamily: "var(--font-data)", fontSize: "var(--web-label)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: d >= 0 ? "#22a06b" : "#e5484d" }}>
+      {d >= 0 ? "▲ +" : "▼ −"}{fmtUSD(Math.abs(d))} ({fmtPct(pct)}) <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>vs paid</span>
+    </span>
+  );
+};
+
 const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "var(--web-small)" }) => (
   <span style={{ fontFamily: "var(--font-data)", fontSize: size, fontWeight: 600, color: pct !== null && pct > 0 ? "var(--text-accent)" : "var(--text-muted)" }}>
     {pct !== null && pct > 0 ? "▲ " : pct !== null && pct < 0 ? "▼ " : ""}{fmtPct(pct)}
@@ -244,6 +255,9 @@ export default function StatsPage() {
   const [histP, setHistP] = useState<Map<string, Any>>(new Map());
   const [histPDone, setHistPDone] = useState(false);
   const [pTotal, setPTotal] = useState(0); // personal (non-10) certs to fetch
+  // Exchange rates for what you paid (column B), loaded for the currencies your owned cards use.
+  const [fx, setFx] = useState<Fx>(null);
+  const [fxFailed, setFxFailed] = useState(false);
   // Saved ALT data: when the last full refresh finished, and whether one is running now.
   const [altAt, setAltAt] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -584,6 +598,15 @@ export default function StatsPage() {
 
   const name = (c: Any) => (lang === "JP" ? (c.nameJP || c.nameEN) : (c.nameEN || c.nameJP));
   const today = todayISO();
+  useEffect(() => {
+    const owned = cards.filter((c: Any) => c.paid && D.pcGrade(c) !== null);
+    const curs = [...new Set(owned.map((c: Any) => c.paid.currency))].filter((c) => c !== "USD") as string[];
+    if (!curs.length) { setFx({ rates: {}, dates: [] }); return; }
+    const from = owned.map((c: Any) => c.paid.date).filter(Boolean).sort()[0] || shiftDate(todayISO(), 7);
+    let live = true;
+    loadFx(curs, from).then((f) => { if (!live) return; setFx(f); setFxFailed(!f); });
+    return () => { live = false; };
+  }, [cards]);
 
   // One row per cert (the sheet can list the same card in more than one tab).
   const rows = useMemo(() => {
@@ -640,7 +663,8 @@ export default function StatsPage() {
       const base = before ? before.value : pts.length > 1 ? pts[0].value : null;
       const change = pts.length && base && base > 0 ? ((pts[pts.length - 1].value - base) / base) * 100 : null;
       const dchange = change === null || base === null ? null : pts[pts.length - 1].value - base; // in dollars
-      charted.push({ card, cert, grade, r, series, pts, lead, tail, last, value, change, dchange, domain: [start, today] as [string, string] });
+      const paid = personal ? paidUSD(fx, card.paid) : null; // what you paid, in USD
+      charted.push({ card, cert, grade, r, series, pts, lead, tail, last, value, change, dchange, paid, domain: [start, today] as [string, string] });
     });
     // Ascending comparators; cards with no change ("—") always go last.
     const cmp: Record<SortKey, (a: Any, b: Any) => number> = {
@@ -658,7 +682,7 @@ export default function StatsPage() {
     hiddenRows.sort((a, b) => name(a.card).localeCompare(name(b.card), "ja"));
     return { charted, failed, pending, noCert, hidden: hiddenRows };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, hist, histP, list, range, sort, dir, lang, mode, today, scope, hiddenSet]);
+  }, [cards, hist, histP, list, range, sort, dir, lang, mode, today, scope, hiddenSet, fx]);
 
   // Search box: filters the cards listed below (not the total).
   const matches = (x: Any) => {
@@ -720,6 +744,13 @@ export default function StatsPage() {
     return { over12: rows.filter((x) => Date.now() - x.t > 12 * 3600e3).length, list: rows.slice(0, 5) };
   }, [hist, cards]);
 
+  // Personal: what the charted cards cost (in USD) against what they're worth now.
+  const costs = useMemo(() => {
+    const withPaid = rows.charted.filter((x: Any) => x.paid !== null && x.paid !== undefined);
+    const paid = withPaid.reduce((a: number, x: Any) => a + x.paid, 0);
+    const worth = withPaid.reduce((a: number, x: Any) => a + x.value, 0);
+    return { n: withPaid.length, paid, worth };
+  }, [rows]);
   /* ---------- gate: password, then loading until all ALT data is in ---------- */
   const allLoaded = histDone && histPDone && imgs.finished;
   if ((phase !== "ready" && phase !== "error") || (phase === "ready" && !allLoaded)) {
@@ -832,11 +863,12 @@ export default function StatsPage() {
                   {sel ? (
                     <>
                       {sales ? `last sale ${fmtDate(sel.last.date)}${sel.last.house ? ` · ${sel.last.house}` : ""} · ${sel.series.length} sale${sel.series.length === 1 ? "" : "s"} · ` : ""}
+                      {list === "personal" && sel.paid !== null && sel.paid !== undefined ? `paid ${fmtUSD(sel.paid)}${sel.card.paid && sel.card.paid.currency !== "USD" ? ` (${sel.card.paid.raw})` : ""}${sel.card.paid && sel.card.paid.date ? ` on ${fmtDate(sel.card.paid.date)}` : ""} · ${sel.value >= sel.paid ? "+" : "−"}${fmtUSD(Math.abs(sel.value - sel.paid))} (${fmtPct(sel.paid > 0 ? ((sel.value - sel.paid) / sel.paid) * 100 : null)}) · ` : ""}
                       cert {sel.cert}{sel.r.grade && parseFloat(sel.r.grade) !== 10 ? ` · grade ${sel.r.grade}` : ""}
                       {sel.r.assetId && <> · <a href={`https://alt.xyz/itm/${sel.r.assetId}/research`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-accent)" }}>ALT ↗</a></>}
                     </>
                   ) : (
-                    `${rows.charted.length} card${rows.charted.length === 1 ? "" : "s"}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} ${total.backfilled === 1 ? "counts at its" : "count at their"} first ${sales ? "sale" : "value"} until then` : ""}`
+                    `${rows.charted.length} card${rows.charted.length === 1 ? "" : "s"}${list === "personal" && costs.n ? ` · paid ${fmtUSD(costs.paid)} for ${costs.n === rows.charted.length ? "them" : `${costs.n} of them`} · ${costs.worth >= costs.paid ? "+" : "−"}${fmtUSD(Math.abs(costs.worth - costs.paid))} (${fmtPct(costs.paid > 0 ? ((costs.worth - costs.paid) / costs.paid) * 100 : null)})` : ""}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} ${total.backfilled === 1 ? "counts at its" : "count at their"} first ${sales ? "sale" : "value"} until then` : ""}`
                   )}
                 </div>
                 </div>
@@ -927,6 +959,7 @@ export default function StatsPage() {
                       <Change pct={x.change} size="var(--web-label)" />
                     </span>
                     {sales && <span style={{ ...faint, marginTop: -4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>last sale {fmtDate(x.last.date)}</span>}
+                    {list === "personal" && x.paid !== null && x.paid !== undefined && <PaidLine paid={x.paid} value={x.value} />}
                   </button>
                   {hiddenSet && (
                     <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), true)} aria-label={`Hide ${name(x.card)} from totals`} title="Hide from totals" data-hover-pink="1"
@@ -965,7 +998,7 @@ export default function StatsPage() {
                       <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : "", list === "personal" && x.paid !== null && x.paid !== undefined ? `paid ${fmtUSD(x.paid)}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                       {!narrow && <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} height={28} />}
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{fmtUSD(x.value)}</span>
@@ -1049,6 +1082,16 @@ export default function StatsPage() {
                     {diag && <div style={line}>ALT API · {diag.requests} request{diag.requests === 1 ? "" : "s"}, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
                     {diagP && <div style={line}>Personal (owned grades below PSA 10) · {diagP.requests} request{diagP.requests === 1 ? "" : "s"}, {diagP.ok} answered{diagP.errors.length ? ` · ${diagP.errors.length} error${diagP.errors.length === 1 ? "" : "s"}: ${[...new Set(diagP.errors as string[])].join("; ")}` : ""}</div>}
                     <div style={line}>Personal · {cards.filter((c: Any) => D.pcGrade(c) !== null).length} sheet rows with a PSA grade in pc</div>
+                    {(() => {
+                      const owned = cards.filter((c: Any) => D.pcGrade(c) !== null);
+                      const priced = owned.filter((c: Any) => c.paid);
+                      if (!priced.length) return <div style={line}>Paid prices · none found (column B, or a "Price paid" column)</div>;
+                      const byCur: Record<string, number> = {};
+                      priced.forEach((c: Any) => { byCur[c.paid.currency] = (byCur[c.paid.currency] || 0) + 1; });
+                      const noRate = priced.filter((c: Any) => paidUSD(fx, c.paid) === null);
+                      const noDate = priced.filter((c: Any) => c.paid.currency !== "USD" && !c.paid.date).length;
+                      return <div style={line}>Paid prices · {priced.length} of {owned.length} owned rows · {Object.entries(byCur).map(([k, v]) => `${k} ${v}`).join(", ")}{fxFailed ? " · exchange rates couldn't load" : noRate.length ? ` · ${noRate.length} can't be converted (${[...new Set(noRate.map((c: Any) => c.paid.currency))].join(", ")})` : ""}{noDate ? ` · ${noDate} without a purchase date use today's rate` : ""}</div>;
+                    })()}
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
                     {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out) · {mismatchCerts.slice(0, 6).map((c) => { const k = cardOf(c); const why = String((hist.get(c) as Any)?.salesError || "").replace(/^sales came back /, ""); return `${k ? `${name(k)}${k.number ? ` ${k.number}` : ""}` : "?"} (cert ${c}, ${why})`; }).join(" · ")}</div>}
