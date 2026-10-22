@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "34.0";
+export const APP_VERSION = "34.1";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -137,10 +137,24 @@ export function parseCSV(csv) {
     paidDate: findIdx("purchase date", ["date purchased", "bought", "purchased", "date bought", "buy date", "date"]),
     paidCur: findIdx("currency", ["ccy", "cur", "paid currency", "purchase currency"]),
   };
-  // What you paid: column B and the purchase date column C when they aren't named as above.
+  // What you paid, when the columns aren't named as above: the price is column B, and the
+  // currency and purchase date are the nearby columns whose cells look like currency codes and
+  // dates (so moving them around doesn't break anything).
   const used = new Set(Object.values(I).filter((j) => j >= 0));
-  if (I.paid < 0 && headers.length > 1 && !used.has(1)) I.paid = 1;
-  if (I.paidDate < 0 && headers.length > 2 && !used.has(2)) I.paidDate = 2;
+  if (I.paid < 0 && headers.length > 1 && !used.has(1)) { I.paid = 1; used.add(1); }
+  if (I.paid >= 0 && (I.paidCur < 0 || I.paidDate < 0)) {
+    const sample = rows.slice(1, 80);
+    const share = (j, test) => {
+      const vals = sample.map((r) => String(r[j] || "").trim()).filter(Boolean);
+      return vals.length ? vals.filter(test).length / vals.length : 0;
+    };
+    const isCode = (v) => /^[A-Za-z]{3}$|^(RMB|US\$|HK\$|[¥￥$€£₩]|円|元)$/i.test(v);
+    for (let j = I.paid + 1; j <= Math.min(headers.length - 1, I.paid + 4); j++) {
+      if (used.has(j)) continue;
+      if (I.paidCur < 0 && share(j, isCode) >= 0.6) { I.paidCur = j; used.add(j); continue; }
+      if (I.paidDate < 0 && share(j, (v) => !!parseDateCell(v)) >= 0.6) { I.paidDate = j; used.add(j); }
+    }
+  }
 
   const out = [];
   for (let r = 1; r < rows.length; r++) {
@@ -189,7 +203,8 @@ export function parseCSV(csv) {
     });
   }
   out.headers = headers;
-  out.paidColumn = I.paid >= 0 ? headers[I.paid] || "column B" : null;
+  const colName = (j) => (j >= 0 ? `${String.fromCharCode(65 + (j % 26))}${headers[j] ? ` "${headers[j]}"` : ""}` : "none");
+  out.paidColumns = I.paid >= 0 ? { price: colName(I.paid), currency: colName(I.paidCur), date: colName(I.paidDate) } : null;
   out.certColumn = I.certs >= 0;
   return out;
 }

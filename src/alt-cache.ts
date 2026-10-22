@@ -69,8 +69,8 @@ export async function save(results: Map<string, Any>, grade: number | ((cert: st
 /* ---------- the sheet (card list + hidden lists), saved like the ALT data ---------- */
 
 // Bumped when the way the sheet is read changes (v2: what you paid), so an older saved copy is
-// fetched again instead of shown without the new fields.
-const SHEET_VERSION = 2;
+// fetched again instead of shown without the new fields (v3: currency column).
+const SHEET_VERSION = 3;
 export type SavedSheet = { at: number; cards: Any[]; hidden: { all: string[]; personal: string[] } | null; diag: Any };
 
 export async function readSheet(): Promise<SavedSheet | null> {
