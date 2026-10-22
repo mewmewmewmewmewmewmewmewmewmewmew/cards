@@ -217,7 +217,7 @@ const PaidLine: React.FC<{ paid: number; value: number }> = ({ paid, value }) =>
   const d = value - paid, pct = paid > 0 ? (d / paid) * 100 : null;
   return (
     <span title={`paid ${fmtUSD(paid)}`} style={{ marginTop: -4, fontFamily: "var(--font-data)", fontSize: "var(--web-label)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: d >= 0 ? "#22a06b" : "#e5484d" }}>
-      {d >= 0 ? "▲ +" : "▼ −"}{fmtUSD(Math.abs(d))} ({fmtPct(pct)}) <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>vs paid</span>
+      {d >= 0 ? "▲ +" : "▼ −"}{fmtUSD(Math.abs(d))} ({fmtPct(pct)}) <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>P/L</span>
     </span>
   );
 };
@@ -778,7 +778,7 @@ export default function StatsPage() {
   }
 
   const pad = narrow ? 16 : 32;
-  // Personal adds a "vs paid" column (today's price minus what you paid).
+  // Personal adds a "P/L" column (today's price minus what you paid).
   const showPaid = list === "personal" && rows.charted.some((x: Any) => x.paid !== null && x.paid !== undefined);
   const listCols = narrow ? `24px minmax(0,1fr) auto 64px${showPaid ? " 76px" : ""}` : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}${showPaid ? " 150px" : ""}`;
   const noMatch = q.trim() && rows.charted.length > 0 && shown.length === 0 ? (
@@ -989,7 +989,7 @@ export default function StatsPage() {
                   <span style={{ textAlign: "right" }}>{sales ? "Last sale" : "Value"}</span>
                   <span style={{ textAlign: "right" }}>Change</span>
                   {sales && !narrow && <span style={{ textAlign: "right" }}>Sold</span>}
-                  {showPaid && <span style={{ textAlign: "right" }}>vs paid</span>}
+                  {showPaid && <span style={{ textAlign: "right" }}>P/L</span>}
                 </div>
               )}
               {shown.map((x: Any) => {
