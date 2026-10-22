@@ -778,7 +778,9 @@ export default function StatsPage() {
   }
 
   const pad = narrow ? 16 : 32;
-  const listCols = narrow ? "24px minmax(0,1fr) auto 64px" : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}`;
+  // Personal adds a "vs paid" column (today's price minus what you paid).
+  const showPaid = list === "personal" && rows.charted.some((x: Any) => x.paid !== null && x.paid !== undefined);
+  const listCols = narrow ? `24px minmax(0,1fr) auto 64px${showPaid ? " 76px" : ""}` : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}${showPaid ? " 150px" : ""}`;
   const noMatch = q.trim() && rows.charted.length > 0 && shown.length === 0 ? (
     <div style={{ gridColumn: "1 / -1", padding: "32px 16px", textAlign: "center", border: "1px dashed var(--line-strong)", ...eyebrow }}>No cards match "{q.trim()}"</div>
   ) : null;
@@ -987,6 +989,7 @@ export default function StatsPage() {
                   <span style={{ textAlign: "right" }}>{sales ? "Last sale" : "Value"}</span>
                   <span style={{ textAlign: "right" }}>Change</span>
                   {sales && !narrow && <span style={{ textAlign: "right" }}>Sold</span>}
+                  {showPaid && <span style={{ textAlign: "right" }}>vs paid</span>}
                 </div>
               )}
               {shown.map((x: Any) => {
@@ -998,12 +1001,17 @@ export default function StatsPage() {
                       <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : "", list === "personal" && x.paid !== null && x.paid !== undefined ? `paid ${fmtUSD(x.paid)}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                       {!narrow && <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} height={28} />}
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{fmtUSD(x.value)}</span>
                       <span style={{ textAlign: "right", whiteSpace: "nowrap" }}><Change pct={x.change} size="var(--web-label)" /></span>
                       {sales && !narrow && <span style={{ ...faint, textAlign: "right", whiteSpace: "nowrap" }}>{fmtDate(x.last.date)}</span>}
+                      {showPaid && (x.paid !== null && x.paid !== undefined
+                        ? <span title={`paid ${fmtUSD(x.paid)}`} style={{ textAlign: "right", whiteSpace: "nowrap", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", fontWeight: 600, color: x.value >= x.paid ? "#22a06b" : "#e5484d" }}>
+                            {x.value >= x.paid ? "+" : "−"}{fmtUSD(Math.abs(x.value - x.paid))}{narrow ? "" : ` (${fmtPct(x.paid > 0 ? ((x.value - x.paid) / x.paid) * 100 : null)})`}
+                          </span>
+                        : <span style={{ ...faint, textAlign: "right" }}>—</span>)}
                     </button>
                     {hiddenSet && (
                       <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), true)} aria-label={`Hide ${name(x.card)} from totals`} title="Hide from totals" data-hover-pink="1"
