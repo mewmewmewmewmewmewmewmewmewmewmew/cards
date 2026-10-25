@@ -7,7 +7,7 @@ import Loader from "./Loader";
 
 /* ------------------------------------------------------------------ *
  * Weekly view of /stats (/stats/#weekly) — a one-page infographic of the week's biggest PSA 10 moves.
- * The week is Monday–Sunday: the latest one ending on or before today,
+ * The week is Monday–Sunday: the latest one that has fully ended in your own time zone,
  * so the page renews itself every Monday (arrows browse earlier weeks).
  * Same data and password as /stats: the sheet's certs ("all cert"), the
  * ALT Worker's PSA 10 sales or daily ALT value, minus cards hidden in
@@ -44,7 +44,8 @@ const fmtPct = (p: number) => `${p > 0 ? "+" : p < 0 ? "−" : ""}${Math.abs(p).
 const fmtDay = (iso: string, year = false) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}), timeZone: "UTC" });
 /** "09/28", "10/04" */
 const fmtMD = (iso: string) => { const [, m, d] = iso.split("-"); return `${m}/${d}`; };
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// Today in the viewer's time zone (toISOString would give the UTC date, a day ahead in the evening).
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
@@ -397,7 +398,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   const [logoSrc, setLogoSrc] = useState("/assets/mew-logo.png");
   useEffect(() => { getTintedLogo().then(setLogoSrc); }, []);
   const [vw, setVw] = useState(() => [window.innerWidth, window.innerHeight]);
-  const latest = sundayOf(todayISO());
+  const latest = sundayOf(addDays(todayISO(), -1)); // a Sunday counts once it's over
   const [end, setEnd] = useState(latest);
   const start = addDays(end, -6);
   const animStart = useMemo(() => performance.now(), [end, mode, fmt]); // eslint-disable-line react-hooks/exhaustive-deps
