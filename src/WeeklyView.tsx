@@ -7,7 +7,7 @@ import Loader from "./Loader";
 
 /* ------------------------------------------------------------------ *
  * Weekly view of /stats (/stats/#weekly) — a one-page infographic of the week's biggest PSA 10 moves.
- * The week is Monday–Sunday: the latest one that has fully ended in your own time zone,
+ * The week is Monday–Sunday (UTC dates, like the sales): the latest one that has fully ended,
  * so the page renews itself every Monday (arrows browse earlier weeks).
  * Same data and password as /stats: the sheet's certs ("all cert"), the
  * ALT Worker's PSA 10 sales or daily ALT value, minus cards hidden in
@@ -44,8 +44,7 @@ const fmtPct = (p: number) => `${p > 0 ? "+" : p < 0 ? "−" : ""}${Math.abs(p).
 const fmtDay = (iso: string, year = false) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}), timeZone: "UTC" });
 /** "09/28", "10/04" */
 const fmtMD = (iso: string) => { const [, m, d] = iso.split("-"); return `${m}/${d}`; };
-// Today in the viewer's time zone (toISOString would give the UTC date, a day ahead in the evening).
-const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const todayISO = () => new Date().toISOString().slice(0, 10); // UTC
 function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
