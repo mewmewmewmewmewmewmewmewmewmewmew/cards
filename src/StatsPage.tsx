@@ -236,31 +236,69 @@ const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "
 
 const field: React.CSSProperties = { boxSizing: "border-box", width: "100%", padding: "8px 10px", background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: "var(--web-radius-sm)", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-title)", outline: "none" };
 const CERTS_HINT = "One cert per line (or separated by commas). Add a grade after a cert for anything that isn't a PSA 10, e.g. 12345678 9.";
+const errText = (e: Any) => (e && e.message === "cancelled" ? "" : (e && e.message) || "Couldn't save.");
 
-/** Name + certs form, for a new list and for editing one. */
-const ListForm: React.FC<{ name: string; text: string; submit: string; onSave: (name: string, items: CL.Item[]) => void; onCancel?: () => void }> = ({ name, text, submit, onSave, onCancel }) => {
+/** Name, link id and certs, for a new list and for editing one. onSave throws to show an error. */
+const ListForm: React.FC<{ name: string; id: string; text: string; submit: string; isNew?: boolean; onSave: (name: string, id: string, items: CL.Item[]) => Promise<void>; onCancel?: () => void }> = ({ name, id, text, submit, isNew, onSave, onCancel }) => {
   const [n, setN] = useState(name);
+  const [linkId, setLinkId] = useState(id);
+  const [touched, setTouched] = useState(!isNew); // a new list's link follows its name until edited
   const [t, setT] = useState(text);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   const items = useMemo(() => CL.parseCerts(t), [t]);
+  const shownId = touched ? linkId : n.trim() ? CL.slugify(n) : "";
+  const idOk = CL.ID_RE.test(shownId);
+  const ready = items.length > 0 && idOk && !busy;
+  const submitForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ready) return;
+    setBusy(true); setErr("");
+    try { await onSave(n.trim() || "Untitled list", shownId, items); } catch (x) { setErr(errText(x)); }
+    setBusy(false);
+  };
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (items.length) onSave(n.trim() || "Untitled list", items); }} style={{ display: "grid", gap: 10 }}>
+    <form onSubmit={submitForm} style={{ display: "grid", gap: 10 }}>
       <input value={n} onChange={(e) => setN(e.target.value)} placeholder="List name" aria-label="List name" maxLength={80} style={{ ...field, fontFamily: "var(--font-body)" }} />
+      <label style={{ ...field, display: "flex", alignItems: "center", gap: 0, padding: 0, overflow: "hidden" }}>
+        <span style={{ padding: "8px 0 8px 10px", color: "var(--text-faint)", whiteSpace: "nowrap" }}>/stats/custom/#</span>
+        <input value={shownId} onChange={(e) => { setTouched(true); setLinkId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 40)); }} placeholder="list-link" aria-label="Link"
+          style={{ flex: 1, minWidth: 0, padding: "8px 10px 8px 0", border: "none", outline: "none", background: "transparent", font: "inherit", color: "var(--text-title)" }} />
+      </label>
       <textarea value={t} onChange={(e) => setT(e.target.value)} placeholder={"12345678\n87654321 9"} aria-label="Certs" rows={8} style={{ ...field, resize: "vertical", lineHeight: 1.5 }} />
       <div style={{ ...faint, lineHeight: 1.5 }}>{CERTS_HINT}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <button type="submit" disabled={!items.length} style={{ ...pill(true), opacity: items.length ? 1 : 0.5, cursor: items.length ? "pointer" : "default" }}>{submit}</button>
+        <button type="submit" disabled={!ready} style={{ ...pill(true), opacity: ready ? 1 : 0.5, cursor: ready ? "pointer" : "default" }}>{busy ? "Saving…" : submit}</button>
         {onCancel && <button type="button" onClick={onCancel} style={pill(false)}>Cancel</button>}
-        <span style={faint}>{items.length} cert{items.length === 1 ? "" : "s"}{items.some((it) => it.grade !== 10) ? ` · ${items.filter((it) => it.grade !== 10).length} below PSA 10` : ""}</span>
+        <span style={faint}>{items.length} cert{items.length === 1 ? "" : "s"}{items.some((it) => it.grade !== 10) ? ` · ${items.filter((it) => it.grade !== 10).length} below PSA 10` : ""}{shownId && !idOk ? " · the link needs a–z, 0–9 or dashes" : ""}</span>
       </div>
+      {err && <div role="alert" style={{ ...faint, color: "var(--text-accent)" }}>{err}</div>}
     </form>
   );
 };
 
-const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow: boolean; open: (id: string) => void }> = ({ theme, setTheme, narrow, open }) => {
-  const [lists, setLists] = useState<CL.List[]>(() => CL.readLists());
-  const [adding, setAdding] = useState(() => CL.readLists().length === 0);
+const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow: boolean; lists: CL.List[]; status: "cached" | "live" | "error"; missing: string; setLists: (l: CL.List[]) => void; open: (id: string) => void }> = ({ theme, setTheme, narrow, lists, status, missing, setLists, open }) => {
+  const [adding, setAdding] = useState(false);
+  const [legacy, setLegacy] = useState<CL.List[]>(() => CL.readLegacy());
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   useEffect(() => { document.title = "mew cards · custom lists"; D.trackEvent("custom_hub_view"); }, []);
+  const names = CL.knownNames();
   const pad = narrow ? 16 : 32;
+  const upload = async () => {
+    setBusy(true); setErr("");
+    try {
+      let all = lists;
+      for (const l of legacy) {
+        const taken = new Set(all.map((x) => x.id));
+        let id = CL.slugify(l.name);
+        for (let k = 2; taken.has(id); k++) id = `${CL.slugify(l.name).slice(0, 36)}-${k}`;
+        all = await CL.saveList({ ...l, id }, { isNew: true });
+      }
+      setLists(all); CL.clearLegacy(); setLegacy([]);
+    } catch (e) { setErr(errText(e)); }
+    setBusy(false);
+  };
   return (
     <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: `${narrow ? 20 : 28}px ${pad}px 64px`, boxSizing: "border-box" }}>
@@ -273,32 +311,50 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
           </div>
         </div>
         <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: narrow ? "var(--web-h2)" : "var(--web-h1)", lineHeight: "var(--web-leading-tight)", color: "var(--text-title)" }}>Custom lists</h1>
-        <div style={{ ...faint, marginTop: 8, lineHeight: 1.5 }}>Lists of PSA certs, charted like the stats page. Saved in this browser; use Share on a list to open it somewhere else.</div>
+        <div style={{ ...faint, marginTop: 8, lineHeight: 1.5 }}>Lists of PSA certs, charted like the stats page. Each one opens at its own link.</div>
+        {missing && status !== "cached" && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>There's no list at #{missing}.</div>}
+        {status === "error" && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>Couldn't load the lists{lists.length ? ", showing the last copy seen here" : ""}. Refresh to try again.</div>}
 
         <div style={{ marginTop: narrow ? 24 : 36, display: "flex", alignItems: "center", gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line-hairline)" }}>
-          <span style={eyebrow}>{lists.length} list{lists.length === 1 ? "" : "s"}</span>
+          <span style={eyebrow}>{status === "cached" && !lists.length ? "Loading…" : `${lists.length} list${lists.length === 1 ? "" : "s"}`}</span>
           {!adding && <button type="button" onClick={() => setAdding(true)} style={{ ...pill(true), marginLeft: "auto" }}>+ New list</button>}
         </div>
+        {legacy.length > 0 && (
+          <div style={{ ...faint, marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            {legacy.length} list{legacy.length === 1 ? "" : "s"} saved only in this browser ({legacy.map((l) => l.name).join(", ")})
+            <button type="button" disabled={busy} onClick={upload} style={pill(false)}>{busy ? "Adding…" : "Add to the lists"}</button>
+            <button type="button" onClick={() => { if (window.confirm("Forget the lists saved only in this browser?")) { CL.clearLegacy(); setLegacy([]); } }} style={pill(false)}>Discard</button>
+          </div>
+        )}
+        {err && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>{err}</div>}
         {adding && (
           <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
             <div style={{ ...eyebrow, marginBottom: 10 }}>New list</div>
-            <ListForm name="" text="" submit="Create list" onCancel={lists.length ? () => setAdding(false) : undefined}
-              onSave={(name, items) => { const l = { id: CL.newId(), name, items, at: Date.now() }; CL.saveList(l); D.trackEvent("custom_list_create", { certs: items.length }); open(l.id); }} />
+            <ListForm name="" id="" text="" submit="Create list" isNew onCancel={() => setAdding(false)}
+              onSave={async (name, id, items) => {
+                const all = await CL.saveList({ id, name, items, at: Date.now() }, { isNew: true });
+                setLists(all);
+                D.trackEvent("custom_list_create", { certs: items.length });
+                open(id);
+              }} />
           </section>
         )}
         <div style={{ marginTop: 16, display: "grid", gap: narrow ? 10 : 14, gridTemplateColumns: `repeat(auto-fill, minmax(${narrow ? 260 : 300}px, 1fr))` }}>
           {lists.map((l) => {
-            const names = [...new Set(l.items.map((it) => it.name).filter(Boolean))] as string[];
+            const seen = [...new Set(l.items.map((it) => names[it.cert] || it.name).filter(Boolean))] as string[];
             return (
               <div key={l.id} style={{ position: "relative", minWidth: 0 }}>
                 <a href={`#${l.id}`} onClick={(e) => { e.preventDefault(); open(l.id); }}
                   style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", boxSizing: "border-box", padding: 14, textDecoration: "none", background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 56 }}>{l.name}</span>
-                  <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)" }}>{l.items.length} cert{l.items.length === 1 ? "" : "s"}</span>
-                  {names.length > 0 && <span style={{ ...faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{names.slice(0, 6).join(" · ")}</span>}
+                  <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)" }}>#{l.id} · {l.items.length} cert{l.items.length === 1 ? "" : "s"}</span>
+                  {seen.length > 0 && <span style={{ ...faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{seen.slice(0, 6).join(" · ")}</span>}
                 </a>
-                <button type="button" onClick={() => { if (window.confirm(`Delete "${l.name}"?`)) { CL.deleteList(l.id); setLists(CL.readLists()); } }} data-hover-pink="1"
-                  style={{ ...eyebrow, position: "absolute", top: 12, right: 12, cursor: "pointer", background: "none", border: "none", padding: 4 }}>Delete</button>
+                <button type="button" data-hover-pink="1" onClick={async () => {
+                  if (!window.confirm(`Delete "${l.name}"? This removes it for everyone.`)) return;
+                  setErr("");
+                  try { setLists(await CL.deleteList(l.id)); } catch (e) { setErr(errText(e)); }
+                }} style={{ ...eyebrow, position: "absolute", top: 12, right: 12, cursor: "pointer", background: "none", border: "none", padding: 4 }}>Delete</button>
               </div>
             );
           })}
@@ -311,16 +367,14 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
 /* ---------- page ---------- */
 
 export default function StatsPage() {
-  // /stats/custom: the hub (no hash), a saved list (#<id>) or a shared one (#share=…).
+  // /stats/custom: the hub (no hash) or a list (#<id>). The lists come from /api/lists (shown
+  // from the copy last seen here until they arrive).
   const custom = /^\/stats\/custom(\/|$)/.test(location.pathname);
-  const listFromHash = (): CL.List | null => {
-    if (!custom) return null;
-    const sh = CL.readShare(location.hash);
-    if (sh) return { id: "shared", name: sh.name, items: sh.items, at: 0 };
-    const id = location.hash.replace(/^#/, "");
-    return id ? CL.getList(id) : null;
-  };
-  const [clist, setClist] = useState<CL.List | null>(listFromHash);
+  const idFromHash = () => { try { return decodeURIComponent(location.hash.replace(/^#/, "")); } catch (e) { return ""; } };
+  const [lists, setLists] = useState<CL.List[]>(() => (custom ? CL.readCached() : []));
+  const [listsStatus, setListsStatus] = useState<"cached" | "live" | "error">("cached");
+  const [hashId, setHashId] = useState(() => (custom ? idFromHash() : ""));
+  const clist = useMemo(() => (custom && hashId ? lists.find((l) => l.id === hashId) || null : null), [lists, hashId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [theme, setTheme] = useState<string>(() => (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
@@ -696,7 +750,8 @@ export default function StatsPage() {
   // Custom lists: follow the hash (hub ⇄ a list), and load a list whenever its certs change.
   useEffect(() => {
     if (!custom) return;
-    const on = () => { setClist(listFromHash()); setEditing(false); };
+    CL.fetchLists().then((l) => { setLists(l); setListsStatus("live"); }).catch(() => setListsStatus("error"));
+    const on = () => { setHashId(idFromHash()); setEditing(false); };
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -705,18 +760,18 @@ export default function StatsPage() {
     if (!custom || !clist) return;
     resetData();
     load("", clist);
-    D.trackEvent("custom_list_view", { certs: clist.items.length, shared: clist.id === "shared" });
+    D.trackEvent("custom_list_view", { certs: clist.items.length });
   }, [clistKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Remember the names found, for the hub.
   useEffect(() => {
-    if (!clist || clist.id === "shared") return;
+    if (!clist) return;
     const names = new Map<string, string>();
     cards.forEach((c: Any) => {
       const cert = D.certOf(c), r = cert ? (c.customGrade === 10 ? hist : histP).get(cert) : null;
       const n = c.nameEN || c.nameJP || (r && r.subject);
       if (cert && n) names.set(cert, n);
     });
-    if (names.size) CL.rememberNames(clist.id, names);
+    if (names.size) CL.rememberNames(names);
   }, [cards, hist, histP]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -899,7 +954,9 @@ export default function StatsPage() {
     const worth = withPaid.reduce((a: number, x: Any) => a + x.value, 0);
     return { n: withPaid.length, paid, worth };
   }, [rows]);
-  if (custom && !clist) return <CustomHub theme={theme} setTheme={setTheme} narrow={narrow} open={(id) => { location.hash = id; }} />;
+  if (custom && !clist && !(hashId && listsStatus === "cached")) {
+    return <CustomHub theme={theme} setTheme={setTheme} narrow={narrow} lists={lists} status={listsStatus} missing={hashId} setLists={setLists} open={(id) => { location.hash = id; }} />;
+  }
 
   /* ---------- gate: password, then loading until all ALT data is in ---------- */
   const allLoaded = histDone && histPDone && imgs.finished;
@@ -963,7 +1020,7 @@ export default function StatsPage() {
             <>
               <a href="/stats/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Stats</a>
               <span aria-hidden="true" style={{ ...eyebrow, marginLeft: -4, marginRight: -4 }}>・</span>
-              <a href="/stats/custom/" onClick={(e) => { e.preventDefault(); history.pushState(null, "", location.pathname); setClist(null); setEditing(false); }} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>All lists</a>
+              <a href="/stats/custom/" onClick={(e) => { e.preventDefault(); history.pushState(null, "", location.pathname); setHashId(""); setEditing(false); }} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>All lists</a>
             </>
           ) : (
             <>
@@ -994,14 +1051,12 @@ export default function StatsPage() {
           {custom && clist && (
             <div role="group" aria-label="List" style={{ display: "flex", gap: 4, ...(narrow ? {} : { paddingLeft: 10, borderLeft: "1px solid var(--line-hairline)" }) }}>
               <button type="button" aria-pressed={editing} onClick={() => setEditing(!editing)} style={pill(editing)}>Edit certs</button>
-              {clist.id === "shared"
-                ? <button type="button" onClick={() => { const l = { ...clist, id: CL.newId() }; CL.saveList(l); history.replaceState(null, "", `#${l.id}`); setClist(l); D.trackEvent("custom_list_save_shared"); }} style={pill(false)}>Save to my lists</button>
-                : <button type="button" onClick={async () => {
-                    const url = CL.shareUrl(clist);
-                    try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
-                    catch (e) { window.prompt("Copy this link:", url); }
-                    D.trackEvent("custom_list_share", { certs: clist.items.length });
-                  }} style={pill(copied)}>{copied ? "Link copied" : "Share"}</button>}
+              <button type="button" onClick={async () => {
+                const url = CL.listUrl(clist.id);
+                try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
+                catch (e) { window.prompt("Copy this link:", url); }
+                D.trackEvent("custom_list_share", { certs: clist.items.length });
+              }} style={pill(copied)}>{copied ? "Link copied" : "Copy link"}</button>
             </div>
           )}
           {!custom && <div role="group" aria-label="Scope" style={{ display: "flex", alignItems: "center", gap: 2, paddingLeft: 8, borderLeft: "1px solid var(--line-hairline)" }}>
@@ -1019,13 +1074,13 @@ export default function StatsPage() {
 
         {custom && clist && editing && (
           <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
-            <ListForm name={clist.name} text={CL.certsText(clist.items)} submit="Save" onCancel={() => setEditing(false)}
-              onSave={(name, items) => {
-                const known = new Map(clist.items.map((it) => [it.cert, it.name]));
-                const l = { ...clist, id: clist.id === "shared" ? CL.newId() : clist.id, name, items: items.map((it) => ({ ...it, name: known.get(it.cert) })), at: Date.now() };
-                CL.saveList(l);
-                if (l.id !== clist.id) history.replaceState(null, "", `#${l.id}`);
-                setClist(l); setEditing(false);
+            <ListForm name={clist.name} id={clist.id} text={CL.certsText(clist.items)} submit="Save" onCancel={() => setEditing(false)}
+              onSave={async (name, id, items) => {
+                const known = CL.knownNames();
+                const l = { id, name, items: items.map((it) => ({ ...it, name: known[it.cert] })), at: Date.now() };
+                const all = await CL.saveList(l, { prevId: id !== clist.id ? clist.id : undefined });
+                if (id !== clist.id) { history.replaceState(null, "", `#${id}`); setHashId(id); }
+                setLists(all); setEditing(false);
                 D.trackEvent("custom_list_edit", { certs: items.length });
               }} />
           </section>
