@@ -5,6 +5,7 @@ import WeeklyView from "./WeeklyView";
 import Loader from "./Loader";
 import * as AC from "./alt-cache";
 import { loadFx, paidUSD, type Fx } from "./fx";
+import * as CL from "./custom-lists";
 
 /* ------------------------------------------------------------------ *
  * /stats — PSA 10 prices for every card in the sheet.
@@ -13,6 +14,9 @@ import { loadFx, paidUSD, type Fx } from "./fx";
  * card's PSA 10 sales (sales=1) and ALT's ~13-month daily valuation.
  * A toggle switches the whole page between actual sales and ALT value.
  * Styling uses the Mew Catalog design tokens (src/ds/*.css).
+ * /stats/custom is the same page for lists of certs you type in (src/custom-lists.ts): its hub
+ * lists them, #<id> opens one. No sheet or password; names come from ALT (or from the saved
+ * sheet when a cert is one of yours).
  * ------------------------------------------------------------------ */
 
 type Any = any;
@@ -228,9 +232,97 @@ const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "
   </span>
 );
 
+/* ---------- /stats/custom hub ---------- */
+
+const field: React.CSSProperties = { boxSizing: "border-box", width: "100%", padding: "8px 10px", background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: "var(--web-radius-sm)", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-title)", outline: "none" };
+const CERTS_HINT = "One cert per line (or separated by commas). Add a grade after a cert for anything that isn't a PSA 10, e.g. 12345678 9.";
+
+/** Name + certs form, for a new list and for editing one. */
+const ListForm: React.FC<{ name: string; text: string; submit: string; onSave: (name: string, items: CL.Item[]) => void; onCancel?: () => void }> = ({ name, text, submit, onSave, onCancel }) => {
+  const [n, setN] = useState(name);
+  const [t, setT] = useState(text);
+  const items = useMemo(() => CL.parseCerts(t), [t]);
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (items.length) onSave(n.trim() || "Untitled list", items); }} style={{ display: "grid", gap: 10 }}>
+      <input value={n} onChange={(e) => setN(e.target.value)} placeholder="List name" aria-label="List name" maxLength={80} style={{ ...field, fontFamily: "var(--font-body)" }} />
+      <textarea value={t} onChange={(e) => setT(e.target.value)} placeholder={"12345678\n87654321 9"} aria-label="Certs" rows={8} style={{ ...field, resize: "vertical", lineHeight: 1.5 }} />
+      <div style={{ ...faint, lineHeight: 1.5 }}>{CERTS_HINT}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <button type="submit" disabled={!items.length} style={{ ...pill(true), opacity: items.length ? 1 : 0.5, cursor: items.length ? "pointer" : "default" }}>{submit}</button>
+        {onCancel && <button type="button" onClick={onCancel} style={pill(false)}>Cancel</button>}
+        <span style={faint}>{items.length} cert{items.length === 1 ? "" : "s"}{items.some((it) => it.grade !== 10) ? ` · ${items.filter((it) => it.grade !== 10).length} below PSA 10` : ""}</span>
+      </div>
+    </form>
+  );
+};
+
+const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow: boolean; open: (id: string) => void }> = ({ theme, setTheme, narrow, open }) => {
+  const [lists, setLists] = useState<CL.List[]>(() => CL.readLists());
+  const [adding, setAdding] = useState(() => CL.readLists().length === 0);
+  useEffect(() => { document.title = "mew cards · custom lists"; D.trackEvent("custom_hub_view"); }, []);
+  const pad = narrow ? 16 : 32;
+  return (
+    <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: `${narrow ? 20 : 28}px ${pad}px 64px`, boxSizing: "border-box" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <a href="/stats/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Stats</a>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+            <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .9 1.6h5.2c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z" /></svg>
+            </button>
+          </div>
+        </div>
+        <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: narrow ? "var(--web-h2)" : "var(--web-h1)", lineHeight: "var(--web-leading-tight)", color: "var(--text-title)" }}>Custom lists</h1>
+        <div style={{ ...faint, marginTop: 8, lineHeight: 1.5 }}>Lists of PSA certs, charted like the stats page. Saved in this browser; use Share on a list to open it somewhere else.</div>
+
+        <div style={{ marginTop: narrow ? 24 : 36, display: "flex", alignItems: "center", gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line-hairline)" }}>
+          <span style={eyebrow}>{lists.length} list{lists.length === 1 ? "" : "s"}</span>
+          {!adding && <button type="button" onClick={() => setAdding(true)} style={{ ...pill(true), marginLeft: "auto" }}>+ New list</button>}
+        </div>
+        {adding && (
+          <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
+            <div style={{ ...eyebrow, marginBottom: 10 }}>New list</div>
+            <ListForm name="" text="" submit="Create list" onCancel={lists.length ? () => setAdding(false) : undefined}
+              onSave={(name, items) => { const l = { id: CL.newId(), name, items, at: Date.now() }; CL.saveList(l); D.trackEvent("custom_list_create", { certs: items.length }); open(l.id); }} />
+          </section>
+        )}
+        <div style={{ marginTop: 16, display: "grid", gap: narrow ? 10 : 14, gridTemplateColumns: `repeat(auto-fill, minmax(${narrow ? 260 : 300}px, 1fr))` }}>
+          {lists.map((l) => {
+            const names = [...new Set(l.items.map((it) => it.name).filter(Boolean))] as string[];
+            return (
+              <div key={l.id} style={{ position: "relative", minWidth: 0 }}>
+                <a href={`#${l.id}`} onClick={(e) => { e.preventDefault(); open(l.id); }}
+                  style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", boxSizing: "border-box", padding: 14, textDecoration: "none", background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
+                  <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 56 }}>{l.name}</span>
+                  <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)" }}>{l.items.length} cert{l.items.length === 1 ? "" : "s"}</span>
+                  {names.length > 0 && <span style={{ ...faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{names.slice(0, 6).join(" · ")}</span>}
+                </a>
+                <button type="button" onClick={() => { if (window.confirm(`Delete "${l.name}"?`)) { CL.deleteList(l.id); setLists(CL.readLists()); } }} data-hover-pink="1"
+                  style={{ ...eyebrow, position: "absolute", top: 12, right: 12, cursor: "pointer", background: "none", border: "none", padding: 4 }}>Delete</button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ---------- page ---------- */
 
 export default function StatsPage() {
+  // /stats/custom: the hub (no hash), a saved list (#<id>) or a shared one (#share=…).
+  const custom = /^\/stats\/custom(\/|$)/.test(location.pathname);
+  const listFromHash = (): CL.List | null => {
+    if (!custom) return null;
+    const sh = CL.readShare(location.hash);
+    if (sh) return { id: "shared", name: sh.name, items: sh.items, at: 0 };
+    const id = location.hash.replace(/^#/, "");
+    return id ? CL.getList(id) : null;
+  };
+  const [clist, setClist] = useState<CL.List | null>(listFromHash);
+  const [editing, setEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [theme, setTheme] = useState<string>(() => (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   const [lang, setLang] = useState<"EN" | "JP">(() => (/^ja\b/i.test(navigator.language || "") ? "JP" : "EN"));
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
@@ -250,8 +342,8 @@ export default function StatsPage() {
   const [scope, setScope] = useState(() => readPref("mew_stats_scope", { mew: true, cameo: false, intl: false }, (v) => !!v && ["mew", "cameo", "intl"].every((k) => typeof v[k] === "boolean")));
   // "all" = every card at PSA 10; "personal" = cards with a PSA grade in the sheet's pc column,
   // each valued at the grade you own.
-  const [list, setList] = useState<"all" | "personal">(() => readPref("mew_stats_list", "all" as "all" | "personal", (v) => v === "all" || v === "personal"));
-  useEffect(() => { savePref("mew_stats_list", list); setSelected(null); }, [list]);
+  const [list, setList] = useState<"all" | "personal">(() => (custom ? "all" : readPref("mew_stats_list", "all" as "all" | "personal", (v) => v === "all" || v === "personal")));
+  useEffect(() => { if (!custom) savePref("mew_stats_list", list); setSelected(null); }, [list]); // eslint-disable-line react-hooks/exhaustive-deps
   const [histP, setHistP] = useState<Map<string, Any>>(new Map());
   const [histPDone, setHistPDone] = useState(false);
   const [pTotal, setPTotal] = useState(0); // personal (non-10) certs to fetch
@@ -345,7 +437,8 @@ export default function StatsPage() {
     D.trackEvent("stats_mode", { mode: m });
   };
 
-  useEffect(() => { document.title = "mew cards · stats"; D.trackEvent("stats_page_view"); }, []);
+  useEffect(() => { if (custom) return; document.title = "mew cards · stats"; D.trackEvent("stats_page_view"); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (clist) document.title = `${clist.name} · mew cards`; }, [clist]);
   useEffect(() => { document.documentElement.setAttribute("data-theme", theme); }, [theme]);
   useEffect(() => { setAllSales(false); }, [selected, mode]);
   useEffect(() => {
@@ -421,8 +514,8 @@ export default function StatsPage() {
       setHistP((cur) => { const n = new Map(cur); dP.forEach((r, c) => { if (AC.keepable(r) || !n.has(c)) n.set(c, r); }); return n; });
       const at = Date.now();
       await AC.save(dP, (c) => gradeOf.get(c) || 10);
-      await AC.save(d10, 10, at);
-      setAltAt(at);
+      await AC.save(d10, 10, custom ? undefined : at); // a custom list isn't the stats page's full refresh
+      if (!custom) setAltAt(at);
     } catch (e) { console.error(e); }
     setRefreshing(false);
   };
@@ -456,12 +549,14 @@ export default function StatsPage() {
     const hl = v.hidden;
     setHiddenLists(hl ? { all: new Set(hl.all), personal: new Set(hl.personal) } : null);
   };
+  // Custom-list cards carry their own grade (customGrade); only the PSA 10s go in the main pass.
+  const gradeOfCard = (c: Any) => (c.customGrade !== undefined ? c.customGrade : D.pcGrade(c));
   const certsOf = (all: Any[]) => {
-    const certs = [...new Set(all.map((c: Any) => D.certOf(c)).filter(Boolean))] as string[];
+    const certs = [...new Set(all.filter((c: Any) => c.customGrade === undefined || c.customGrade === 10).map((c: Any) => D.certOf(c)).filter(Boolean))] as string[];
     const pairs: Array<{ cert: string; grade: number }> = [];
     const seen = new Set<string>();
     for (const c of all) {
-      const cert = D.certOf(c), g = D.pcGrade(c);
+      const cert = D.certOf(c), g = gradeOfCard(c);
       if (!cert || !g || g === 10 || seen.has(cert)) continue;
       seen.add(cert); pairs.push({ cert, grade: g });
     }
@@ -504,14 +599,33 @@ export default function StatsPage() {
     } catch (e) { console.error(e); }
   };
 
-  const load = async (password: string) => {
+  /**
+   * A custom list as sheet rows: certs that are in your saved sheet bring that card's name,
+   * number and image; the rest get ALT's name once their data is in.
+   */
+  const customSheet = async (cl: CL.List) => {
+    const saved = await AC.readSheet();
+    const mine = new Map<string, Any>();
+    (saved ? saved.cards : []).forEach((c: Any) => String(c.certs || "").split(/[^A-Za-z0-9-]+/).forEach((t) => { if (t && !mine.has(t)) mine.set(t, c); }));
+    const cards = cl.items.map((it) => {
+      const c = mine.get(it.cert);
+      return { ...(c || {}), id: `custom-${it.cert}`, certs: it.cert, customGrade: it.grade, nameEN: (c && c.nameEN) || (c && c.nameJP ? "" : it.name || ""), paid: null, pc: "", isMew: true };
+    });
+    return { cards, hidden: null, diag: {} };
+  };
+  const resetData = () => {
+    setHist(new Map()); setHistP(new Map()); setHistDone(false); setHistPDone(false);
+    setImgs({ done: 0, total: 0, finished: false }); setDiag(null); setDiagP(null); setOldRun(null); setSelected(null);
+  };
+
+  const load = async (password: string, cl?: CL.List) => {
     setPhase("loading");
     try {
       // The saved sheet opens the page at once (the current one is checked in the background,
       // below); with nothing saved, wait for Apps Script.
       // (Only for a password that has already worked here, or a public page.)
-      const savedSheet = !password || password === savedPw() ? await AC.readSheet() : null;
-      const sheet = savedSheet || (await fetchSheet(password));
+      const savedSheet = cl ? null : !password || password === savedPw() ? await AC.readSheet() : null;
+      const sheet = cl ? await customSheet(cl) : savedSheet || (await fetchSheet(password));
       const all = sheet.cards;
       pwRef.current = password;
       if (password) rememberPw(password);
@@ -530,7 +644,7 @@ export default function StatsPage() {
       pairs.forEach((p) => { const r = saved.map.get(AC.keyOf(p.cert, p.grade)); if (r) haveP.set(p.cert, r); });
       const miss10 = certs.filter((c) => !have10.has(c));
       const missP = pairs.filter((p) => !haveP.has(p.cert));
-      const first = have10.size === 0;
+      const first = !cl && have10.size === 0;
       setHist(have10);
       setDiag({ requests: 0, ok: 0, errors: [] });
       if (miss10.length) {
@@ -556,7 +670,7 @@ export default function StatsPage() {
       }
       setHistPDone(true);
       if (first) setAltAt(Date.now());
-      else if (saved.at === null || Date.now() - saved.at > AC.ALT_MAX_AGE) refreshAlt(); // in the background
+      else if (!cl && (saved.at === null || Date.now() - saved.at > AC.ALT_MAX_AGE)) refreshAlt(); // in the background
       else refreshOld(have10, haveP, pairs); // anything over 6h old, fresh from ALT (in the background)
       // Card images too, so the grid (and the weekly poster) open fully drawn. A slow or broken
       // image gives up after 8s rather than holding the page.
@@ -579,7 +693,34 @@ export default function StatsPage() {
     }
   };
 
+  // Custom lists: follow the hash (hub ⇄ a list), and load a list whenever its certs change.
   useEffect(() => {
+    if (!custom) return;
+    const on = () => { setClist(listFromHash()); setEditing(false); };
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const clistKey = clist ? JSON.stringify(clist.items.map((it) => [it.cert, it.grade])) : "";
+  useEffect(() => {
+    if (!custom || !clist) return;
+    resetData();
+    load("", clist);
+    D.trackEvent("custom_list_view", { certs: clist.items.length, shared: clist.id === "shared" });
+  }, [clistKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Remember the names found, for the hub.
+  useEffect(() => {
+    if (!clist || clist.id === "shared") return;
+    const names = new Map<string, string>();
+    cards.forEach((c: Any) => {
+      const cert = D.certOf(c), r = cert ? (c.customGrade === 10 ? hist : histP).get(cert) : null;
+      const n = c.nameEN || c.nameJP || (r && r.subject);
+      if (cert && n) names.set(cert, n);
+    });
+    if (names.size) CL.rememberNames(clist.id, names);
+  }, [cards, hist, histP]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (custom) return;
     // Remembered password: go straight in (a wrong/changed one falls back to the password box).
     const remembered = savedPw();
     if (remembered) { load(remembered); return; }
@@ -615,7 +756,7 @@ export default function StatsPage() {
     const byCert = new Map<string, Any>();
     const noCert: Any[] = [];
     const personal = list === "personal";
-    const inScope = (c: Any) => ((scope.mew && c.isMew) || (scope.cameo && c.isCameo) || (scope.intl && c.isIntl)) && (!personal || D.pcGrade(c) !== null);
+    const inScope = (c: Any) => (custom || (scope.mew && c.isMew) || (scope.cameo && c.isCameo) || (scope.intl && c.isIntl)) && (!personal || D.pcGrade(c) !== null);
     for (const c of cards) {
       const cert = D.certOf(c);
       if (!cert) { if (inScope(c)) noCert.push(c); continue; }
@@ -625,10 +766,12 @@ export default function StatsPage() {
       else { if (c.isMew) prev.isMew = true; if (c.isCameo) prev.isCameo = true; if (c.isIntl) prev.isIntl = true; }
     }
     const charted: Any[] = [], failed: Any[] = [], pending: Any[] = [], hiddenRows: Any[] = [];
-    byCert.forEach((card, cert) => {
-      if (!inScope(card)) return;
-      const grade = personal ? (D.pcGrade(card) as number) : 10;
+    byCert.forEach((card0, cert) => {
+      if (!inScope(card0)) return;
+      const grade = card0.customGrade !== undefined ? card0.customGrade : personal ? (D.pcGrade(card0) as number) : 10;
       const r = grade === 10 ? hist.get(cert) : histP.get(cert);
+      // A custom cert that isn't in the sheet goes by ALT's name for it (the PSA label's subject).
+      const card = card0.nameEN || card0.nameJP ? card0 : { ...card0, nameEN: (r && r.subject) || `Cert ${cert}` };
       if (hiddenSet && hiddenSet.has(cert)) {
         const s = r ? seriesOf(r, mode) : [];
         hiddenRows.push({ card, cert, grade, value: s.length ? s[s.length - 1].value : null });
@@ -725,7 +868,7 @@ export default function StatsPage() {
 
   const sel = selected ? rows.charted.find((x: Any) => x.cert === selected) : null;
   // Loading progress and the Data check count every cert, whatever the scope toggles show.
-  const allCerts = useMemo(() => new Set(cards.map((c: Any) => D.certOf(c)).filter(Boolean)), [cards]);
+  const allCerts = useMemo(() => new Set(cards.filter((c: Any) => c.customGrade === undefined || c.customGrade === 10).map((c: Any) => D.certOf(c)).filter(Boolean)), [cards]);
   const totalCerts = allCerts.size;
   const loadedCerts = [...allCerts].filter((c) => hist.has(c as string)).length;
   const noScope = !scope.mew && !scope.cameo && !scope.intl;
@@ -756,6 +899,8 @@ export default function StatsPage() {
     const worth = withPaid.reduce((a: number, x: Any) => a + x.value, 0);
     return { n: withPaid.length, paid, worth };
   }, [rows]);
+  if (custom && !clist) return <CustomHub theme={theme} setTheme={setTheme} narrow={narrow} open={(id) => { location.hash = id; }} />;
+
   /* ---------- gate: password, then loading until all ALT data is in ---------- */
   const allLoaded = histDone && histPDone && imgs.finished;
   if ((phase !== "ready" && phase !== "error") || (phase === "ready" && !allLoaded)) {
@@ -791,15 +936,16 @@ export default function StatsPage() {
   ) : null;
   const emptyState = histDone && rows.charted.length === 0 ? (
     <div style={{ gridColumn: "1 / -1", padding: "40px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
-      <div style={eyebrow}>{noScope ? "No scope selected" : "No cards to chart"}</div>
+      <div style={eyebrow}>{noScope && !custom ? "No scope selected" : "No cards to chart"}</div>
       <div style={{ marginTop: 8, fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
-        {noScope ? "Turn on Mew, Cameo or Intl above."
+        {custom ? (mode === "sales" ? "None of these certs has a recorded sale at its grade on ALT. Try ALT value, or check the certs under Not charted." : "None of these certs has ALT value history. Check the certs under Not charted.")
+          : noScope ? "Turn on Mew, Cameo or Intl above."
           : list === "personal" && !cards.some((c: Any) => D.pcGrade(c) !== null) ? "No card in the sheet has a PSA grade in its pc column yet."
           : mode === "sales" ? `None of these cards has a recorded ${list === "personal" ? "" : "PSA 10 "}sale. Try ALT value, or another scope.` : "None of these cards has ALT value history."}
       </div>
     </div>
   ) : null;
-  const headTitle = sel ? name(sel.card) : list === "personal" ? "My collection" : "Collection at PSA 10";
+  const headTitle = sel ? name(sel.card) : custom && clist ? clist.name : list === "personal" ? "My collection" : "Collection at PSA 10";
   const headValue = sel ? sel.value : total.value;
   const headChange = sel ? sel.change : pctOf(total.pts);
   const chartEmpty = sales ? "NO SALES IN THIS RANGE" : "NOT ENOUGH DATA";
@@ -813,9 +959,21 @@ export default function StatsPage() {
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: `${narrow ? 20 : 28}px ${pad}px 64px`, boxSizing: "border-box" }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <a href="/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Catalog</a>
-          <span aria-hidden="true" style={{ ...eyebrow, marginLeft: -4, marginRight: -4 }}>・</span>
-          <a href="#weekly" onClick={openWeekly} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>Weekly Report ✦</a>
+          {custom ? (
+            <>
+              <a href="/stats/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Stats</a>
+              <span aria-hidden="true" style={{ ...eyebrow, marginLeft: -4, marginRight: -4 }}>・</span>
+              <a href="/stats/custom/" onClick={(e) => { e.preventDefault(); history.pushState(null, "", location.pathname); setClist(null); setEditing(false); }} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>All lists</a>
+            </>
+          ) : (
+            <>
+              <a href="/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Catalog</a>
+              <span aria-hidden="true" style={{ ...eyebrow, marginLeft: -4, marginRight: -4 }}>・</span>
+              <a href="#weekly" onClick={openWeekly} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>Weekly Report ✦</a>
+              <span aria-hidden="true" style={{ ...eyebrow, marginLeft: -4, marginRight: -4 }}>・</span>
+              <a href="/stats/custom/" data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>Custom lists</a>
+            </>
+          )}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
             <button type="button" onClick={() => setLang(lang === "JP" ? "EN" : "JP")} data-hover-pink="1" style={iconBtn} aria-label="Toggle language">{lang === "JP" ? "JA" : "EN"}</button>
             <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">
@@ -823,28 +981,55 @@ export default function StatsPage() {
             </button>
           </div>
         </div>
-        <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: narrow ? "var(--web-h2)" : "var(--web-h1)", lineHeight: "var(--web-leading-tight)", color: "var(--text-title)" }}>{list === "personal" ? "My collection" : "PSA 10 value"}</h1>
+        <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: narrow ? "var(--web-h2)" : "var(--web-h1)", lineHeight: "var(--web-leading-tight)", color: "var(--text-title)" }}>{custom && clist ? clist.name : list === "personal" ? "My collection" : "PSA 10 value"}</h1>
         <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div role="group" aria-label="Cards" style={{ display: "flex", gap: 4, paddingRight: 10, borderRight: "1px solid var(--line-hairline)" }}>
+          {!custom && <div role="group" aria-label="Cards" style={{ display: "flex", gap: 4, paddingRight: 10, borderRight: "1px solid var(--line-hairline)" }}>
             <button type="button" aria-pressed={list === "all"} onClick={() => { setList("all"); D.trackEvent("stats_list", { list: "all" }); }} style={pill(list === "all")}>All</button>
             <button type="button" aria-pressed={list === "personal"} onClick={() => { setList("personal"); D.trackEvent("stats_list", { list: "personal" }); }} style={pill(list === "personal")}>Personal</button>
-          </div>
+          </div>}
           <div role="group" aria-label="Price source" style={{ display: "flex", gap: 4 }}>
             <button type="button" aria-pressed={sales} onClick={() => setMode("sales")} style={pill(sales)}>Sales</button>
             <button type="button" aria-pressed={!sales} onClick={() => setMode("alt")} style={pill(!sales)}>ALT value</button>
           </div>
-          <div role="group" aria-label="Scope" style={{ display: "flex", alignItems: "center", gap: 2, paddingLeft: 8, borderLeft: "1px solid var(--line-hairline)" }}>
+          {custom && clist && (
+            <div role="group" aria-label="List" style={{ display: "flex", gap: 4, ...(narrow ? {} : { paddingLeft: 10, borderLeft: "1px solid var(--line-hairline)" }) }}>
+              <button type="button" aria-pressed={editing} onClick={() => setEditing(!editing)} style={pill(editing)}>Edit certs</button>
+              {clist.id === "shared"
+                ? <button type="button" onClick={() => { const l = { ...clist, id: CL.newId() }; CL.saveList(l); history.replaceState(null, "", `#${l.id}`); setClist(l); D.trackEvent("custom_list_save_shared"); }} style={pill(false)}>Save to my lists</button>
+                : <button type="button" onClick={async () => {
+                    const url = CL.shareUrl(clist);
+                    try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
+                    catch (e) { window.prompt("Copy this link:", url); }
+                    D.trackEvent("custom_list_share", { certs: clist.items.length });
+                  }} style={pill(copied)}>{copied ? "Link copied" : "Share"}</button>}
+            </div>
+          )}
+          {!custom && <div role="group" aria-label="Scope" style={{ display: "flex", alignItems: "center", gap: 2, paddingLeft: 8, borderLeft: "1px solid var(--line-hairline)" }}>
             {([["mew", "Mew", <MewIcon key="m" w={22} h={20} />], ["cameo", "Cameo", <CameoIcon key="c" w={18} h={18} />], ["intl", "Intl", <IntlIcon key="i" w={17} h={17} />]] as Array<["mew" | "cameo" | "intl", string, React.ReactNode]>).map(([k, label, icon]) => (
               <button key={k} type="button" onClick={() => toggleScope(k)} aria-pressed={scope[k]} aria-label={label} title={label}
                 style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, padding: 0, cursor: "pointer", background: "transparent", border: "none", color: scope[k] ? "var(--pink-700)" : "var(--text-muted)", transition: "color var(--dur-fast) var(--ease)" }}>
                 {icon}
               </button>
             ))}
-          </div>
+          </div>}
           <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
             {!histDone ? `loading ${loadedCerts}/${totalCerts}` : list === "personal" && !histPDone ? "loading your grades" : ""}
           </span>
         </div>
+
+        {custom && clist && editing && (
+          <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
+            <ListForm name={clist.name} text={CL.certsText(clist.items)} submit="Save" onCancel={() => setEditing(false)}
+              onSave={(name, items) => {
+                const known = new Map(clist.items.map((it) => [it.cert, it.name]));
+                const l = { ...clist, id: clist.id === "shared" ? CL.newId() : clist.id, name, items: items.map((it) => ({ ...it, name: known.get(it.cert) })), at: Date.now() };
+                CL.saveList(l);
+                if (l.id !== clist.id) history.replaceState(null, "", `#${l.id}`);
+                setClist(l); setEditing(false);
+                D.trackEvent("custom_list_edit", { certs: items.length });
+              }} />
+          </section>
+        )}
 
         {phase === "error" && (
           <div style={{ marginTop: 24, padding: "40px 24px", textAlign: "center", border: "1px dashed var(--line-strong)", ...eyebrow }}>Couldn't load the catalog. Refresh to try again.</div>
@@ -957,7 +1142,7 @@ export default function StatsPage() {
                       <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                     </span>
                     <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} />
@@ -1006,7 +1191,7 @@ export default function StatsPage() {
                       <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number, x.card.year || "", list === "personal" ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                       {!narrow && <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} height={28} />}
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{fmtUSD(x.value)}</span>
@@ -1077,8 +1262,8 @@ export default function StatsPage() {
                       {workerAge && <> · Worker copy {workerAge}</>}
                       {!refreshing && altAt && <> · <button type="button" onClick={() => refreshAlt(true)} style={{ font: "inherit", color: "var(--text-accent)", background: "none", border: "none", padding: 0, cursor: "pointer" }}>Refresh now</button></>}
                     </div>
-                    <div style={line}>Sheet · {cards.length} rows</div>
-                    {tabs.map((t) => {
+                    {!custom && <div style={line}>Sheet · {cards.length} rows</div>}
+                    {!custom && tabs.map((t) => {
                       const s = sheets[t];
                       return (
                         <div key={t} style={line}>
@@ -1090,12 +1275,12 @@ export default function StatsPage() {
                       );
                     })}
                     <div style={line}>Certs to look up · {totalCerts}</div>
-                    {hiddenSet ? <div style={line}>Hidden · {hiddenSet.size} (saved in the sheet's Hidden tab)</div>
+                    {custom ? null : hiddenSet ? <div style={line}>Hidden · {hiddenSet.size} (saved in the sheet's Hidden tab)</div>
                       : <div style={hint}>Hiding cards needs the updated Apps Script: the sheet response has no hidden list yet.</div>}
                     {diag && <div style={line}>ALT API · {diag.requests} request{diag.requests === 1 ? "" : "s"}, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}
-                    {diagP && <div style={line}>Personal (owned grades below PSA 10) · {diagP.requests} request{diagP.requests === 1 ? "" : "s"}, {diagP.ok} answered{diagP.errors.length ? ` · ${diagP.errors.length} error${diagP.errors.length === 1 ? "" : "s"}: ${[...new Set(diagP.errors as string[])].join("; ")}` : ""}</div>}
-                    <div style={line}>Personal · {cards.filter((c: Any) => D.pcGrade(c) !== null).length} sheet rows with a PSA grade in pc</div>
-                    {(() => {
+                    {diagP && <div style={line}>{custom ? "Certs below PSA 10" : "Personal (owned grades below PSA 10)"} · {diagP.requests} request{diagP.requests === 1 ? "" : "s"}, {diagP.ok} answered{diagP.errors.length ? ` · ${diagP.errors.length} error${diagP.errors.length === 1 ? "" : "s"}: ${[...new Set(diagP.errors as string[])].join("; ")}` : ""}</div>}
+                    {!custom && <div style={line}>Personal · {cards.filter((c: Any) => D.pcGrade(c) !== null).length} sheet rows with a PSA grade in pc</div>}
+                    {!custom && (() => {
                       const owned = cards.filter((c: Any) => D.pcGrade(c) !== null);
                       const priced = owned.filter((c: Any) => c.paid);
                       if (!priced.length) return <div style={line}>Paid prices · none found (column B, or a "Price paid" column)</div>;
@@ -1110,7 +1295,7 @@ export default function StatsPage() {
                     {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out) · {mismatchCerts.slice(0, 6).map((c) => { const k = cardOf(c); const why = String((hist.get(c) as Any)?.salesError || "").replace(/^sales came back /, ""); return `${k ? `${name(k)}${k.number ? ` ${k.number}` : ""}` : "?"} (cert ${c}, ${why})`; }).join(" · ")}</div>}
                     {oldRun && <div style={line}>Old-data refresh this visit · {oldRun.asked ? `${oldRun.asked} asked for fresh, ${oldRun.got} answered, ${oldRun.newer} came back newer, ${oldRun.unusable} unusable (kept the old copy)` : "nothing over 6h old"}</div>}
                     {oldest.over12 > 0 && <div style={line}>Over 12h old · {oldest.over12} · oldest: {oldest.list.filter((x) => Date.now() - x.t > 12 * 3600e3).map((x) => `${x.card ? name(x.card) : "?"}${x.card && x.card.number ? ` ${x.card.number}` : ""} (cert ${x.cert}, ${ago(x.t)})`).join(" · ")}</div>}
-                    {!anyCertCol && tabs.length > 0 && <div style={hint}>The page looks for a column named "All Cert" (or "Cert", "Certs", "Cert Number") in the {tabs.join(", ")} tabs.</div>}
+                    {!custom && !anyCertCol && tabs.length > 0 && <div style={hint}>The page looks for a column named "All Cert" (or "Cert", "Certs", "Cert Number") in the {tabs.join(", ")} tabs.</div>}
                     {netErr && <div style={hint}>The browser couldn't reach the API. If it works from elsewhere, the Worker may be refusing requests from this site (CORS or an origin allowlist).</div>}
                   </div>
                 </details>
