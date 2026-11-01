@@ -377,6 +377,8 @@ export default function StatsPage() {
   const clist = useMemo(() => (custom && hashId ? lists.find((l) => l.id === hashId) || null : null), [lists, hashId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  // PSA's details for custom certs that aren't in the sheet (year, set, number…).
+  const [psa, setPsa] = useState<{ info: Record<string, CL.CertInfo>; token: boolean; limited: boolean } | null>(null);
   const [theme, setTheme] = useState<string>(() => (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   const [lang, setLang] = useState<"EN" | "JP">(() => (/^ja\b/i.test(navigator.language || "") ? "JP" : "EN"));
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
@@ -663,7 +665,7 @@ export default function StatsPage() {
     (saved ? saved.cards : []).forEach((c: Any) => String(c.certs || "").split(/[^A-Za-z0-9-]+/).forEach((t) => { if (t && !mine.has(t)) mine.set(t, c); }));
     const cards = cl.items.map((it) => {
       const c = mine.get(it.cert);
-      return { ...(c || {}), id: `custom-${it.cert}`, certs: it.cert, customGrade: it.grade, nameEN: (c && c.nameEN) || (c && c.nameJP ? "" : it.name || ""), paid: null, pc: "", isMew: true };
+      return { ...(c || {}), id: `custom-${it.cert}`, certs: it.cert, customGrade: it.grade, fromSheet: !!c, nameEN: (c && c.nameEN) || (c && c.nameJP ? "" : it.name || ""), paid: null, pc: "", isMew: true };
     });
     return { cards, hidden: null, diag: {} };
   };
@@ -762,6 +764,24 @@ export default function StatsPage() {
     load("", clist);
     D.trackEvent("custom_list_view", { certs: clist.items.length });
   }, [clistKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Custom certs not in the sheet: fill in year, set and card number from PSA (in the background).
+  useEffect(() => {
+    if (!custom || !clist || phase !== "ready") return;
+    const want = cards.filter((c: Any) => !c.fromSheet).map((c: Any) => D.certOf(c)).filter(Boolean) as string[];
+    if (!want.length) return;
+    let live = true;
+    CL.fetchCertInfo(want).then((p) => {
+      if (!live) return;
+      setPsa(p);
+      setCards((cur) => cur.map((c: Any) => {
+        const i = !c.fromSheet && p.info[D.certOf(c) as string];
+        if (!i || i.notFound) return c;
+        return { ...c, number: c.number || i.number, year: c.year || i.year || undefined, set: c.set || [i.set, i.variety].filter(Boolean).join(" · "), psaSubject: i.subject };
+      }));
+    });
+    return () => { live = false; };
+  }, [clistKey, phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Remember the names found, for the hub.
   useEffect(() => {
     if (!clist) return;
@@ -826,7 +846,7 @@ export default function StatsPage() {
       const grade = card0.customGrade !== undefined ? card0.customGrade : personal ? (D.pcGrade(card0) as number) : 10;
       const r = grade === 10 ? hist.get(cert) : histP.get(cert);
       // A custom cert that isn't in the sheet goes by ALT's name for it (the PSA label's subject).
-      const card = card0.nameEN || card0.nameJP ? card0 : { ...card0, nameEN: (r && r.subject) || `Cert ${cert}` };
+      const card = card0.nameEN || card0.nameJP ? card0 : { ...card0, nameEN: (r && r.subject) || card0.psaSubject || `Cert ${cert}` };
       if (hiddenSet && hiddenSet.has(cert)) {
         const s = r ? seriesOf(r, mode) : [];
         hiddenRows.push({ card, cert, grade, value: s.length ? s[s.length - 1].value : null });
@@ -1330,6 +1350,19 @@ export default function StatsPage() {
                       );
                     })}
                     <div style={line}>Certs to look up · {totalCerts}</div>
+                    {custom && psa && (() => {
+                      const mine = cards.filter((c: Any) => !c.fromSheet);
+                      const got = mine.filter((c: Any) => { const i = psa.info[D.certOf(c) as string]; return i && !i.notFound; });
+                      const notFound = mine.filter((c: Any) => { const i = psa.info[D.certOf(c) as string]; return i && i.notFound; }).map((c: Any) => D.certOf(c));
+                      const off = got.filter((c: Any) => { const i = psa.info[D.certOf(c) as string]; return i.grade && i.grade !== c.customGrade; });
+                      return (
+                        <>
+                          <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited ? " · PSA's daily limit reached, the rest fill in tomorrow" : ""}</div>
+                          {!psa.token && got.length < mine.length && <div style={hint}>Year, set and card number come from PSA: add a PSA_TOKEN environment variable in Netlify (a free API token from psacard.com).</div>}
+                          {off.length > 0 && <div style={hint}>Grade differs from PSA · {off.map((c: Any) => `cert ${D.certOf(c)} is a PSA ${psa.info[D.certOf(c) as string].grade}, listed at ${c.customGrade}`).join(" · ")}</div>}
+                        </>
+                      );
+                    })()}
                     {custom ? null : hiddenSet ? <div style={line}>Hidden · {hiddenSet.size} (saved in the sheet's Hidden tab)</div>
                       : <div style={hint}>Hiding cards needs the updated Apps Script: the sheet response has no hidden list yet.</div>}
                     {diag && <div style={line}>ALT API · {diag.requests} request{diag.requests === 1 ? "" : "s"}, {diag.ok} answered{errs.length ? "" : ", no errors"}</div>}

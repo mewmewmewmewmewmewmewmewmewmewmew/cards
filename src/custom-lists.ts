@@ -115,3 +115,26 @@ export function parseCerts(text: string): Item[] {
 
 /** The list as editable text, one cert per line (grade shown when it isn't 10). */
 export const certsText = (items: Item[]) => items.map((it) => (it.grade === 10 ? it.cert : `${it.cert} ${it.grade}`)).join("\n");
+
+/* ---------- what PSA says about a cert (year, set, number…) ---------- */
+
+export type CertInfo = { year: number | null; set: string; number: string; subject: string; variety: string; grade: number | null; gradeText?: string; notFound?: boolean };
+const INFO = "mew_cert_info";
+
+/** PSA details for certs (from /api/certs, kept here too); token false = PSA_TOKEN isn't set. */
+export async function fetchCertInfo(certs: string[]): Promise<{ info: Record<string, CertInfo>; token: boolean; limited: boolean }> {
+  const info: Record<string, CertInfo> = readJSON(INFO, {}) || {};
+  const want = certs.filter((c) => !info[c]);
+  let token = true, limited = false;
+  for (let i = 0; i < want.length; i += 60) {
+    try {
+      const res = await fetch(`/api/certs?certs=${want.slice(i, i + 60).join(",")}`, { cache: "no-store" });
+      const j = await res.json();
+      if (j && j.certs) Object.assign(info, j.certs);
+      if (j && j.token === false) token = false;
+      if (j && j.limited) limited = true;
+    } catch (e) { break; }
+  }
+  writeJSON(INFO, info);
+  return { info, token, limited };
+}
