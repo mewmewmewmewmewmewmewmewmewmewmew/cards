@@ -1534,7 +1534,7 @@ export default function StatsPage() {
                           <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited && (!psa.problem || psa.problem.status === 429) ? " · PSA's daily limit reached, the rest are queued and fill in on a later visit" : ""}</div>
                           {psa.problem && psa.problem.status !== 429 && <div style={hint}>{psa.problem.status === 401
                             ? "PSA rejected the token (401). In Cloudflare, set PSA_TOKEN to just the token from psacard.com's Public API page (no \"Bearer\"), retry the deployment, then press Refresh."
-                            : `PSA refused the request (${psa.problem.status}): PSA may be blocking requests from Cloudflare.`}{psa.problem.text ? ` PSA said: "${psa.problem.text}"` : ""}</div>}
+                            : /approved customers/i.test(psa.problem.text || "") ? `PSA refused the request (${psa.problem.status}): its API is only open to approved accounts, and this token's account isn't approved.` : `PSA refused the request (${psa.problem.status}): PSA may be blocking requests from Cloudflare.`}{psa.problem.text ? ` PSA said: "${psa.problem.text}"` : ""}</div>}
                           {(() => {
                             const all = cards.map((c: Any) => psa.info[D.certOf(c) as string]).filter((i: Any) => i && !i.notFound);
                             const withPhoto = all.filter((i: Any) => i.image).length, asked = all.filter((i: Any) => i.imgTried).length;
