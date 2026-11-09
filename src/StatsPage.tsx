@@ -1004,7 +1004,11 @@ export default function StatsPage() {
       const grade = card0.customGrade !== undefined ? card0.customGrade : personal ? (D.pcGrade(card0) as number) : 10;
       const r = grade === 10 ? hist.get(cert) : histP.get(cert);
       // A custom cert that isn't in the sheet goes by ALT's name for it (the PSA label's subject).
-      const card = card0.nameEN || card0.nameJP ? card0 : { ...card0, nameEN: (r && r.subject) || card0.psaSubject || `Cert ${cert}` };
+      let card = card0.nameEN || card0.nameJP ? card0 : { ...card0, nameEN: (r && r.subject) || card0.psaSubject || `Cert ${cert}` };
+      // Set number, set and year from ALT when the Worker sends them (they fill gaps only).
+      if (r && (r.cardNumber || r.set || r.setName || r.year) && (!card.number || !card.set || !card.year)) {
+        card = { ...card, number: card.number || r.cardNumber || "", set: card.set || r.set || r.setName || "", year: card.year || Number(r.year) || undefined };
+      }
       if (hiddenSet && hiddenSet.has(cert)) {
         const s = r ? seriesOf(r, mode) : [];
         hiddenRows.push({ card, cert, grade, value: s.length ? s[s.length - 1].value : null });
@@ -1197,7 +1201,9 @@ export default function StatsPage() {
   const showPaid = list === "personal" && rows.charted.some((x: Any) => x.paid !== null && x.paid !== undefined);
   // PSA 10 / 9 pop columns (desktop list) when any card has pop.
   const showPop = !narrow && [...rows.charted, ...rows.nodata].some((x: Any) => x.pop);
-  const listCols = narrow ? `24px minmax(0,1fr) auto 64px${showPaid ? " 76px" : ""}` : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}${showPop ? " 64px 64px" : ""}${showPaid ? " 150px" : ""}`;
+  // No picture column when none of the cards shown has a picture.
+  const anyImg = shown.some((x: Any) => x.card.image);
+  const listCols = narrow ? `${anyImg ? "24px " : ""}minmax(0,1fr) auto 64px${showPaid ? " 76px" : ""}` : `${anyImg ? "28px " : ""}minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}${showPop ? " 64px 64px" : ""}${showPaid ? " 150px" : ""}`;
   const noMatch = q.trim() && listed > 0 && shown.length === 0 ? (
     <div style={{ gridColumn: "1 / -1", padding: "32px 16px", textAlign: "center", border: "1px dashed var(--line-strong)", ...eyebrow }}>No cards match "{q.trim()}"</div>
   ) : null;
@@ -1307,7 +1313,7 @@ export default function StatsPage() {
           <section style={{ marginTop: narrow ? 20 : 28, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
               <div style={{ minWidth: 0, flex: "1 1 260px", display: "flex", alignItems: "flex-start", gap: 12 }}>
-                {sel && narrow && <span style={{ flex: "0 0 auto", width: 64, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(sel.card), boxShadow: "var(--shadow-raised)" }} />}
+                {sel && narrow && sel.card.image && <span style={{ flex: "0 0 auto", width: 64, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(sel.card), boxShadow: "var(--shadow-raised)" }} />}
                 <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={eyebrow}>{sel ? `${sel.card.number || ""} ${sel.card.set || ""}`.trim() || "Card" : "Total"}</span>
@@ -1342,7 +1348,7 @@ export default function StatsPage() {
               {sel
                 ? (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
-                    {!narrow && <span style={{ flex: "0 0 auto", height: 260, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(sel.card), boxShadow: "var(--shadow-raised)" }} />}
+                    {!narrow && sel.card.image && <span style={{ flex: "0 0 auto", height: 260, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(sel.card), boxShadow: "var(--shadow-raised)" }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <LineChart pts={sel.pts} lead={sel.lead} tail={sel.tail} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={sel.nodata ? "NO DATA" : chartEmpty} />
                     </div>
@@ -1406,7 +1412,7 @@ export default function StatsPage() {
                   <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { setSelected(on ? null : x.key); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8, padding: 10, textAlign: "left", cursor: "pointer", minWidth: 0, background: on ? "var(--surface-tint)" : "var(--surface-card)", border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, borderRadius: "var(--web-radius)", transition: "border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)" }}>
                     <span style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, paddingRight: hiddenSet ? 20 : 0 }}>
-                      <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />
+                      {x.card.image && <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />}
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
@@ -1443,7 +1449,7 @@ export default function StatsPage() {
             <div style={{ marginTop: 12 }}>
               {shown.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `0 ${hiddenSet ? 36 : 8}px 8px 8px`, borderBottom: "1px solid var(--line-strong)", ...eyebrow }}>
-                  <span /><span>Card</span>{!narrow && <span />}
+                  {anyImg && <span />}<span>Card</span>{!narrow && <span />}
                   <span style={{ textAlign: "right" }}>{sales ? "Last sale" : "Value"}</span>
                   <span style={{ textAlign: "right" }}>Change</span>
                   {sales && !narrow && <span style={{ textAlign: "right" }}>Sold</span>}
@@ -1457,7 +1463,7 @@ export default function StatsPage() {
                   <div key={x.key} style={{ position: "relative" }}>
                     <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { setSelected(on ? null : x.key); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
                       style={{ width: "100%", boxSizing: "border-box", display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `7px ${hiddenSet ? 36 : 8}px 7px 8px`, textAlign: "left", cursor: "pointer", background: on ? "var(--surface-tint)" : "transparent", border: "none", borderBottom: "1px solid var(--line-hairline)", transition: "background var(--dur-fast) var(--ease)" }}>
-                      <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />
+                      {anyImg && <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />}
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
@@ -1499,7 +1505,7 @@ export default function StatsPage() {
                 <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
                   {rows.hidden.map((x: Any) => (
                     <div key={x.cert} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "var(--web-small)" }}>
-                      <span style={{ flex: "0 0 auto", width: 22, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card), opacity: 0.6 }} />
+                      {x.card.image && <span style={{ flex: "0 0 auto", width: 22, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card), opacity: 0.6 }} />}
                       <span style={{ color: "var(--text-body)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                       <span style={faint}>{[x.card.number, x.value !== null ? fmtUSD(x.value) : null].filter(Boolean).join(" · ")}</span>
                       <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), false)} style={{ ...eyebrow, cursor: "pointer", background: "none", border: "none", padding: "4px 0", color: "var(--pink-700)" }}>Unhide</button>
