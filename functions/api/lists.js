@@ -21,7 +21,7 @@ const clean = (l) => ({
   name: String(l.name || "Untitled list").slice(0, 80),
   items: (Array.isArray(l.items) ? l.items : []).slice(0, 500)
     .filter((it) => it && /^\d{7,12}$/.test(String(it.cert)))
-    .map((it) => ({ cert: String(it.cert), grade: Math.min(10, Math.max(1, Number(it.grade) || 10)), ...(it.name ? { name: String(it.name).slice(0, 120) } : {}) })),
+    .map((it) => ({ cert: String(it.cert), grade: Math.min(10, Math.max(1, Number(it.grade) || 10)), ...(it.name ? { name: String(it.name).slice(0, 120) } : {}), ...(it.label ? { label: String(it.label).slice(0, 40) } : {}) })),
   ...(/^#[0-9a-f]{6}$/i.test(String(l.color || "")) ? { color: String(l.color).toLowerCase() } : {}),
   at: Date.now(),
 });

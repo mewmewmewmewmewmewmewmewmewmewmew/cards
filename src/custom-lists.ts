@@ -7,7 +7,8 @@
  */
 type Any = any;
 
-export type Item = { cert: string; grade: number; name?: string };
+/** label: your own text for the card (e.g. its set number), typed after the cert. */
+export type Item = { cert: string; grade: number; name?: string; label?: string };
 /** color: its theme colour (#rrggbb, none = the site pink); locked: the list has a view password; hidden: this browser hasn't given it (no items sent, count = how many). */
 export type List = { id: string; name: string; items: Item[]; at: number; color?: string; locked?: boolean; hidden?: boolean; count?: number };
 
@@ -125,6 +126,17 @@ export function parseCerts(text: string): Item[] {
   const out: Item[] = [];
   const seen = new Set<string>();
   for (const line of String(text || "").split(/\n/)) {
+    // One cert on the line: an optional grade, then anything else is the card's label
+    // ("12345678 9 205/165"). A grade only counts as a number on its own, so "5/34" is a label.
+    if ((line.match(/\d{7,12}/g) || []).length === 1) {
+      const m = /^\s*#?(\d{7,12})(?:[\s,;]+(?:psa\s*)?(\d{1,2}(?:\.5)?)(?=[\s,;]|$))?(?:[\s,;]+(.*))?$/i.exec(line);
+      if (m) {
+        const g = m[2] ? parseFloat(m[2]) : 10;
+        const label = (m[3] || "").trim().slice(0, 40);
+        if (!seen.has(m[1])) { seen.add(m[1]); out.push({ cert: m[1], grade: g >= 1 && g <= 10 ? g : 10, ...(label ? { label } : {}) }); }
+        continue;
+      }
+    }
     const toks = line.split(/[\s,;|/]+/).filter(Boolean);
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i].replace(/^#/, "");
@@ -142,8 +154,8 @@ export function parseCerts(text: string): Item[] {
   return out;
 }
 
-/** The list as editable text, one cert per line (grade shown when it isn't 10). */
-export const certsText = (items: Item[]) => items.map((it) => (it.grade === 10 ? it.cert : `${it.cert} ${it.grade}`)).join("\n");
+/** The list as editable text, one cert per line (grade shown when it isn't 10, then the label). */
+export const certsText = (items: Item[]) => items.map((it) => [it.cert, it.grade === 10 ? "" : String(it.grade), it.label || ""].filter(Boolean).join(" ")).join("\n");
 
 /* ---------- saved ALT data + PSA details per list (/api/snapshot) ---------- */
 

@@ -302,7 +302,7 @@ const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "
 /* ---------- /stats/custom hub ---------- */
 
 const field: React.CSSProperties = { boxSizing: "border-box", width: "100%", padding: "8px 10px", background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: "var(--web-radius-sm)", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-title)", outline: "none" };
-const CERTS_HINT = "One cert per line (or separated by commas). Add a grade after a cert for anything that isn't a PSA 10, e.g. 12345678 9.";
+const CERTS_HINT = "One cert per line. Add a grade after a cert for anything that isn't a PSA 10, then anything else as the card's label, e.g. 12345678 9 205/165.";
 const errText = (e: Any) => (e && e.message === "cancelled" ? "" : (e && e.message) || "Couldn't save.");
 
 /** Name, link id and certs, for a new list and for editing one. onSave throws to show an error. */
@@ -786,7 +786,7 @@ export default function StatsPage() {
     (saved ? saved.cards : []).forEach((c: Any) => String(c.certs || "").split(/[^A-Za-z0-9-]+/).forEach((t) => { if (t && !mine.has(t)) mine.set(t, c); }));
     const cards = cl.items.map((it) => {
       const c = mine.get(it.cert);
-      return { ...(c || {}), id: `custom-${it.cert}`, certs: it.cert, customGrade: it.grade, fromSheet: !!c, nameEN: (c && c.nameEN) || (c && c.nameJP ? "" : it.name || ""), paid: null, pc: "", isMew: true };
+      return { ...(c || {}), ...(it.label ? { number: it.label } : {}), id: `custom-${it.cert}`, certs: it.cert, customGrade: it.grade, fromSheet: !!c, nameEN: (c && c.nameEN) || (c && c.nameJP ? "" : it.name || ""), paid: null, pc: "", isMew: true };
     });
     return { cards, hidden: null, diag: {} };
   };
@@ -1294,7 +1294,7 @@ export default function StatsPage() {
             <ListForm name={clist.name} id={clist.id} text={CL.certsText(clist.items)} submit="Save" locked={!!clist.locked} color={clist.color || ""} onCancel={() => setEditing(false)}
               onSave={async (name, id, items, view) => {
                 const known = CL.knownNames();
-                const l = { id, name, items: items.map((it) => ({ ...it, name: known[it.cert] })), at: Date.now(), ...view };
+                const l = { ...view, id, name, items: items.map((it) => ({ ...it, name: known[it.cert] })), at: Date.now() };
                 const all = await CL.saveList(l, { prevId: id !== clist.id ? clist.id : undefined });
                 fillMissing.current = id;
                 if (id !== clist.id) { history.replaceState(null, "", `#${id}`); setHashId(id); }
