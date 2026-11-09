@@ -102,6 +102,12 @@ export async function onRequestPost({ request, env }) {
   for (const [grade, certs] of byGrade) {
     const got = await fetchAlt(certs, grade, !missingOnly, errors);
     calls += got.calls;
+    // The Worker's cached copy can predate its card details (number, year, pop): ask ALT afresh
+    // for those certs.
+    if (missingOnly) {
+      const old = certs.filter((c) => { const r = got.out.get(c); return r && !("cardNumber" in r) && !("population" in r) && !("year" in r); });
+      if (old.length) { const again = await fetchAlt(old, grade, true, errors); calls += again.calls; again.out.forEach((r, c) => got.out.set(c, r)); }
+    }
     certs.forEach((c) => {
       const r = got.out.get(c), k = `${c}|${grade}`;
       if (r && (useful(r) || !results[k])) results[k] = trim(r);
