@@ -488,7 +488,7 @@ export default function StatsPage() {
     } catch (e) { const m = errText(e); if (m) setSnapMsg(m); }
   };
   // PSA's details for custom certs that aren't in the sheet (year, set, number…).
-  const [psa, setPsa] = useState<{ info: Record<string, CL.CertInfo>; token: boolean; limited: boolean; problem?: { status: number; text: string } | null } | null>(null);
+  const [psa, setPsa] = useState<{ info: Record<string, CL.CertInfo>; token: boolean; limited: boolean; problem?: { status: number; text: string } | null; photosRefused?: { status: number; text: string } | null } | null>(null);
   // A custom list's data is the copy saved on the server (/api/snapshot): viewing never calls ALT,
   // only Refresh does. snapAt = when it was fetched.
   const [snapAt, setSnapAt] = useState<number | null>(null);
@@ -795,7 +795,7 @@ export default function StatsPage() {
     const h10 = new Map<string, Any>(), hP = new Map<string, Any>();
     cl.items.forEach((it) => { const r = snap && snap.results[`${it.cert}|${it.grade}`]; if (r) (it.grade === 10 ? h10 : hP).set(it.cert, D.checkResult(r, it.grade)); });
     setHist(h10); setHistP(hP);
-    setPsa(snap ? { info: snap.psa || {}, token: snap.psaToken !== false, limited: !!snap.psaLimited, problem: snap.psaProblem || null } : null);
+    setPsa(snap ? { info: snap.psa || {}, token: snap.psaToken !== false, limited: !!snap.psaLimited, problem: snap.psaProblem || null, photosRefused: snap.psaPhotosRefused || null } : null);
     setSnapAt(snap ? snap.at : null);
     setCards((cur) => cur.map((c: Any) => {
       const i = snap && snap.psa && snap.psa[D.certOf(c) as string];
@@ -1565,7 +1565,7 @@ export default function StatsPage() {
                           {(() => {
                             const all = cards.map((c: Any) => psa.info[D.certOf(c) as string]).filter((i: Any) => i && !i.notFound);
                             const withPhoto = all.filter((i: Any) => i.image).length, asked = all.filter((i: Any) => i.imgTried).length;
-                            return <div style={line}>PSA photos · {withPhoto} of {cards.length} certs have one · {asked} asked{asked < all.length ? ` · ${all.length - asked} queued` : ""}{asked > withPhoto ? ` · ${asked - withPhoto} with no photo on PSA` : ""}{psa.limited && (!psa.problem || psa.problem.status === 429) ? " · PSA's daily limit reached" : ""}</div>;
+                            return <div style={line}>PSA photos · {withPhoto} of {cards.length} certs have one · {asked} asked{asked < all.length ? ` · ${all.length - asked} queued` : ""}{asked > withPhoto ? ` · ${asked - withPhoto} with no photo on PSA` : ""}{psa.limited && (!psa.problem || psa.problem.status === 429) ? " · PSA's daily limit reached" : ""}{psa.photosRefused ? ` · PSA refused the photos (${psa.photosRefused.status}${psa.photosRefused.text ? `: ${psa.photosRefused.text}` : ""}), the details still load` : ""}</div>;
                           })()}
                           {!psa.token && got.length < mine.length && <div style={hint}>Year, set and card number come from PSA: add a PSA_TOKEN secret to the mewcards project in Cloudflare (a free API token from psacard.com); they fill in on the next visit.</div>}
                           {off.length > 0 && <div style={hint}>Grade differs from PSA · {off.map((c: Any) => `cert ${D.certOf(c)} is a PSA ${psa.info[D.certOf(c) as string].grade}, listed at ${c.customGrade}`).join(" · ")}</div>}

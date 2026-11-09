@@ -77,7 +77,7 @@ export async function onRequestPost({ request, env }) {
     const queued = certs.filter((c) => { const i = (prev.psa || {})[c]; return !i || (!i.notFound && !i.imgTried); });
     if (!queued.length || !env.PSA_TOKEN || (prev.psaRetryAt && Date.now() < prev.psaRetryAt)) return json({ snap: prev });
     const psa = await lookupPsa(env, queued, 45);
-    const snap = { ...prev, psa: { ...(prev.psa || {}), ...psa.info }, psaToken: psa.token, psaLimited: psa.limited, psaProblem: psa.problem || null, psaRetryAt: psa.limited ? Date.now() + (psa.problem && psa.problem.status !== 429 ? 10 * 60 * 1000 : PSA_RETRY) : 0 };
+    const snap = { ...prev, psa: { ...(prev.psa || {}), ...psa.info }, psaToken: psa.token, psaLimited: psa.limited, psaProblem: psa.problem || null, psaPhotosRefused: psa.photosRefused || null, psaRetryAt: psa.limited ? Date.now() + (psa.problem && psa.problem.status !== 429 ? 10 * 60 * 1000 : PSA_RETRY) : 0 };
     await env.MEW_KV.put(snapKey(list.id), JSON.stringify(snap));
     await nameItems(env, lists, list, snap);
     return json({ snap });
@@ -106,7 +106,7 @@ export async function onRequestPost({ request, env }) {
   // PSA: anything not yet known (a cert is only ever looked up once); certs past PSA's daily
   // limit stay queued for a later visit or refresh.
   const psa = await lookupPsa(env, certs, 45 - calls);
-  const snap = { at: want.length ? Date.now() : prev.at || Date.now(), tried: Date.now(), results, psa: psa.info, psaToken: psa.token, psaLimited: psa.limited, psaProblem: psa.problem || null, psaRetryAt: psa.limited ? Date.now() + (psa.problem && psa.problem.status !== 429 ? 10 * 60 * 1000 : PSA_RETRY) : 0, errors };
+  const snap = { at: want.length ? Date.now() : prev.at || Date.now(), tried: Date.now(), results, psa: psa.info, psaToken: psa.token, psaLimited: psa.limited, psaProblem: psa.problem || null, psaPhotosRefused: psa.photosRefused || null, psaRetryAt: psa.limited ? Date.now() + (psa.problem && psa.problem.status !== 429 ? 10 * 60 * 1000 : PSA_RETRY) : 0, errors };
   await env.MEW_KV.put(snapKey(list.id), JSON.stringify(snap));
   await nameItems(env, lists, list, snap);
   return json({ snap });

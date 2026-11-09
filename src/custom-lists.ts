@@ -161,7 +161,7 @@ export const certsText = (items: Item[]) => items.map((it) => [it.cert, it.grade
 
 export type CertInfo = { year: number | null; set: string; number: string; subject: string; variety: string; grade: number | null; gradeText?: string; image?: string; imgTried?: boolean; notFound?: boolean };
 /** results are keyed "<cert>|<grade>"; at = when the data was last fetched. */
-export type Snap = { at: number; tried?: number; results: Record<string, Any>; psa: Record<string, CertInfo>; psaToken?: boolean; psaLimited?: boolean; psaProblem?: { status: number; text: string } | null; psaRetryAt?: number; errors?: string[] };
+export type Snap = { at: number; tried?: number; results: Record<string, Any>; psa: Record<string, CertInfo>; psaToken?: boolean; psaLimited?: boolean; psaProblem?: { status: number; text: string } | null; psaPhotosRefused?: { status: number; text: string } | null; psaRetryAt?: number; errors?: string[] };
 
 export async function fetchSnapshot(id: string): Promise<Snap | null> {
   const res = await fetch(`/api/snapshot?id=${encodeURIComponent(id)}`, { cache: "no-store", headers: pwHeaders(id) });

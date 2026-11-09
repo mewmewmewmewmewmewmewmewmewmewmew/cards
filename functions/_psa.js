@@ -25,7 +25,7 @@ function infoOf(c) {
 }
 
 /**
- * → { info: { [cert]: info | { notFound: true } }, token: bool, limited: bool, problem?: { status, text } }
+ * → { info: { [cert]: info | { notFound: true } }, token: bool, limited: bool, problem?: { status, text }, photosRefused?: { status, text } }
  * limited: PSA refused (429 its daily limit, 401 a bad token, 403 blocked); problem says which.
  * Each cert costs two calls once: its details, then PSA's photo of the slab (info.image, the front;
  * imgTried marks that it was asked, as older certs often have no photo). At most `max` calls to
@@ -39,12 +39,16 @@ export async function lookupPsa(env, certs, max = 40) {
   let limited = false, problem = null;
   if (!token) return { info, token: false, limited };
   let calls = 0;
-  const get = async (url) => {
+  // A refused photo (PSA may keep images to approved accounts) doesn't stop the details: photos
+  // are just skipped for the rest of this run and asked again next time.
+  let photosRefused = null;
+  const get = async (url, photo = false) => {
     calls++;
     const res = await fetch(url, { headers: { authorization: `bearer ${token}`, accept: "application/json", "user-agent": "mew.cards (custom lists)" } });
     if (res.status === 429 || res.status === 401 || res.status === 403) {
-      limited = true;
-      problem = { status: res.status, text: (await res.text().catch(() => "")).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) };
+      const p = { status: res.status, text: (await res.text().catch(() => "")).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) };
+      if (photo && res.status !== 429) { photosRefused = p; return { skip: true }; }
+      limited = true; problem = p;
       return { stop: true };
     }
     return { status: res.status, ok: res.ok, json: res.ok ? await res.json().catch(() => null) : null };
@@ -63,9 +67,10 @@ export async function lookupPsa(env, certs, max = 40) {
         await save(c);
       }
       // PSA's photo of the slab (the front), once per cert.
-      if (!info[c].notFound && !info[c].imgTried && calls < max) {
-        const r = await get(PSA_IMAGES + c);
+      if (!info[c].notFound && !info[c].imgTried && !photosRefused && calls < max) {
+        const r = await get(PSA_IMAGES + c, true);
         if (r.stop) break;
+        if (r.skip) continue;
         if (!r.ok && r.status !== 404) continue;
         // A list of { IsFrontImage, ImageURL } (or the same list inside an object).
         const imgs = Array.isArray(r.json) ? r.json : r.json && typeof r.json === "object" ? (Object.values(r.json).find(Array.isArray) || []) : [];
@@ -75,5 +80,5 @@ export async function lookupPsa(env, certs, max = 40) {
       }
     } catch (e) { /* tried again later */ }
   }
-  return { info, token: true, limited, ...(problem ? { problem } : {}) };
+  return { info, token: true, limited, ...(problem ? { problem } : {}), ...(photosRefused ? { photosRefused } : {}) };
 }
