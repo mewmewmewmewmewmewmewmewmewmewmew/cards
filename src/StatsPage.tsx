@@ -61,6 +61,10 @@ const cardImg = (c: Any): React.CSSProperties => ({
   backgroundRepeat: "no-repeat",
 });
 
+const Lock: React.FC = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-label="Password protected"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+);
+
 const Trash: React.FC = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" /><path d="M9 7V4h6v3" />
@@ -256,7 +260,10 @@ const CERTS_HINT = "One cert per line (or separated by commas). Add a grade afte
 const errText = (e: Any) => (e && e.message === "cancelled" ? "" : (e && e.message) || "Couldn't save.");
 
 /** Name, link id and certs, for a new list and for editing one. onSave throws to show an error. */
-const ListForm: React.FC<{ name: string; id: string; text: string; submit: string; isNew?: boolean; onSave: (name: string, id: string, items: CL.Item[]) => Promise<void>; onCancel?: () => void }> = ({ name, id, text, submit, isNew, onSave, onCancel }) => {
+type ViewPw = { viewPassword?: string; removeViewPassword?: boolean };
+const ListForm: React.FC<{ name: string; id: string; text: string; submit: string; isNew?: boolean; locked?: boolean; onSave: (name: string, id: string, items: CL.Item[], view: ViewPw) => Promise<void>; onCancel?: () => void }> = ({ name, id, text, submit, isNew, locked, onSave, onCancel }) => {
+  const [viewPw, setViewPw] = useState("");
+  const [removePw, setRemovePw] = useState(false);
   const [n, setN] = useState(name);
   const [linkId, setLinkId] = useState(id);
   const [touched, setTouched] = useState(!isNew); // a new list's link follows its name until edited
@@ -271,7 +278,7 @@ const ListForm: React.FC<{ name: string; id: string; text: string; submit: strin
     e.preventDefault();
     if (!ready) return;
     setBusy(true); setErr("");
-    try { await onSave(n.trim() || "Untitled list", shownId, items); } catch (x) { setErr(errText(x)); }
+    try { await onSave(n.trim() || "Untitled list", shownId, items, viewPw ? { viewPassword: viewPw } : removePw ? { removeViewPassword: true } : {}); } catch (x) { setErr(errText(x)); }
     setBusy(false);
   };
   return (
@@ -282,6 +289,12 @@ const ListForm: React.FC<{ name: string; id: string; text: string; submit: strin
         <input value={shownId} onChange={(e) => { setTouched(true); setLinkId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 40)); }} placeholder="list-link" aria-label="Link"
           style={{ flex: 1, minWidth: 0, padding: "8px 10px 8px 0", border: "none", outline: "none", background: "transparent", font: "inherit", color: "var(--text-title)" }} />
       </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="password" value={viewPw} onChange={(e) => { setViewPw(e.target.value); setRemovePw(false); }} aria-label="View password" autoComplete="new-password"
+          placeholder={locked && !removePw ? "View password set · type a new one to change it" : "View password (optional) · leave empty for anyone to see"}
+          style={{ ...field, flex: 1, minWidth: 0 }} />
+        {locked && !viewPw && <button type="button" onClick={() => setRemovePw(!removePw)} style={pill(removePw)}>{removePw ? "Will remove" : "Remove"}</button>}
+      </div>
       <textarea value={t} onChange={(e) => setT(e.target.value)} placeholder={"12345678\n87654321 9"} aria-label="Certs" rows={8} style={{ ...field, resize: "vertical", lineHeight: 1.5 }} />
       <div style={{ ...faint, lineHeight: 1.5 }}>{CERTS_HINT}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -347,8 +360,8 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
           <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
             <div style={{ ...eyebrow, marginBottom: 10 }}>New list</div>
             <ListForm name="" id="" text="" submit="Create list" isNew onCancel={() => setAdding(false)}
-              onSave={async (name, id, items) => {
-                const all = await CL.saveList({ id, name, items, at: Date.now() }, { isNew: true });
+              onSave={async (name, id, items, view) => {
+                const all = await CL.saveList({ id, name, items, at: Date.now(), ...view }, { isNew: true });
                 setLists(all);
                 D.trackEvent("custom_list_create", { certs: items.length });
                 open(id);
@@ -363,7 +376,9 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
                 <a href={`#${l.id}`} onClick={(e) => { e.preventDefault(); open(l.id); }}
                   style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", boxSizing: "border-box", padding: 14, textDecoration: "none", background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 28 }}>{l.name}</span>
-                  <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)" }}>#{l.id} · {l.items.length} cert{l.items.length === 1 ? "" : "s"}</span>
+                  <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", display: "flex", alignItems: "center", gap: 6 }}>
+                    {l.locked && <Lock />}#{l.id} · {l.hidden ? l.count || 0 : l.items.length} cert{(l.hidden ? l.count : l.items.length) === 1 ? "" : "s"}
+                  </span>
                   {seen.length > 0 && <span style={{ ...faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{seen.slice(0, 6).join(" · ")}</span>}
                 </a>
                 <button type="button" data-hover-pink="1" onClick={async () => {
@@ -395,13 +410,17 @@ export default function StatsPage() {
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   // PSA's details for custom certs that aren't in the sheet (year, set, number…).
-  const [psa, setPsa] = useState<{ info: Record<string, CL.CertInfo>; token: boolean; limited: boolean } | null>(null);
+  const [psa, setPsa] = useState<{ info: Record<string, CL.CertInfo>; token: boolean; limited: boolean; problem?: { status: number; text: string } | null } | null>(null);
   // A custom list's data is the copy saved on the server (/api/snapshot): viewing never calls ALT,
   // only Refresh does. snapAt = when it was fetched.
   const [snapAt, setSnapAt] = useState<number | null>(null);
   const [snapBusy, setSnapBusy] = useState(false);
   const [snapMsg, setSnapMsg] = useState("");
   const fillMissing = useRef<string | null>(null); // list just made or edited: fetch its new certs
+  // A list with a view password, not yet opened here: the password box.
+  const [unlockPw, setUnlockPw] = useState("");
+  const [unlockErr, setUnlockErr] = useState("");
+  const showUnlocked = (l: CL.List) => setLists((cur) => cur.map((x) => (x.id === l.id ? l : x)));
   const [theme, setTheme] = useState<string>(() => (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   const [lang, setLang] = useState<"EN" | "JP">(() => (/^ja\b/i.test(navigator.language || "") ? "JP" : "EN"));
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
@@ -697,7 +716,7 @@ export default function StatsPage() {
     const h10 = new Map<string, Any>(), hP = new Map<string, Any>();
     cl.items.forEach((it) => { const r = snap && snap.results[`${it.cert}|${it.grade}`]; if (r) (it.grade === 10 ? h10 : hP).set(it.cert, D.checkResult(r, it.grade)); });
     setHist(h10); setHistP(hP);
-    setPsa(snap ? { info: snap.psa || {}, token: snap.psaToken !== false, limited: !!snap.psaLimited } : null);
+    setPsa(snap ? { info: snap.psa || {}, token: snap.psaToken !== false, limited: !!snap.psaLimited, problem: snap.psaProblem || null } : null);
     setSnapAt(snap ? snap.at : null);
     setCards((cur) => cur.map((c: Any) => {
       const i = snap && snap.psa && snap.psa[D.certOf(c) as string];
@@ -831,6 +850,12 @@ export default function StatsPage() {
   const clistKey = clist ? JSON.stringify(clist.items.map((it) => [it.cert, it.grade])) : "";
   useEffect(() => {
     if (!custom || !clist) return;
+    if (clist.hidden) {
+      // Locked: open it with a view password remembered here, else ask (below).
+      const pw = CL.savedViewPw(clist.id);
+      if (pw) CL.openList(clist.id, pw).then(showUnlocked).catch(() => {});
+      return;
+    }
     resetData();
     setSnapMsg("");
     loadCustom(clist);
@@ -1042,6 +1067,26 @@ export default function StatsPage() {
     return <CustomHub theme={theme} setTheme={setTheme} narrow={narrow} lists={lists} status={listsStatus} missing={hashId} setLists={setLists} open={(id) => { location.hash = id; }} />;
   }
 
+  if (custom && clist && clist.hidden) {
+    const unlock = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!unlockPw) return;
+      setUnlockErr("");
+      try { showUnlocked(await CL.openList(clist.id, unlockPw)); setUnlockPw(""); }
+      catch (x: Any) { setUnlockErr((x && x.message) || "Couldn't open it."); }
+    };
+    return (
+      <Loader theme={theme} progress={0}>
+        <form onSubmit={unlock} style={{ position: "absolute", top: "50%", left: 0, right: 0, marginTop: 72, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, animation: "mewFadeUp 400ms var(--ease) both" }}>
+          <span style={{ ...faint, color: "rgba(203, 151, 165, 0.9)" }}>{clist.name}</span>
+          <input type="password" className="mew-gate-input" value={unlockPw} onChange={(e) => setUnlockPw(e.target.value)} aria-label="Password" autoFocus
+            style={{ height: 30, width: 96, padding: "0 10px", boxSizing: "border-box", borderRadius: 6, textAlign: "center", fontFamily: "var(--font-body)", fontSize: 13, letterSpacing: "0.25em", textIndent: "0.25em", outline: "none" }} />
+          {unlockErr && <span role="alert" style={{ ...faint, color: "rgba(203, 151, 165, 0.9)" }}>{unlockErr}</span>}
+        </form>
+      </Loader>
+    );
+  }
+
   /* ---------- gate: password, then loading until all ALT data is in ---------- */
   const allLoaded = histDone && histPDone && imgs.finished;
   if ((phase !== "ready" && phase !== "error") || (phase === "ready" && !allLoaded)) {
@@ -1161,10 +1206,10 @@ export default function StatsPage() {
 
         {custom && clist && editing && (
           <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
-            <ListForm name={clist.name} id={clist.id} text={CL.certsText(clist.items)} submit="Save" onCancel={() => setEditing(false)}
-              onSave={async (name, id, items) => {
+            <ListForm name={clist.name} id={clist.id} text={CL.certsText(clist.items)} submit="Save" locked={!!clist.locked} onCancel={() => setEditing(false)}
+              onSave={async (name, id, items, view) => {
                 const known = CL.knownNames();
-                const l = { id, name, items: items.map((it) => ({ ...it, name: known[it.cert] })), at: Date.now() };
+                const l = { id, name, items: items.map((it) => ({ ...it, name: known[it.cert] })), at: Date.now(), ...view };
                 const all = await CL.saveList(l, { prevId: id !== clist.id ? clist.id : undefined });
                 fillMissing.current = id;
                 if (id !== clist.id) { history.replaceState(null, "", `#${id}`); setHashId(id); }
@@ -1425,11 +1470,14 @@ export default function StatsPage() {
                       const off = got.filter((c: Any) => { const i = psa.info[D.certOf(c) as string]; return i.grade && i.grade !== c.customGrade; });
                       return (
                         <>
-                          <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited ? " · PSA's daily limit reached, the rest are queued and fill in on a later visit" : ""}</div>
+                          <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited && (!psa.problem || psa.problem.status === 429) ? " · PSA's daily limit reached, the rest are queued and fill in on a later visit" : ""}</div>
+                          {psa.problem && psa.problem.status !== 429 && <div style={hint}>{psa.problem.status === 401
+                            ? "PSA rejected the token (401). In Cloudflare, set PSA_TOKEN to just the token from psacard.com's Public API page (no \"Bearer\"), retry the deployment, then press Refresh."
+                            : `PSA refused the request (${psa.problem.status}): PSA may be blocking requests from Cloudflare.`}{psa.problem.text ? ` PSA said: "${psa.problem.text}"` : ""}</div>}
                           {(() => {
                             const all = cards.map((c: Any) => psa.info[D.certOf(c) as string]).filter((i: Any) => i && !i.notFound);
                             const withPhoto = all.filter((i: Any) => i.image).length, asked = all.filter((i: Any) => i.imgTried).length;
-                            return <div style={line}>PSA photos · {withPhoto} of {cards.length} certs have one · {asked} asked{asked < all.length ? ` · ${all.length - asked} queued` : ""}{asked > withPhoto ? ` · ${asked - withPhoto} with no photo on PSA` : ""}{psa.limited ? " · PSA's daily limit reached" : ""}</div>;
+                            return <div style={line}>PSA photos · {withPhoto} of {cards.length} certs have one · {asked} asked{asked < all.length ? ` · ${all.length - asked} queued` : ""}{asked > withPhoto ? ` · ${asked - withPhoto} with no photo on PSA` : ""}{psa.limited && (!psa.problem || psa.problem.status === 429) ? " · PSA's daily limit reached" : ""}</div>;
                           })()}
                           {!psa.token && got.length < mine.length && <div style={hint}>Year, set and card number come from PSA: add a PSA_TOKEN secret to the mewcards project in Cloudflare (a free API token from psacard.com); they fill in on the next visit.</div>}
                           {off.length > 0 && <div style={hint}>Grade differs from PSA · {off.map((c: Any) => `cert ${D.certOf(c)} is a PSA ${psa.info[D.certOf(c) as string].grade}, listed at ${c.customGrade}`).join(" · ")}</div>}

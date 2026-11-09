@@ -25,7 +25,8 @@ function infoOf(c) {
 }
 
 /**
- * → { info: { [cert]: info | { notFound: true } }, token: bool, limited: bool }
+ * → { info: { [cert]: info | { notFound: true } }, token: bool, limited: bool, problem?: { status, text } }
+ * limited: PSA refused (429 its daily limit, 401 a bad token, 403 blocked); problem says which.
  * Each cert costs two calls once: its details, then PSA's photo of the slab (info.image, the front;
  * imgTried marks that it was asked, as older certs often have no photo). At most `max` calls to
  * PSA (a Pages Function may only make 50 outside requests); the rest are looked up later.
@@ -33,14 +34,19 @@ function infoOf(c) {
 export async function lookupPsa(env, certs, max = 40) {
   const info = {};
   await Promise.all(certs.map(async (c) => { const v = await env.MEW_KV.get(key(c), "json").catch(() => null); if (v) info[c] = v; }));
-  const token = env.PSA_TOKEN;
-  let limited = false;
+  // Just the token: a pasted "Bearer …" would be sent as "bearer Bearer …".
+  const token = String(env.PSA_TOKEN || "").trim().replace(/^bearer\s+/i, "");
+  let limited = false, problem = null;
   if (!token) return { info, token: false, limited };
   let calls = 0;
   const get = async (url) => {
     calls++;
-    const res = await fetch(url, { headers: { authorization: `bearer ${token}` } });
-    if (res.status === 429 || res.status === 401 || res.status === 403) { limited = true; return { stop: true }; }
+    const res = await fetch(url, { headers: { authorization: `bearer ${token}`, accept: "application/json", "user-agent": "mew.cards (custom lists)" } });
+    if (res.status === 429 || res.status === 401 || res.status === 403) {
+      limited = true;
+      problem = { status: res.status, text: (await res.text().catch(() => "")).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160) };
+      return { stop: true };
+    }
     return { status: res.status, ok: res.ok, json: res.ok ? await res.json().catch(() => null) : null };
   };
   const save = (c) => env.MEW_KV.put(key(c), JSON.stringify(info[c]));
@@ -69,5 +75,5 @@ export async function lookupPsa(env, certs, max = 40) {
       }
     } catch (e) { /* tried again later */ }
   }
-  return { info, token: true, limited };
+  return { info, token: true, limited, ...(problem ? { problem } : {}) };
 }

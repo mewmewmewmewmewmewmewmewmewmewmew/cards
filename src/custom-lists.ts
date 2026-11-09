@@ -2,18 +2,21 @@
  * Custom lists for /stats/custom: named lists of PSA certs (each at a grade), each opened at
  * /stats/custom/#<id> (an id you can edit). Kept on Cloudflare (/api/lists, functions/api, in the
  * MEW_KV namespace) so every device sees the same lists; a copy in localStorage opens the page at
- * once. Reading is open, changes need the LISTS_PASSWORD secret.
+ * once. Reading is open, changes need the LISTS_PASSWORD secret. A list can have its own view
+ * password: then the server sends its certs and data only with that password or the main one.
  */
 type Any = any;
 
 export type Item = { cert: string; grade: number; name?: string };
-export type List = { id: string; name: string; items: Item[]; at: number };
+/** locked: the list has a view password; hidden: this browser hasn't given it (no items sent, count = how many). */
+export type List = { id: string; name: string; items: Item[]; at: number; locked?: boolean; hidden?: boolean; count?: number };
 
 const API = "/api/lists";
 const CACHE = "mew_custom_lists_cache";
 const LEGACY = "mew_custom_lists_v1"; // lists saved only in this browser (before /api/lists)
 const NAMES = "mew_cert_names";
 const PW = "mew_lists_pw";
+const VIEW_PW = "mew_list_view_pw"; // { [list id]: its view password }
 
 const okList = (l: Any) => l && typeof l.id === "string" && Array.isArray(l.items);
 function readJSON(key: string, fallback: Any) { try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; } catch (e) { return fallback; } }
@@ -22,7 +25,7 @@ function writeJSON(key: string, v: Any) { try { localStorage.setItem(key, JSON.s
 /** The lists as last seen (instant), then the current ones from the server. */
 export const readCached = (): List[] => (readJSON(CACHE, []) as Any[]).filter(okList);
 export async function fetchLists(): Promise<List[]> {
-  const res = await fetch(API, { cache: "no-store" });
+  const res = await fetch(API, { cache: "no-store", headers: password() ? { "x-password": password() } : {} });
   const j = await res.json().catch(() => null);
   if (!res.ok || !j || !Array.isArray(j.lists)) throw new Error((j && j.error) || `HTTP ${res.status}`);
   const lists = j.lists.filter(okList);
@@ -58,8 +61,34 @@ async function change(body: Any): Promise<List[]> {
   throw new Error("Wrong password.");
 }
 
-/** Save a list; prevId when its id (link) changed, isNew for a new list. Resolves to every list. */
-export const saveList = (list: List, opts: { prevId?: string; isNew?: boolean } = {}) => change({ action: "save", list, ...opts });
+/**
+ * Save a list; prevId when its id (link) changed, isNew for a new list. viewPassword sets or
+ * changes its view password, removeViewPassword drops it (neither: it keeps the one it had).
+ * Resolves to every list.
+ */
+export const saveList = (list: List & { viewPassword?: string; removeViewPassword?: boolean }, opts: { prevId?: string; isNew?: boolean } = {}) => change({ action: "save", list, ...opts });
+
+/* ---------- view passwords ---------- */
+
+/** Both passwords this browser knows for a list (its view password, the main one), as headers. */
+const pwHeaders = (id: string): Record<string, string> => {
+  const h: Record<string, string> = {};
+  if (password()) h["x-password"] = password();
+  if (savedViewPw(id)) h["x-view-password"] = savedViewPw(id);
+  return h;
+};
+
+/** Open a locked list with its view password (or the main one); remembered for next time. */
+export async function openList(id: string, pw: string): Promise<List> {
+  const res = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "open", id, password: pw }) });
+  const j = await res.json().catch(() => null);
+  if (res.status === 401) throw new Error("Wrong password.");
+  if (!res.ok || !j || !okList(j.list)) throw new Error((j && j.error) || `HTTP ${res.status}`);
+  writeJSON(VIEW_PW, { ...(readJSON(VIEW_PW, {}) || {}), [id]: pw });
+  return j.list;
+}
+/** A remembered view password for this list, if any (to open it without asking). */
+export const savedViewPw = (id: string): string => (readJSON(VIEW_PW, {}) || {})[id] || "";
 export const deleteList = (id: string) => change({ action: "delete", id });
 
 /* ---------- lists from before the server (this browser only) ---------- */
@@ -120,10 +149,10 @@ export const certsText = (items: Item[]) => items.map((it) => (it.grade === 10 ?
 
 export type CertInfo = { year: number | null; set: string; number: string; subject: string; variety: string; grade: number | null; gradeText?: string; image?: string; imgTried?: boolean; notFound?: boolean };
 /** results are keyed "<cert>|<grade>"; at = when the data was last fetched. */
-export type Snap = { at: number; tried?: number; results: Record<string, Any>; psa: Record<string, CertInfo>; psaToken?: boolean; psaLimited?: boolean; psaRetryAt?: number; errors?: string[] };
+export type Snap = { at: number; tried?: number; results: Record<string, Any>; psa: Record<string, CertInfo>; psaToken?: boolean; psaLimited?: boolean; psaProblem?: { status: number; text: string } | null; psaRetryAt?: number; errors?: string[] };
 
 export async function fetchSnapshot(id: string): Promise<Snap | null> {
-  const res = await fetch(`/api/snapshot?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+  const res = await fetch(`/api/snapshot?id=${encodeURIComponent(id)}`, { cache: "no-store", headers: pwHeaders(id) });
   const j = await res.json().catch(() => null);
   if (!res.ok || !j) throw new Error((j && j.error) || `HTTP ${res.status}`);
   return j.snap || null;
@@ -131,11 +160,12 @@ export async function fetchSnapshot(id: string): Promise<Snap | null> {
 
 /**
  * Fetch new data for a list on the server: "all" (Refresh) or only the certs it doesn't have yet.
- * Sends the lists password when this browser knows it (no prompt), which skips the cooldown.
+ * Sends the passwords this browser knows (no prompt): the main one skips the cooldown, and a
+ * locked list needs one of them.
  * → { snap, cooldown? (minutes until anyone can refresh again) }
  */
 export async function refreshSnapshot(id: string, mode: "all" | "missing" | "psa"): Promise<{ snap: Snap; cooldown?: number }> {
-  const res = await fetch("/api/snapshot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, mode, password: password() || undefined }) });
+  const res = await fetch("/api/snapshot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, mode, password: password() || undefined, viewPassword: savedViewPw(id) || undefined }) });
   const j = await res.json().catch(() => null);
   if (!res.ok || !j || !j.snap) throw new Error((j && j.error) || `HTTP ${res.status}`);
   return j;

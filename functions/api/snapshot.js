@@ -7,12 +7,15 @@
  *                                            (after a list is made or edited);
  *                                            mode "psa": no ALT, only PSA details still missing
  *                                            (queued certs, e.g. after PSA's daily limit).
- * Anyone may refresh, but a list refreshes at most once per COOLDOWN unless the request carries
- * LISTS_PASSWORD; "psa" waits PSA_RETRY after PSA said its daily limit was used up. Kept in MEW_KV
+ * A list with a view password needs it (x-view-password header on GET, viewPassword in the POST
+ * body) or the main password (x-password, password). Anyone who may see a list may refresh it, but a list refreshes at most once per COOLDOWN unless the request carries
+ * LISTS_PASSWORD; "psa" waits PSA_RETRY after PSA said its daily limit was used up (10 min after it refused the
+ * token or the request). Kept in MEW_KV
  * as "snap:<id>":
  *   { at, tried, results: { "<cert>|<grade>": ALT result }, psa: { [cert]: info }, psaToken, psaLimited, psaRetryAt, errors }
  */
 import { lookupPsa } from "../_psa.js";
+import { read, isMain, canView } from "../_lists.js";
 
 const ALT = "https://cryptjapan-proxy.mew-860.workers.dev/alt-history";
 const COOLDOWN = 15 * 60 * 1000;
@@ -51,6 +54,8 @@ async function fetchAlt(certs, grade, fresh, errors) {
 export async function onRequestGet({ request, env }) {
   if (!env.MEW_KV) return json({ error: "The MEW_KV namespace isn't bound to this Pages project yet" }, 503);
   const id = new URL(request.url).searchParams.get("id") || "";
+  const list = (await read(env)).find((l) => l.id === id);
+  if (list && !(await canView(env, list, request.headers.get("x-password"))) && !(await canView(env, list, request.headers.get("x-view-password")))) return json({ error: "locked" }, 401);
   return json({ snap: id ? await env.MEW_KV.get(snapKey(id), "json") : null });
 }
 
@@ -58,10 +63,11 @@ export async function onRequestPost({ request, env }) {
   if (!env.MEW_KV) return json({ error: "The MEW_KV namespace isn't bound to this Pages project yet" }, 503);
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "bad json" }, 400); }
-  const lists = (await env.MEW_KV.get("custom-lists", "json")) || [];
+  const lists = await read(env);
   const list = lists.find((l) => l.id === (body && body.id));
   if (!list) return json({ error: "No such list." }, 404);
-  const owner = !!env.LISTS_PASSWORD && body.password === env.LISTS_PASSWORD;
+  if (!(await canView(env, list, body.password)) && !(await canView(env, list, body.viewPassword))) return json({ error: "locked" }, 401);
+  const owner = isMain(env, body.password);
   const prev = (await env.MEW_KV.get(snapKey(list.id), "json")) || { results: {}, psa: {} };
   const certs = [...new Set(list.items.map((it) => it.cert))];
   if (body.mode === "psa") {
@@ -69,7 +75,7 @@ export async function onRequestPost({ request, env }) {
     const queued = certs.filter((c) => { const i = (prev.psa || {})[c]; return !i || (!i.notFound && !i.imgTried); });
     if (!queued.length || !env.PSA_TOKEN || (prev.psaRetryAt && Date.now() < prev.psaRetryAt)) return json({ snap: prev });
     const psa = await lookupPsa(env, queued, 45);
-    const snap = { ...prev, psa: { ...(prev.psa || {}), ...psa.info }, psaToken: psa.token, psaLimited: psa.limited, psaRetryAt: psa.limited ? Date.now() + PSA_RETRY : 0 };
+    const snap = { ...prev, psa: { ...(prev.psa || {}), ...psa.info }, psaToken: psa.token, psaLimited: psa.limited, psaProblem: psa.problem || null, psaRetryAt: psa.limited ? Date.now() + (psa.problem && psa.problem.status !== 429 ? 10 * 60 * 1000 : PSA_RETRY) : 0 };
     await env.MEW_KV.put(snapKey(list.id), JSON.stringify(snap));
     await nameItems(env, lists, list, snap);
     return json({ snap });
@@ -98,7 +104,7 @@ export async function onRequestPost({ request, env }) {
   // PSA: anything not yet known (a cert is only ever looked up once); certs past PSA's daily
   // limit stay queued for a later visit or refresh.
   const psa = await lookupPsa(env, certs, 45 - calls);
-  const snap = { at: want.length ? Date.now() : prev.at || Date.now(), tried: Date.now(), results, psa: psa.info, psaToken: psa.token, psaLimited: psa.limited, psaRetryAt: psa.limited ? Date.now() + PSA_RETRY : 0, errors };
+  const snap = { at: want.length ? Date.now() : prev.at || Date.now(), tried: Date.now(), results, psa: psa.info, psaToken: psa.token, psaLimited: psa.limited, psaProblem: psa.problem || null, psaRetryAt: psa.limited ? Date.now() + (psa.problem && psa.problem.status !== 429 ? 10 * 60 * 1000 : PSA_RETRY) : 0, errors };
   await env.MEW_KV.put(snapKey(list.id), JSON.stringify(snap));
   await nameItems(env, lists, list, snap);
   return json({ snap });

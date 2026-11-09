@@ -6,9 +6,13 @@
  *   POST { password, action: "save", list, prevId?, isNew? } → { lists }
  *   POST { password, action: "delete", id }                 → { lists }
  *   POST { password, action: "check" }                      → { ok: true }
- * Reading is open; changes need the LISTS_PASSWORD secret.
+ * Reading is open, except lists with a view password (see _lists.js): without it (or the main
+ * password, sent as an x-password header) a browser gets only their name and size;
+ *   POST { action: "open", id, password } → { list }  opens one with its view password.
+ * Changes need the LISTS_PASSWORD secret. A saved list may carry viewPassword (set or change it)
+ * or removeViewPassword; otherwise it keeps the one it had.
  */
-const KEY = "custom-lists";
+import { KEY, read, hashPw, isMain, canView, shown, hidden } from "../_lists.js";
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
@@ -21,17 +25,22 @@ const clean = (l) => ({
   at: Date.now(),
 });
 
-const read = async (env) => (await env.MEW_KV.get(KEY, "json")) || [];
-
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ request, env }) {
   if (!env.MEW_KV) return json({ error: "The MEW_KV namespace isn't bound to this Pages project yet" }, 503);
-  return json({ lists: await read(env) });
+  const main = isMain(env, request.headers.get("x-password"));
+  return json({ lists: (await read(env)).map((l) => (main || !l.viewHash ? shown(l) : hidden(l))) });
 }
 
 export async function onRequestPost({ request, env }) {
   if (!env.MEW_KV) return json({ error: "The MEW_KV namespace isn't bound to this Pages project yet" }, 503);
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "bad json" }, 400); }
+  if (body && body.action === "open") {
+    const l = (await read(env)).find((x) => x.id === body.id);
+    if (!l) return json({ error: "No such list." }, 404);
+    if (!(await canView(env, l, body.password))) return json({ error: "auth" }, 401);
+    return json({ list: shown(l) });
+  }
   if (!env.LISTS_PASSWORD) return json({ error: "LISTS_PASSWORD isn't set in Cloudflare yet" }, 503);
   if (!body || body.password !== env.LISTS_PASSWORD) return json({ error: "auth" }, 401);
 
@@ -41,7 +50,7 @@ export async function onRequestPost({ request, env }) {
     const next = lists.filter((l) => l.id !== body.id);
     await env.MEW_KV.put(KEY, JSON.stringify(next));
     await env.MEW_KV.delete(`snap:${body.id}`);
-    return json({ lists: next });
+    return json({ lists: next.map(shown) });
   }
   if (body.action === "save") {
     const l = body.list && clean(body.list);
@@ -50,6 +59,10 @@ export async function onRequestPost({ request, env }) {
     const prev = body.prevId && body.prevId !== l.id ? body.prevId : null;
     // A new list, or a renamed link, can't take an id another list already has.
     if ((prev || body.isNew) && lists.some((x) => x.id === l.id)) return json({ error: `#${l.id} is already used by another list.` }, 409);
+    const before = lists.find((x) => x.id === (prev || l.id));
+    const vp = String(body.list.viewPassword || "");
+    if (vp) l.viewHash = await hashPw(vp);
+    else if (!body.list.removeViewPassword && before && before.viewHash) l.viewHash = before.viewHash;
     const next = [l, ...lists.filter((x) => x.id !== l.id && x.id !== prev)];
     await env.MEW_KV.put(KEY, JSON.stringify(next));
     if (prev) {
@@ -57,7 +70,7 @@ export async function onRequestPost({ request, env }) {
       const snap = await env.MEW_KV.get(`snap:${prev}`);
       if (snap) { await env.MEW_KV.put(`snap:${l.id}`, snap); await env.MEW_KV.delete(`snap:${prev}`); }
     }
-    return json({ lists: next });
+    return json({ lists: next.map(shown) });
   }
   return json({ error: "unknown action" }, 400);
 }
