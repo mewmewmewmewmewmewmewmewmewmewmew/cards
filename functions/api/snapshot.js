@@ -66,7 +66,7 @@ export async function onRequestPost({ request, env }) {
   const certs = [...new Set(list.items.map((it) => it.cert))];
   if (body.mode === "psa") {
     // The PSA queue: only certs still without PSA details, no ALT calls.
-    const queued = certs.filter((c) => !(prev.psa || {})[c]);
+    const queued = certs.filter((c) => { const i = (prev.psa || {})[c]; return !i || (!i.notFound && !i.imgTried); });
     if (!queued.length || !env.PSA_TOKEN || (prev.psaRetryAt && Date.now() < prev.psaRetryAt)) return json({ snap: prev });
     const psa = await lookupPsa(env, queued, 45);
     const snap = { ...prev, psa: { ...(prev.psa || {}), ...psa.info }, psaToken: psa.token, psaLimited: psa.limited, psaRetryAt: psa.limited ? Date.now() + PSA_RETRY : 0 };

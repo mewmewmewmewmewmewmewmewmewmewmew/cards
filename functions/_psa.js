@@ -5,6 +5,7 @@
  * aren't served.)
  */
 const PSA = "https://api.psacard.com/publicapi/cert/GetByCertNumber/";
+const PSA_IMAGES = "https://api.psacard.com/publicapi/cert/GetImagesByCertNumber/";
 const key = (c) => `psa-cert:${c}`;
 
 // "GEM MT 10" → 10, "MINT 9" → 9, "NM-MT 8.5" → 8.5
@@ -25,8 +26,9 @@ function infoOf(c) {
 
 /**
  * → { info: { [cert]: info | { notFound: true } }, token: bool, limited: bool }
- * At most `max` calls to PSA (a Pages Function may only make 50 outside requests); the rest are
- * looked up on a later refresh.
+ * Each cert costs two calls once: its details, then PSA's photo of the slab (info.image, the front;
+ * imgTried marks that it was asked, as older certs often have no photo). At most `max` calls to
+ * PSA (a Pages Function may only make 50 outside requests); the rest are looked up later.
  */
 export async function lookupPsa(env, certs, max = 40) {
   const info = {};
@@ -34,18 +36,37 @@ export async function lookupPsa(env, certs, max = 40) {
   const token = env.PSA_TOKEN;
   let limited = false;
   if (!token) return { info, token: false, limited };
-  for (const c of certs.filter((c) => !info[c]).slice(0, Math.max(0, max))) {
+  let calls = 0;
+  const get = async (url) => {
+    calls++;
+    const res = await fetch(url, { headers: { authorization: `bearer ${token}` } });
+    if (res.status === 429 || res.status === 401 || res.status === 403) { limited = true; return { stop: true }; }
+    return { status: res.status, ok: res.ok, json: res.ok ? await res.json().catch(() => null) : null };
+  };
+  const save = (c) => env.MEW_KV.put(key(c), JSON.stringify(info[c]));
+  for (const c of certs) {
+    if (limited || calls >= max) break;
     try {
-      const res = await fetch(PSA + c, { headers: { authorization: `bearer ${token}` } });
-      if (res.status === 429 || res.status === 401 || res.status === 403) { limited = true; break; }
-      if (res.status === 404) { info[c] = { notFound: true, at: Date.now() }; await env.MEW_KV.put(key(c), JSON.stringify(info[c])); continue; }
-      if (!res.ok) continue;
-      const j = await res.json().catch(() => null);
-      const cert = j && j.PSACert;
-      if (!cert) { if (j && /not found|invalid/i.test(String(j.ServerMessage || ""))) { info[c] = { notFound: true, at: Date.now() }; await env.MEW_KV.put(key(c), JSON.stringify(info[c])); } continue; }
-      info[c] = infoOf(cert);
-      await env.MEW_KV.put(key(c), JSON.stringify(info[c]));
-    } catch (e) { /* tried again on the next refresh */ }
+      if (!info[c]) {
+        const r = await get(PSA + c);
+        if (r.stop) break;
+        const cert = r.json && r.json.PSACert;
+        if (r.status === 404 || (!cert && r.json && /not found|invalid/i.test(String(r.json.ServerMessage || "")))) { info[c] = { notFound: true, at: Date.now() }; await save(c); continue; }
+        if (!cert) continue; // tried again later
+        info[c] = infoOf(cert);
+        await save(c);
+      }
+      // PSA's photo of the slab (the front), once per cert.
+      if (!info[c].notFound && !info[c].imgTried && calls < max) {
+        const r = await get(PSA_IMAGES + c);
+        if (r.stop) break;
+        if (!r.ok && r.status !== 404) continue;
+        const imgs = Array.isArray(r.json) ? r.json : [];
+        const front = imgs.find((x) => x && x.IsFrontImage && x.ImageURL) || imgs.find((x) => x && x.ImageURL);
+        info[c] = { ...info[c], image: front ? String(front.ImageURL) : "", imgTried: true };
+        await save(c);
+      }
+    } catch (e) { /* tried again later */ }
   }
   return { info, token: true, limited };
 }

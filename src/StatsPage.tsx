@@ -50,6 +50,23 @@ function readPref<T>(key: string, fallback: T, ok: (v: Any) => boolean): T {
 }
 function savePref(key: string, v: Any) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
 
+/**
+ * A card picture as a background. PSA's slab photos (card.slab) are zoomed to the card window: the
+ * slab is ~3.3 × 5.35 in with the 2.5 × 3.5 in card about 28% from the top.
+ */
+const cardImg = (c: Any): React.CSSProperties => ({
+  backgroundImage: c.image ? `url("${c.image}")` : "none",
+  backgroundSize: c.slab ? "132% auto" : "100% 100%",
+  backgroundPosition: c.slab ? "50% 81%" : undefined,
+  backgroundRepeat: "no-repeat",
+});
+
+const Trash: React.FC = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" /><path d="M9 7V4h6v3" />
+  </svg>
+);
+
 const EyeOff: React.FC = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M3 3l18 18" /><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
@@ -345,7 +362,7 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
               <div key={l.id} style={{ position: "relative", minWidth: 0 }}>
                 <a href={`#${l.id}`} onClick={(e) => { e.preventDefault(); open(l.id); }}
                   style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", boxSizing: "border-box", padding: 14, textDecoration: "none", background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
-                  <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 56 }}>{l.name}</span>
+                  <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 28 }}>{l.name}</span>
                   <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)" }}>#{l.id} · {l.items.length} cert{l.items.length === 1 ? "" : "s"}</span>
                   {seen.length > 0 && <span style={{ ...faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{seen.slice(0, 6).join(" · ")}</span>}
                 </a>
@@ -353,7 +370,8 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
                   if (!window.confirm(`Delete "${l.name}"? This removes it for everyone.`)) return;
                   setErr("");
                   try { setLists(await CL.deleteList(l.id)); } catch (e) { setErr(errText(e)); }
-                }} style={{ ...eyebrow, position: "absolute", top: 12, right: 12, cursor: "pointer", background: "none", border: "none", padding: 4 }}>Delete</button>
+                }} aria-label={`Delete ${l.name}`} title="Delete list"
+                  style={{ position: "absolute", top: 10, right: 10, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "none", border: "none", padding: 0, color: "var(--text-faint)" }}><Trash /></button>
               </div>
             );
           })}
@@ -684,7 +702,7 @@ export default function StatsPage() {
     setCards((cur) => cur.map((c: Any) => {
       const i = snap && !c.fromSheet && snap.psa && snap.psa[D.certOf(c) as string];
       if (!i || i.notFound) return c;
-      return { ...c, number: c.number || i.number, year: c.year || i.year || undefined, set: c.set || [i.set, i.variety].filter(Boolean).join(" · "), psaSubject: i.subject };
+      return { ...c, number: c.number || i.number, year: c.year || i.year || undefined, set: c.set || [i.set, i.variety].filter(Boolean).join(" · "), psaSubject: i.subject, ...(!c.image && i.image ? { image: i.image, slab: true } : {}) };
     }));
   };
   /** Fetch new data on the server: "all" for Refresh, "missing" for certs the copy doesn't have. */
@@ -713,7 +731,7 @@ export default function StatsPage() {
       if (missing && (!snap || fillMissing.current === cl.id)) refreshCustom(cl, "missing");
       // PSA details still queued (PSA's daily limit, or no token earlier): top them up quietly,
       // without calling ALT. The server holds off for an hour after PSA says the limit is used up.
-      else if (snap && (!snap.psaRetryAt || Date.now() > snap.psaRetryAt) && cl.items.some((it) => !(snap.psa || {})[it.cert])) {
+      else if (snap && (!snap.psaRetryAt || Date.now() > snap.psaRetryAt) && cl.items.some((it) => { const i = (snap.psa || {})[it.cert]; return !i || (!i.notFound && !i.imgTried); })) {
         CL.refreshSnapshot(cl.id, "psa").then(({ snap: s2 }) => showSnap(cl, s2)).catch(() => {});
       }
       fillMissing.current = null;
@@ -1162,7 +1180,7 @@ export default function StatsPage() {
           <section style={{ marginTop: narrow ? 20 : 28, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
               <div style={{ minWidth: 0, flex: "1 1 260px", display: "flex", alignItems: "flex-start", gap: 12 }}>
-                {sel && narrow && <span style={{ flex: "0 0 auto", width: 64, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: sel.card.image ? `url("${sel.card.image}")` : "none", backgroundSize: "100% 100%", boxShadow: "var(--shadow-raised)" }} />}
+                {sel && narrow && <span style={{ flex: "0 0 auto", width: 64, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(sel.card), boxShadow: "var(--shadow-raised)" }} />}
                 <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={eyebrow}>{sel ? `${sel.card.number || ""} ${sel.card.set || ""}`.trim() || "Card" : "Total"}</span>
@@ -1197,7 +1215,7 @@ export default function StatsPage() {
               {sel
                 ? (
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
-                    {!narrow && <span style={{ flex: "0 0 auto", height: 260, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: sel.card.image ? `url("${sel.card.image}")` : "none", backgroundSize: "100% 100%", boxShadow: "var(--shadow-raised)" }} />}
+                    {!narrow && <span style={{ flex: "0 0 auto", height: 260, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(sel.card), boxShadow: "var(--shadow-raised)" }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <LineChart pts={sel.pts} lead={sel.lead} tail={sel.tail} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={chartEmpty} />
                     </div>
@@ -1261,7 +1279,7 @@ export default function StatsPage() {
                   <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { if (x.nodata) return; setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8, padding: 10, textAlign: "left", cursor: x.nodata ? "default" : "pointer", minWidth: 0, background: on ? "var(--surface-tint)" : "var(--surface-card)", border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, borderRadius: "var(--web-radius)", transition: "border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)" }}>
                     <span style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, paddingRight: hiddenSet ? 20 : 0 }}>
-                      <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
+                      <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
@@ -1310,7 +1328,7 @@ export default function StatsPage() {
                   <div key={x.key} style={{ position: "relative" }}>
                     <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { if (x.nodata) return; setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
                       style={{ width: "100%", boxSizing: "border-box", display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `7px ${hiddenSet ? 36 : 8}px 7px 8px`, textAlign: "left", cursor: x.nodata ? "default" : "pointer", background: on ? "var(--surface-tint)" : "transparent", border: "none", borderBottom: "1px solid var(--line-hairline)", transition: "background var(--dur-fast) var(--ease)" }}>
-                      <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
+                      <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
@@ -1351,7 +1369,7 @@ export default function StatsPage() {
                 <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
                   {rows.hidden.map((x: Any) => (
                     <div key={x.cert} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "var(--web-small)" }}>
-                      <span style={{ flex: "0 0 auto", width: 22, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%", opacity: 0.6 }} />
+                      <span style={{ flex: "0 0 auto", width: 22, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card), opacity: 0.6 }} />
                       <span style={{ color: "var(--text-body)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                       <span style={faint}>{[x.card.number, x.value !== null ? fmtUSD(x.value) : null].filter(Boolean).join(" · ")}</span>
                       <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), false)} style={{ ...eyebrow, cursor: "pointer", background: "none", border: "none", padding: "4px 0", color: "var(--pink-700)" }}>Unhide</button>

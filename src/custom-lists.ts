@@ -118,7 +118,7 @@ export const certsText = (items: Item[]) => items.map((it) => (it.grade === 10 ?
 
 /* ---------- saved ALT data + PSA details per list (/api/snapshot) ---------- */
 
-export type CertInfo = { year: number | null; set: string; number: string; subject: string; variety: string; grade: number | null; gradeText?: string; notFound?: boolean };
+export type CertInfo = { year: number | null; set: string; number: string; subject: string; variety: string; grade: number | null; gradeText?: string; image?: string; imgTried?: boolean; notFound?: boolean };
 /** results are keyed "<cert>|<grade>"; at = when the data was last fetched. */
 export type Snap = { at: number; tried?: number; results: Record<string, Any>; psa: Record<string, CertInfo>; psaToken?: boolean; psaLimited?: boolean; psaRetryAt?: number; errors?: string[] };
 
