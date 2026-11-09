@@ -483,6 +483,7 @@ export default function StatsPage() {
     try {
       await CL.checkPassword();
       setUnlocked(true); setSnapMsg("");
+      if (clist && !clist.hidden) CL.fetchSnapshot(clist.id).then((s2) => fillPsa(clist, s2)).catch(() => {});
       CL.fetchLists().then(setLists).catch(() => {}); // locked lists come back in full now
       D.trackEvent("custom_unlock");
     } catch (e) { const m = errText(e); if (m) setSnapMsg(m); }
@@ -795,7 +796,8 @@ export default function StatsPage() {
     const h10 = new Map<string, Any>(), hP = new Map<string, Any>();
     cl.items.forEach((it) => { const r = snap && snap.results[`${it.cert}|${it.grade}`]; if (r) (it.grade === 10 ? h10 : hP).set(it.cert, D.checkResult(r, it.grade)); });
     setHist(h10); setHistP(hP);
-    setPsa(snap ? { info: snap.psa || {}, token: snap.psaToken !== false, limited: !!snap.psaLimited, problem: snap.psaProblem || null, photosRefused: snap.psaPhotosRefused || null } : null);
+    const pp = snap && snap.psaProblem;
+    setPsa(snap ? { info: snap.psa || {}, token: !(pp && pp.text === "no-token"), limited: !!(pp && pp.status === 429), problem: pp && pp.text !== "no-token" ? pp : null, photosRefused: snap.psaPhotosRefused || null } : null);
     setSnapAt(snap ? snap.at : null);
     setCards((cur) => cur.map((c: Any) => {
       const i = snap && snap.psa && snap.psa[D.certOf(c) as string];
@@ -812,12 +814,21 @@ export default function StatsPage() {
     try {
       const { snap, cooldown } = await CL.refreshSnapshot(cl.id, mode);
       showSnap(cl, snap);
+      fillPsa(cl, snap, mode === "all"); // Refresh also retries PSA now
       if (cooldown) setSnapMsg(`Refreshed less than 15 minutes ago, so this is the saved copy. Try again in ${cooldown} min.`);
       else if (snap.errors && snap.errors.length) setSnapMsg(`Some certs couldn't be fetched: ${[...new Set(snap.errors)].join("; ")}`);
       D.trackEvent("custom_list_refresh", { mode, cooldown: !!cooldown });
       CL.fetchLists().then(setLists).catch(() => {}); // names found by the refresh
     } catch (e: Any) { setSnapMsg(`Couldn't refresh: ${(e && e.message) || e}`); }
     setSnapBusy(false);
+  };
+  /**
+   * PSA details still missing: looked up in this browser while editing is unlocked (PSA refuses
+   * Cloudflare), then saved for everyone. Waits after PSA's daily limit or a refusal.
+   */
+  const fillPsa = (cl: CL.List, snap: CL.Snap | null, force = false) => {
+    if (!CL.isUnlocked() || !snap || (!force && snap.psaRetryAt && Date.now() < snap.psaRetryAt)) return;
+    CL.fillPsa(cl.id, [...new Set(cl.items.map((it) => it.cert))], snap.psa || {}).then((s2) => { if (s2) showSnap(cl, s2); }).catch(() => {});
   };
   const loadCustom = async (cl: CL.List) => {
     setPhase("loading");
@@ -830,11 +841,7 @@ export default function StatsPage() {
       // A list that's never been fetched, or was just made or edited: fetch the certs it lacks.
       const missing = cl.items.some((it) => !(snap && snap.results[`${it.cert}|${it.grade}`]));
       if (missing && (!snap || fillMissing.current === cl.id)) refreshCustom(cl, "missing");
-      // PSA details still queued (PSA's daily limit, or no token earlier): top them up quietly,
-      // without calling ALT. The server holds off for an hour after PSA says the limit is used up.
-      else if (snap && (!snap.psaRetryAt || Date.now() > snap.psaRetryAt) && cl.items.some((it) => { const i = (snap.psa || {})[it.cert]; return !i || (!i.notFound && !i.imgTried); })) {
-        CL.refreshSnapshot(cl.id, "psa").then(({ snap: s2 }) => showSnap(cl, s2)).catch(() => {});
-      }
+      else if (snap) fillPsa(cl, snap);
       fillMissing.current = null;
     } catch (e) { console.error(e); setPhase("error"); }
   };
@@ -1558,7 +1565,7 @@ export default function StatsPage() {
                       const off = got.filter((c: Any) => { const i = psa.info[D.certOf(c) as string]; return i.grade && i.grade !== c.customGrade; });
                       return (
                         <>
-                          <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited && (!psa.problem || psa.problem.status === 429) ? " · PSA's daily limit reached, the rest are queued and fill in on a later visit" : ""}</div>
+                          <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited && (!psa.problem || psa.problem.status === 429) ? " · PSA's daily limit reached (100 a day), the rest fill in on a later unlocked visit" : ""}</div>
                           {psa.problem && psa.problem.status !== 429 && <div style={hint}>{psa.problem.status === 401
                             ? "PSA rejected the token (401). In Cloudflare, set PSA_TOKEN to just the token from psacard.com's Public API page (no \"Bearer\"), retry the deployment, then press Refresh."
                             : /approved customers/i.test(psa.problem.text || "") ? `PSA refused the request (${psa.problem.status}): its API is only open to approved accounts, and this token's account isn't approved.` : `PSA refused the request (${psa.problem.status}): PSA may be blocking requests from Cloudflare.`}{psa.problem.text ? ` PSA said: "${psa.problem.text}"` : ""}</div>}
@@ -1567,7 +1574,8 @@ export default function StatsPage() {
                             const withPhoto = all.filter((i: Any) => i.image).length, asked = all.filter((i: Any) => i.imgTried).length;
                             return <div style={line}>PSA photos · {withPhoto} of {cards.length} certs have one · {asked} asked{asked < all.length ? ` · ${all.length - asked} queued` : ""}{asked > withPhoto ? ` · ${asked - withPhoto} with no photo on PSA` : ""}{psa.limited && (!psa.problem || psa.problem.status === 429) ? " · PSA's daily limit reached" : ""}{psa.photosRefused ? ` · PSA refused the photos (${psa.photosRefused.status}${psa.photosRefused.text ? `: ${psa.photosRefused.text}` : ""}), the details still load` : ""}</div>;
                           })()}
-                          {!psa.token && got.length < mine.length && <div style={hint}>Year, set and card number come from PSA: add a PSA_TOKEN secret to the mewcards project in Cloudflare (a free API token from psacard.com); they fill in on the next visit.</div>}
+                          {psa.token && !unlocked && got.length < mine.length && <div style={line}>PSA details are looked up in your browser when you open this list with editing unlocked (PSA doesn't answer Cloudflare).</div>}
+                          {!psa.token && got.length < mine.length && <div style={hint}>Year, set and card number come from PSA: add a PSA_TOKEN secret to the mewcards project in Cloudflare (a free API token from psacard.com); they fill in on your next unlocked visit.</div>}
                           {off.length > 0 && <div style={hint}>Grade differs from PSA · {off.map((c: Any) => `cert ${D.certOf(c)} is a PSA ${psa.info[D.certOf(c) as string].grade}, listed at ${c.customGrade}`).join(" · ")}</div>}
                         </>
                       );

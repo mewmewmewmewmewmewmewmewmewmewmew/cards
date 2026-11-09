@@ -190,3 +190,80 @@ export const checkPassword = () => change({ action: "check" });
 export const isUnlocked = () => { const own = readJSON(PW, ""); return typeof own === "string" && !!own; };
 /** Lock editing again (forget the lists password on this device). */
 export const lockEditing = () => writeJSON(PW, "");
+
+/* ---------- PSA lookups, in the owner's browser ---------- */
+// PSA's API answers browsers but refuses servers that aren't approved, so while editing is
+// unlocked the page looks up certs itself (token from Cloudflare, given only with the lists
+// password) and saves what it finds for everyone. ~100 calls a day; each cert costs one call for
+// its details and one for its slab photo, once.
+
+const PSA_API = "https://api.psacard.com/publicapi/cert/";
+let psaTokenCache = "";
+async function psaToken(): Promise<string> {
+  if (psaTokenCache) return psaTokenCache;
+  const res = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "psaToken", password: password() }) });
+  const j = await res.json().catch(() => null);
+  if (res.status === 404) throw new Error("no-token");
+  if (!res.ok || !j || !j.token) throw new Error((j && j.error) || `HTTP ${res.status}`);
+  psaTokenCache = j.token;
+  return psaTokenCache;
+}
+
+const gradeOf = (s: Any) => { const m = /(\d+(?:\.5)?)\s*$/.exec(String(s || "")); return m ? Number(m[1]) : null; };
+const clip = (t: string) => t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+type Problem = { status: number; text: string };
+
+/**
+ * Look up the certs that still need PSA details or a photo, and save the results with the list's
+ * saved data. Resolves to the updated saved data (null when there was nothing to do).
+ */
+export async function fillPsa(id: string, certs: string[], have: Record<string, CertInfo>, max = 40): Promise<Snap | null> {
+  const need = certs.filter((c) => { const i = have[c]; return !i || (!i.notFound && !i.imgTried); });
+  if (!need.length || !isUnlocked()) return null;
+  let token = "";
+  const got: Record<string, CertInfo> = {};
+  let problem: Problem | null = null, photosRefused: Problem | null = null, retryAt = 0;
+  try { token = await psaToken(); } catch (e: Any) {
+    problem = e && e.message === "no-token" ? { status: 0, text: "no-token" } : { status: 0, text: String((e && e.message) || e) };
+  }
+  let calls = 0;
+  const get = async (path: string) => {
+    calls++;
+    const res = await fetch(PSA_API + path, { headers: { authorization: `bearer ${token}`, accept: "application/json" } });
+    if (res.status === 429 || res.status === 401 || res.status === 403) return { refused: { status: res.status, text: clip(await res.text().catch(() => "")) } };
+    return { status: res.status, ok: res.ok, json: res.ok ? await res.json().catch(() => null) : null } as Any;
+  };
+  for (const c of need) {
+    if (!token || problem || calls >= max) break;
+    try {
+      let info: Any = have[c] ? { ...have[c] } : null;
+      if (!info) {
+        const r = await get(`GetByCertNumber/${c}`);
+        if (r.refused) { problem = r.refused; break; }
+        const pc = r.json && r.json.PSACert;
+        if (r.status === 404 || (!pc && r.json && /not found|invalid/i.test(String(r.json.ServerMessage || "")))) { got[c] = { notFound: true } as CertInfo; continue; }
+        if (!pc) continue;
+        info = {
+          year: /^\d{4}$/.test(String(pc.Year || "").trim()) ? Number(pc.Year) : null, set: String(pc.Brand || "").trim(), number: String(pc.CardNumber || "").trim(),
+          subject: String(pc.Subject || "").trim(), variety: String(pc.Variety || "").trim(), grade: gradeOf(pc.CardGrade || pc.GradeDescription), gradeText: String(pc.CardGrade || "").trim(),
+        };
+      }
+      if (!photosRefused && calls < max) {
+        const r = await get(`GetImagesByCertNumber/${c}`);
+        if (r.refused) { if (r.refused.status === 429) { problem = r.refused; got[c] = info; break; } photosRefused = r.refused; }
+        else if (r.ok || r.status === 404) {
+          const imgs = Array.isArray(r.json) ? r.json : r.json && typeof r.json === "object" ? ((Object.values(r.json).find(Array.isArray) as Any[]) || []) : [];
+          const front = imgs.find((x: Any) => x && x.IsFrontImage && x.ImageURL) || imgs.find((x: Any) => x && x.ImageURL);
+          info = { ...info, image: front ? String(front.ImageURL) : "", imgTried: true };
+        }
+      }
+      got[c] = info;
+    } catch (e) { /* tried again next time */ }
+  }
+  // Wait before asking PSA again: its daily limit (429), or a refusal / missing token.
+  if (problem) retryAt = Date.now() + (problem.status === 429 ? 3 : 24) * 3600e3;
+  const res = await fetch("/api/snapshot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, mode: "psaSave", password: password(), psa: got, problem, photosRefused, retryAt }) });
+  const j = await res.json().catch(() => null);
+  if (!res.ok || !j || !j.snap) throw new Error((j && j.error) || `HTTP ${res.status}`);
+  return j.snap;
+}

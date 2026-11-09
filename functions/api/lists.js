@@ -9,6 +9,7 @@
  * Reading is open, except lists with a view password (see _lists.js): without it (or the main
  * password, sent as an x-password header) a browser gets only their name and size;
  *   POST { action: "open", id, password } → { list }  opens one with its view password.
+ *   POST { password, action: "psaToken" }  → { token }  PSA_TOKEN, for PSA lookups in the browser.
  * Changes need the LISTS_PASSWORD secret. A saved list may carry viewPassword (set or change it)
  * or removeViewPassword; otherwise it keeps the one it had.
  */
@@ -47,6 +48,12 @@ export async function onRequestPost({ request, env }) {
 
   const lists = await read(env);
   if (body.action === "check") return json({ ok: true });
+  // PSA answers browsers but not this server, so the owner's browser does the lookups with the
+  // token kept here (only ever handed out with the main password).
+  if (body.action === "psaToken") {
+    const token = String(env.PSA_TOKEN || "").trim().replace(/^bearer\s+/i, "");
+    return token ? json({ token }) : json({ error: "PSA_TOKEN isn't set in Cloudflare" }, 404);
+  }
   if (body.action === "delete") {
     const next = lists.filter((l) => l.id !== body.id);
     await env.MEW_KV.put(KEY, JSON.stringify(next));

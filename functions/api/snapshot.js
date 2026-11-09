@@ -5,21 +5,20 @@
  *   POST { id, mode, password? } → { snap }  mode "all": every cert fresh from ALT (Refresh);
  *                                            mode "missing": only certs the copy doesn't have yet
  *                                            (after a list is made or edited);
- *                                            mode "psa": no ALT, only PSA details still missing
- *                                            (queued certs, e.g. after PSA's daily limit).
+ *                                            mode "psaSave" (main password only): PSA details
+ *                                            looked up in the owner's browser, { psa, problem? }.
  * A list with a view password needs it (x-view-password header on GET, viewPassword in the POST
- * body) or the main password (x-password, password). Anyone who may see a list may refresh it, but a list refreshes at most once per COOLDOWN unless the request carries
- * LISTS_PASSWORD; "psa" waits PSA_RETRY after PSA said its daily limit was used up (10 min after it refused the
- * token or the request). Kept in MEW_KV
- * as "snap:<id>":
- *   { at, tried, results: { "<cert>|<grade>": ALT result }, psa: { [cert]: info }, psaToken, psaLimited, psaRetryAt, errors }
+ * body) or the main password (x-password, password). Anyone who may see a list may refresh it,
+ * but a list refreshes at most once per COOLDOWN unless the request carries LISTS_PASSWORD.
+ * The server never calls PSA (PSA refuses servers that aren't approved); see _psa.js.
+ * Kept in MEW_KV as "snap:<id>":
+ *   { at, tried, results: { "<cert>|<grade>": ALT result }, psa: { [cert]: info }, psaProblem, psaRetryAt, errors }
  */
-import { lookupPsa } from "../_psa.js";
+import { readPsa, cleanInfo, savePsa } from "../_psa.js";
 import { read, isMain, canView } from "../_lists.js";
 
 const ALT = "https://cryptjapan-proxy.mew-860.workers.dev/alt-history";
 const COOLDOWN = 15 * 60 * 1000;
-const PSA_RETRY = 60 * 60 * 1000;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const snapKey = (id) => `snap:${id}`;
 
@@ -72,12 +71,17 @@ export async function onRequestPost({ request, env }) {
   const owner = isMain(env, body.password);
   const prev = (await env.MEW_KV.get(snapKey(list.id), "json")) || { results: {}, psa: {} };
   const certs = [...new Set(list.items.map((it) => it.cert))];
-  if (body.mode === "psa") {
-    // The PSA queue: only certs still without PSA details, no ALT calls.
-    const queued = certs.filter((c) => { const i = (prev.psa || {})[c]; return !i || (!i.notFound && !i.imgTried); });
-    if (!queued.length || !env.PSA_TOKEN || (prev.psaRetryAt && Date.now() < prev.psaRetryAt)) return json({ snap: prev });
-    const psa = await lookupPsa(env, queued, 45);
-    const snap = { ...prev, psa: { ...(prev.psa || {}), ...psa.info }, psaToken: psa.token, psaLimited: psa.limited, psaProblem: psa.problem || null, psaPhotosRefused: psa.photosRefused || null, psaRetryAt: psa.limited ? Date.now() + (psa.problem && psa.problem.status !== 429 ? 10 * 60 * 1000 : PSA_RETRY) : 0 };
+  if (body.mode === "psaSave") {
+    // PSA details the owner's browser looked up: saved for every list with these certs.
+    if (!owner) return json({ error: "auth" }, 401);
+    const got = {};
+    for (const [c, i] of Object.entries(body.psa || {})) {
+      if (!certs.includes(c)) continue;
+      const v = cleanInfo(i);
+      if (v) { got[c] = v; await savePsa(env, c, v); }
+    }
+    const p = body.problem && typeof body.problem === "object" ? { status: Number(body.problem.status) || 0, text: String(body.problem.text || "").slice(0, 160) } : null;
+    const snap = { ...prev, psa: { ...(prev.psa || {}), ...got }, psaProblem: p, psaPhotosRefused: body.photosRefused ? { status: Number(body.photosRefused.status) || 0, text: String(body.photosRefused.text || "").slice(0, 160) } : null, psaRetryAt: Number(body.retryAt) || 0 };
     await env.MEW_KV.put(snapKey(list.id), JSON.stringify(snap));
     await nameItems(env, lists, list, snap);
     return json({ snap });
@@ -105,8 +109,9 @@ export async function onRequestPost({ request, env }) {
   }
   // PSA: anything not yet known (a cert is only ever looked up once); certs past PSA's daily
   // limit stay queued for a later visit or refresh.
-  const psa = await lookupPsa(env, certs, 45 - calls);
-  const snap = { at: want.length ? Date.now() : prev.at || Date.now(), tried: Date.now(), results, psa: psa.info, psaToken: psa.token, psaLimited: psa.limited, psaProblem: psa.problem || null, psaPhotosRefused: psa.photosRefused || null, psaRetryAt: psa.limited ? Date.now() + (psa.problem && psa.problem.status !== 429 ? 10 * 60 * 1000 : PSA_RETRY) : 0, errors };
+  // PSA details already saved for these certs (looked up in the owner's browser).
+  const psa = { ...(prev.psa || {}), ...(await readPsa(env, certs)) };
+  const snap = { at: want.length ? Date.now() : prev.at || Date.now(), tried: Date.now(), results, psa, psaProblem: prev.psaProblem || null, psaPhotosRefused: prev.psaPhotosRefused || null, psaRetryAt: prev.psaRetryAt || 0, errors };
   await env.MEW_KV.put(snapKey(list.id), JSON.stringify(snap));
   await nameItems(env, lists, list, snap);
   return json({ snap });
