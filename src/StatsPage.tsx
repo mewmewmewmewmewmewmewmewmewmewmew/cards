@@ -445,7 +445,8 @@ export default function StatsPage() {
   const [unlockErr, setUnlockErr] = useState("");
   const showUnlocked = (l: CL.List) => setLists((cur) => cur.map((x) => (x.id === l.id ? l : x)));
   const [theme, setTheme] = useState<string>(() => (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
-  const [lang, setLang] = useState<"EN" | "JP">(() => (/^ja\b/i.test(navigator.language || "") ? "JP" : "EN"));
+  // Custom lists are English only (their names come from ALT / PSA); /stats keeps the EN / JA toggle.
+  const [lang, setLang] = useState<"EN" | "JP">(() => (!/^\/stats\/custom(\/|$)/.test(location.pathname) && /^ja\b/i.test(navigator.language || "") ? "JP" : "EN"));
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
   const [narrow, setNarrow] = useState(() => window.innerWidth < 700);
   const [phase, setPhase] = useState<"checking" | "password" | "loading" | "ready" | "error">("checking");
@@ -1183,8 +1184,7 @@ export default function StatsPage() {
             </>
           )}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
-            {custom && lockBtn(unlocked, toggleLock)}
-            <button type="button" onClick={() => setLang(lang === "JP" ? "EN" : "JP")} data-hover-pink="1" style={iconBtn} aria-label="Toggle language">{lang === "JP" ? "JA" : "EN"}</button>
+            {custom ? lockBtn(unlocked, toggleLock) : <button type="button" onClick={() => setLang(lang === "JP" ? "EN" : "JP")} data-hover-pink="1" style={iconBtn} aria-label="Toggle language">{lang === "JP" ? "JA" : "EN"}</button>}
             <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .9 1.6h5.2c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z" /></svg>
             </button>
