@@ -65,6 +65,17 @@ const Lock: React.FC = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-label="Password protected"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
 );
 
+/** The edit lock (top right on custom lists): closed when locked, open when unlocked. */
+const EditLock: React.FC<{ open: boolean }> = ({ open }) => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="5" y="11" width="14" height="10" rx="2" />{open ? <path d="M8 11V7a4 4 0 0 1 7.5-2" /> : <path d="M8 11V7a4 4 0 0 1 8 0v4" />}
+  </svg>
+);
+const lockBtn = (open: boolean, onClick: () => void) => (
+  <button type="button" onClick={onClick} data-hover-pink="1" style={{ ...iconBtn, color: open ? "var(--pink-700)" : undefined }}
+    aria-label={open ? "Lock editing" : "Unlock editing"} title={open ? "Editing unlocked · click to lock" : "Unlock editing"}><EditLock open={open} /></button>
+);
+
 const Trash: React.FC = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" /><path d="M9 7V4h6v3" />
@@ -307,7 +318,7 @@ const ListForm: React.FC<{ name: string; id: string; text: string; submit: strin
   );
 };
 
-const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow: boolean; lists: CL.List[]; status: "cached" | "live" | "error"; missing: string; setLists: (l: CL.List[]) => void; open: (id: string) => void }> = ({ theme, setTheme, narrow, lists, status, missing, setLists, open }) => {
+const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow: boolean; lists: CL.List[]; status: "cached" | "live" | "error"; missing: string; setLists: (l: CL.List[]) => void; open: (id: string) => void; unlocked: boolean; toggleLock: () => void }> = ({ theme, setTheme, narrow, lists, status, missing, setLists, open, unlocked, toggleLock }) => {
   const [adding, setAdding] = useState(false);
   const [legacy, setLegacy] = useState<CL.List[]>(() => CL.readLegacy());
   const [err, setErr] = useState("");
@@ -335,21 +346,21 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: `${narrow ? 20 : 28}px ${pad}px 64px`, boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+            {lockBtn(unlocked, toggleLock)}
             <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .9 1.6h5.2c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z" /></svg>
             </button>
           </div>
         </div>
         <h1 style={{ margin: "14px 0 0", fontFamily: "var(--font-body)", fontWeight: 700, fontSize: narrow ? "var(--web-h2)" : "var(--web-h1)", lineHeight: "var(--web-leading-tight)", color: "var(--text-title)" }}>Custom lists</h1>
-        <div style={{ ...faint, marginTop: 8, lineHeight: 1.5 }}>Lists of PSA certs, charted like the stats page. Each one opens at its own link.</div>
         {missing && status !== "cached" && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>There's no list at #{missing}.</div>}
         {status === "error" && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>Couldn't load the lists{lists.length ? ", showing the last copy seen here" : ""}. Refresh to try again.</div>}
 
         <div style={{ marginTop: narrow ? 24 : 36, display: "flex", alignItems: "center", gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line-hairline)" }}>
           <span style={eyebrow}>{status === "cached" && !lists.length ? "Loading…" : `${lists.length} list${lists.length === 1 ? "" : "s"}`}</span>
-          {!adding && <button type="button" onClick={async () => { setErr(""); try { await CL.checkPassword(); setAdding(true); } catch (e) { setErr(errText(e)); } }} style={{ ...pill(true), marginLeft: "auto" }}>+ New list</button>}
+          {unlocked && !adding && <button type="button" onClick={async () => { setErr(""); try { await CL.checkPassword(); setAdding(true); } catch (e) { setErr(errText(e)); } }} style={{ ...pill(true), marginLeft: "auto" }}>+ New list</button>}
         </div>
-        {legacy.length > 0 && (
+        {unlocked && legacy.length > 0 && (
           <div style={{ ...faint, marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             {legacy.length} list{legacy.length === 1 ? "" : "s"} saved only in this browser ({legacy.map((l) => l.name).join(", ")})
             <button type="button" disabled={busy} onClick={upload} style={pill(false)}>{busy ? "Adding…" : "Add to the lists"}</button>
@@ -357,7 +368,7 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
           </div>
         )}
         {err && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>{err}</div>}
-        {adding && (
+        {unlocked && adding && (
           <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
             <div style={{ ...eyebrow, marginBottom: 10 }}>New list</div>
             <ListForm name="" id="" text="" submit="Create list" isNew onCancel={() => setAdding(false)}
@@ -382,12 +393,12 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
                   </span>
                   {seen.length > 0 && <span style={{ ...faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{seen.slice(0, 6).join(" · ")}</span>}
                 </a>
-                <button type="button" data-hover-pink="1" onClick={async () => {
+                {unlocked && <button type="button" data-hover-pink="1" onClick={async () => {
                   if (!window.confirm(`Delete "${l.name}"? This removes it for everyone.`)) return;
                   setErr("");
                   try { setLists(await CL.deleteList(l.id)); } catch (e) { setErr(errText(e)); }
                 }} aria-label={`Delete ${l.name}`} title="Delete list"
-                  style={{ position: "absolute", top: 10, right: 10, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "none", border: "none", padding: 0, color: "var(--text-faint)" }}><Trash /></button>
+                  style={{ position: "absolute", top: 10, right: 10, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "none", border: "none", padding: 0, color: "var(--text-faint)" }}><Trash /></button>}
               </div>
             );
           })}
@@ -410,6 +421,17 @@ export default function StatsPage() {
   const clist = useMemo(() => (custom && hashId ? lists.find((l) => l.id === hashId) || null : null), [lists, hashId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Editing custom lists (new list, edit, delete, copy link) is unlocked with the lists password.
+  const [unlocked, setUnlocked] = useState(() => custom && CL.isUnlocked());
+  const toggleLock = async () => {
+    if (unlocked) { CL.lockEditing(); setUnlocked(false); setEditing(false); return; }
+    try {
+      await CL.checkPassword();
+      setUnlocked(true); setSnapMsg("");
+      CL.fetchLists().then(setLists).catch(() => {}); // locked lists come back in full now
+      D.trackEvent("custom_unlock");
+    } catch (e) { const m = errText(e); if (m) setSnapMsg(m); }
+  };
   // PSA's details for custom certs that aren't in the sheet (year, set, number…).
   const [psa, setPsa] = useState<{ info: Record<string, CL.CertInfo>; token: boolean; limited: boolean; problem?: { status: number; text: string } | null } | null>(null);
   // A custom list's data is the copy saved on the server (/api/snapshot): viewing never calls ALT,
@@ -1065,7 +1087,7 @@ export default function StatsPage() {
     return { n: withPaid.length, paid, worth };
   }, [rows]);
   if (custom && !clist && !(hashId && listsStatus === "cached")) {
-    return <CustomHub theme={theme} setTheme={setTheme} narrow={narrow} lists={lists} status={listsStatus} missing={hashId} setLists={setLists} open={(id) => { location.hash = id; }} />;
+    return <CustomHub theme={theme} setTheme={setTheme} narrow={narrow} lists={lists} status={listsStatus} missing={hashId} setLists={setLists} open={(id) => { location.hash = id; }} unlocked={unlocked} toggleLock={toggleLock} />;
   }
 
   if (custom && clist && clist.hidden) {
@@ -1161,6 +1183,7 @@ export default function StatsPage() {
             </>
           )}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+            {custom && lockBtn(unlocked, toggleLock)}
             <button type="button" onClick={() => setLang(lang === "JP" ? "EN" : "JP")} data-hover-pink="1" style={iconBtn} aria-label="Toggle language">{lang === "JP" ? "JA" : "EN"}</button>
             <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .9 1.6h5.2c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z" /></svg>
@@ -1180,16 +1203,13 @@ export default function StatsPage() {
           {custom && clist && (
             <div role="group" aria-label="List" style={{ display: "flex", gap: 4, ...(narrow ? {} : { paddingLeft: 10, borderLeft: "1px solid var(--line-hairline)" }) }}>
               <button type="button" disabled={snapBusy} onClick={() => refreshCustom(clist, "all")} style={pill(false)}>{snapBusy ? "Refreshing…" : "Refresh"}</button>
-              <button type="button" aria-pressed={editing} onClick={async () => {
-                if (editing) { setEditing(false); return; }
-                try { await CL.checkPassword(); setEditing(true); } catch (e) { const m = errText(e); if (m) setSnapMsg(m); }
-              }} style={pill(editing)}>Edit certs</button>
-              <button type="button" onClick={async () => {
+              {unlocked && <button type="button" aria-pressed={editing} onClick={() => setEditing(!editing)} style={pill(editing)}>Edit certs</button>}
+              {unlocked && <button type="button" onClick={async () => {
                 const url = CL.listUrl(clist.id);
                 try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
                 catch (e) { window.prompt("Copy this link:", url); }
                 D.trackEvent("custom_list_share", { certs: clist.items.length });
-              }} style={pill(copied)}>{copied ? "Link copied" : "Copy link"}</button>
+              }} style={pill(copied)}>{copied ? "Link copied" : "Copy link"}</button>}
             </div>
           )}
           {!custom && <div role="group" aria-label="Scope" style={{ display: "flex", alignItems: "center", gap: 2, paddingLeft: 8, borderLeft: "1px solid var(--line-hairline)" }}>
@@ -1206,7 +1226,7 @@ export default function StatsPage() {
         </div>
         {custom && snapMsg && <div role="status" style={{ ...faint, marginTop: 8, color: "var(--text-accent)" }}>{snapMsg}</div>}
 
-        {custom && clist && editing && (
+        {custom && clist && editing && unlocked && (
           <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
             <ListForm name={clist.name} id={clist.id} text={CL.certsText(clist.items)} submit="Save" locked={!!clist.locked} onCancel={() => setEditing(false)}
               onSave={async (name, id, items, view) => {

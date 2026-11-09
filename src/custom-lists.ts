@@ -173,3 +173,8 @@ export async function refreshSnapshot(id: string, mode: "all" | "missing" | "psa
 
 /** Ask for (and check) the lists password before opening a form. Throws when it's wrong or cancelled. */
 export const checkPassword = () => change({ action: "check" });
+
+/** Editing is unlocked on this device: the lists password has been accepted here. */
+export const isUnlocked = () => { const own = readJSON(PW, ""); return typeof own === "string" && !!own; };
+/** Lock editing again (forget the lists password on this device). */
+export const lockEditing = () => writeJSON(PW, "");
