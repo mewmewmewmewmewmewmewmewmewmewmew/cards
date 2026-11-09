@@ -1242,7 +1242,7 @@ export default function StatsPage() {
           {custom && clist && (
             <div role="group" aria-label="List" style={{ display: "flex", gap: 4, ...(narrow ? {} : { paddingLeft: 10, borderLeft: "1px solid var(--line-hairline)" }) }}>
               <button type="button" disabled={snapBusy} onClick={() => refreshCustom(clist, "all")} style={pill(false)}>{snapBusy ? "Refreshing…" : "Refresh"}</button>
-              {unlocked && <button type="button" aria-pressed={editing} onClick={() => setEditing(!editing)} style={pill(editing)}>Edit certs</button>}
+              {unlocked && <button type="button" aria-pressed={editing} onClick={() => setEditing(!editing)} style={pill(editing)}>Edit</button>}
               {unlocked && <button type="button" onClick={async () => {
                 const url = CL.listUrl(clist.id);
                 try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
