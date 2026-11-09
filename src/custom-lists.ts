@@ -1,8 +1,8 @@
 /**
  * Custom lists for /stats/custom: named lists of PSA certs (each at a grade), each opened at
- * /stats/custom/#<id> (an id you can edit). Kept by the site's host (/api/lists: functions/api on
- * Cloudflare Pages, netlify/functions on Netlify) so every device sees the same lists; a copy in
- * localStorage opens the page at once. Reading is open, changes need the LISTS_PASSWORD secret.
+ * /stats/custom/#<id> (an id you can edit). Kept on Cloudflare (/api/lists, functions/api, in the
+ * MEW_KV namespace) so every device sees the same lists; a copy in localStorage opens the page at
+ * once. Reading is open, changes need the LISTS_PASSWORD secret.
  */
 type Any = any;
 

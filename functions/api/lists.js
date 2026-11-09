@@ -1,5 +1,5 @@
 /**
- * /api/lists on Cloudflare Pages (same API as netlify/functions/lists.mjs): the custom lists
+ * /api/lists (Cloudflare Pages Function): the custom lists
  * behind /stats/custom, kept in the MEW_KV namespace (one JSON value), so every device sees the
  * same lists.
  *   GET  → { lists }

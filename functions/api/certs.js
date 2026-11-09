@@ -1,5 +1,5 @@
 /**
- * /api/certs?certs=1,2,3 on Cloudflare Pages (same API as netlify/functions/certs.mjs): what PSA
+ * /api/certs?certs=1,2,3 (Cloudflare Pages Function): what PSA
  * says about each cert (year, set, card number, name, variety, grade). Looked up once through
  * PSA's public API (the PSA_TOKEN secret, ~100 calls a day) and kept in MEW_KV for good, since a
  * cert never changes.
