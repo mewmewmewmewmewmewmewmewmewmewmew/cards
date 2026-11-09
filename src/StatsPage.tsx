@@ -76,6 +76,22 @@ const lockBtn = (open: boolean, onClick: () => void) => (
     aria-label={open ? "Lock editing" : "Unlock editing"} title={open ? "Editing unlocked · click to lock" : "Unlock editing"}><EditLock open={open} /></button>
 );
 
+/**
+ * A list's theme colour in place of the site's pink: the accent, its text shade, the tint behind a
+ * selected card, and readable text on it.
+ */
+function accentVars(color?: string): React.CSSProperties {
+  if (!color || !/^#[0-9a-f]{6}$/i.test(color)) return {};
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16) / 255);
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return {
+    "--pink-700": color, "--accent": color, "--line-accent": color, "--link-hover": color,
+    "--text-accent": `color-mix(in srgb, ${color} 82%, var(--text-title))`,
+    "--surface-tint": `color-mix(in srgb, ${color} 10%, var(--surface-card))`,
+    "--on-accent": lum > 0.55 ? "#141414" : "#ffffff",
+  } as React.CSSProperties;
+}
+
 const Trash: React.FC = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" /><path d="M9 7V4h6v3" />
@@ -226,7 +242,7 @@ const LineChart: React.FC<{ pts: Pt[]; domain: [string, string]; height: number;
 const pill = (on: boolean): React.CSSProperties => ({
   cursor: "pointer", padding: "3px 9px", borderRadius: "var(--web-radius-sm)",
   fontFamily: "var(--font-data)", fontSize: "var(--web-label)", letterSpacing: "0.08em", whiteSpace: "nowrap",
-  background: on ? "var(--pink-700)" : "transparent", color: on ? "var(--text-title)" : "var(--text-body)",
+  background: on ? "var(--pink-700)" : "transparent", color: on ? "var(--on-accent, var(--text-title))" : "var(--text-body)",
   border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, fontWeight: on ? 700 : 500,
   transition: "background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)",
 });
@@ -271,8 +287,13 @@ const CERTS_HINT = "One cert per line (or separated by commas). Add a grade afte
 const errText = (e: Any) => (e && e.message === "cancelled" ? "" : (e && e.message) || "Couldn't save.");
 
 /** Name, link id and certs, for a new list and for editing one. onSave throws to show an error. */
-type ViewPw = { viewPassword?: string; removeViewPassword?: boolean };
-const ListForm: React.FC<{ name: string; id: string; text: string; submit: string; isNew?: boolean; locked?: boolean; onSave: (name: string, id: string, items: CL.Item[], view: ViewPw) => Promise<void>; onCancel?: () => void }> = ({ name, id, text, submit, isNew, locked, onSave, onCancel }) => {
+type ViewPw = { viewPassword?: string; removeViewPassword?: boolean; color: string };
+// Theme colours for a list ("" = the site's pink); the wheel picks any other.
+const SWATCHES: Array<[string, string]> = [["", "Pink"], ["#E5484D", "Red"], ["#F76B15", "Orange"], ["#D4A017", "Gold"], ["#30A46C", "Green"], ["#12A594", "Teal"], ["#0090FF", "Blue"], ["#8E4EC6", "Violet"], ["#6B7280", "Slate"]];
+const swatch = (bg: string, on: boolean): React.CSSProperties => ({ width: 24, height: 24, borderRadius: "50%", padding: 0, cursor: "pointer", background: bg, border: "none", boxShadow: on ? "0 0 0 2px var(--surface-card), 0 0 0 4px var(--text-title)" : "inset 0 0 0 1px rgba(0,0,0,0.12)", flex: "0 0 auto" });
+
+const ListForm: React.FC<{ name: string; id: string; text: string; submit: string; isNew?: boolean; locked?: boolean; color?: string; onSave: (name: string, id: string, items: CL.Item[], view: ViewPw) => Promise<void>; onCancel?: () => void }> = ({ name, id, text, submit, isNew, locked, color: color0 = "", onSave, onCancel }) => {
+  const [color, setColor] = useState(color0);
   const [viewPw, setViewPw] = useState("");
   const [removePw, setRemovePw] = useState(false);
   const [n, setN] = useState(name);
@@ -289,22 +310,37 @@ const ListForm: React.FC<{ name: string; id: string; text: string; submit: strin
     e.preventDefault();
     if (!ready) return;
     setBusy(true); setErr("");
-    try { await onSave(n.trim() || "Untitled list", shownId, items, viewPw ? { viewPassword: viewPw } : removePw ? { removeViewPassword: true } : {}); } catch (x) { setErr(errText(x)); }
+    try { await onSave(n.trim() || "Untitled list", shownId, items, { color, ...(viewPw ? { viewPassword: viewPw } : removePw ? { removeViewPassword: true } : {}) }); } catch (x) { setErr(errText(x)); }
     setBusy(false);
   };
   return (
     <form onSubmit={submitForm} style={{ display: "grid", gap: 10 }}>
       <input value={n} onChange={(e) => setN(e.target.value)} placeholder="List name" aria-label="List name" maxLength={80} style={{ ...field, fontFamily: "var(--font-body)" }} />
-      <label style={{ ...field, display: "flex", alignItems: "center", gap: 0, padding: 0, overflow: "hidden" }}>
-        <span style={{ padding: "8px 0 8px 10px", color: "var(--text-faint)", whiteSpace: "nowrap" }}>/stats/custom/#</span>
-        <input value={shownId} onChange={(e) => { setTouched(true); setLinkId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 40)); }} placeholder="list-link" aria-label="Link"
-          style={{ flex: 1, minWidth: 0, padding: "8px 10px 8px 0", border: "none", outline: "none", background: "transparent", font: "inherit", color: "var(--text-title)" }} />
-      </label>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <input type="password" value={viewPw} onChange={(e) => { setViewPw(e.target.value); setRemovePw(false); }} aria-label="View password" autoComplete="new-password"
-          placeholder={locked && !removePw ? "View password set · type a new one to change it" : "View password (optional) · leave empty for anyone to see"}
-          style={{ ...field, flex: 1, minWidth: 0 }} />
-        {locked && !viewPw && <button type="button" onClick={() => setRemovePw(!removePw)} style={pill(removePw)}>{removePw ? "Will remove" : "Remove"}</button>}
+      {/* link and view password: one row when there's room */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <label style={{ ...field, flex: "1 1 280px", width: "auto", display: "flex", alignItems: "center", gap: 0, padding: 0, overflow: "hidden" }}>
+          <span style={{ padding: "8px 0 8px 10px", color: "var(--text-faint)", whiteSpace: "nowrap" }}>/stats/custom/#</span>
+          <input value={shownId} onChange={(e) => { setTouched(true); setLinkId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 40)); }} placeholder="list-link" aria-label="Link"
+            style={{ flex: 1, minWidth: 0, padding: "8px 10px 8px 0", border: "none", outline: "none", background: "transparent", font: "inherit", color: "var(--text-title)" }} />
+        </label>
+        <div style={{ flex: "1 1 280px", display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <input type="password" value={viewPw} onChange={(e) => { setViewPw(e.target.value); setRemovePw(false); }} aria-label="View password" autoComplete="new-password"
+            placeholder={locked && !removePw ? "View password set · type to change" : "View password (optional)"}
+            style={{ ...field, flex: 1, minWidth: 0 }} />
+          {locked && !viewPw && <button type="button" onClick={() => setRemovePw(!removePw)} style={pill(removePw)}>{removePw ? "Will remove" : "Remove"}</button>}
+        </div>
+      </div>
+      <div role="radiogroup" aria-label="Theme colour" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ ...faint, marginRight: 2 }}>Colour</span>
+        {SWATCHES.map(([c, label]) => (
+          <button key={label} type="button" role="radio" aria-checked={color.toLowerCase() === c.toLowerCase()} aria-label={label} title={label} onClick={() => setColor(c)} style={swatch(c || "#FF4D9D", color.toLowerCase() === c.toLowerCase())} />
+        ))}
+        {/* the colour wheel: any colour */}
+        <label title="Pick any colour" style={{ ...swatch("conic-gradient(red, yellow, lime, cyan, blue, magenta, red)", !!color && !SWATCHES.some(([c]) => c.toLowerCase() === color.toLowerCase())), position: "relative", overflow: "hidden" }}>
+          <input type="color" value={color || "#FF4D9D"} onChange={(e) => setColor(e.target.value)} aria-label="Pick any colour"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", border: "none", padding: 0 }} />
+        </label>
+        {color && !SWATCHES.some(([c]) => c.toLowerCase() === color.toLowerCase()) && <span style={{ ...faint, display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: "50%", background: color }} />{color.toUpperCase()}</span>}
       </div>
       <textarea value={t} onChange={(e) => setT(e.target.value)} placeholder={"12345678\n87654321 9"} aria-label="Certs" rows={8} style={{ ...field, resize: "vertical", lineHeight: 1.5 }} />
       <div style={{ ...faint, lineHeight: 1.5 }}>{CERTS_HINT}</div>
@@ -387,7 +423,10 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
               <div key={l.id} style={{ position: "relative", minWidth: 0 }}>
                 <a href={`#${l.id}`} onClick={(e) => { e.preventDefault(); open(l.id); }}
                   style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", boxSizing: "border-box", padding: 14, textDecoration: "none", background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
-                  <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 28 }}>{l.name}</span>
+                  <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 28, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span aria-hidden="true" style={{ flex: "0 0 auto", width: 10, height: 10, borderRadius: "50%", background: l.color || "var(--pink-700)" }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
+                  </span>
                   <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", display: "flex", alignItems: "center", gap: 6 }}>
                     {l.locked && <Lock />}#{l.id} · {l.hidden ? l.count || 0 : l.items.length} cert{(l.hidden ? l.count : l.items.length) === 1 ? "" : "s"}
                   </span>
@@ -1162,7 +1201,7 @@ export default function StatsPage() {
   const salesList: Pt[] = sel && sales ? [...sel.series].reverse() : [];
 
   return (
-    <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
+    <div data-theme={theme} style={{ ...accentVars(custom && clist ? clist.color : undefined), minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
       <VersionTag />
       {!histDone && totalCerts > 0 && (
         <span style={{ position: "fixed", top: 0, left: 0, height: 2, zIndex: 50, background: "var(--pink-700)", width: `${Math.round((loadedCerts / totalCerts) * 100)}%`, transition: "width 200ms linear" }} />
@@ -1228,7 +1267,7 @@ export default function StatsPage() {
 
         {custom && clist && editing && unlocked && (
           <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
-            <ListForm name={clist.name} id={clist.id} text={CL.certsText(clist.items)} submit="Save" locked={!!clist.locked} onCancel={() => setEditing(false)}
+            <ListForm name={clist.name} id={clist.id} text={CL.certsText(clist.items)} submit="Save" locked={!!clist.locked} color={clist.color || ""} onCancel={() => setEditing(false)}
               onSave={async (name, id, items, view) => {
                 const known = CL.knownNames();
                 const l = { id, name, items: items.map((it) => ({ ...it, name: known[it.cert] })), at: Date.now(), ...view };

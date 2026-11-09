@@ -8,8 +8,8 @@
 type Any = any;
 
 export type Item = { cert: string; grade: number; name?: string };
-/** locked: the list has a view password; hidden: this browser hasn't given it (no items sent, count = how many). */
-export type List = { id: string; name: string; items: Item[]; at: number; locked?: boolean; hidden?: boolean; count?: number };
+/** color: its theme colour (#rrggbb, none = the site pink); locked: the list has a view password; hidden: this browser hasn't given it (no items sent, count = how many). */
+export type List = { id: string; name: string; items: Item[]; at: number; color?: string; locked?: boolean; hidden?: boolean; count?: number };
 
 const API = "/api/lists";
 const CACHE = "mew_custom_lists_cache";

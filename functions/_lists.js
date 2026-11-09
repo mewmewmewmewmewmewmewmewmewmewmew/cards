@@ -23,4 +23,4 @@ export async function canView(env, list, pw) {
 /** A list as sent to a browser that may see it: no hash, just locked: true. */
 export const shown = (l) => { const { viewHash, ...rest } = l; return viewHash ? { ...rest, locked: true } : rest; };
 /** A locked list for everyone else: its name and size only. */
-export const hidden = (l) => ({ id: l.id, name: l.name, at: l.at, locked: true, hidden: true, count: l.items.length, items: [] });
+export const hidden = (l) => ({ id: l.id, name: l.name, at: l.at, ...(l.color ? { color: l.color } : {}), locked: true, hidden: true, count: l.items.length, items: [] });
