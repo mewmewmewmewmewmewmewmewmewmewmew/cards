@@ -1,5 +1,6 @@
 import React from "react";
 import * as MewData from "./mew-data";
+import { VersionTag } from "./Loader";
 import { MewIcon, CameoIcon, IntlIcon } from "./icons";
 
 /* ------------------------------------------------------------------ *
@@ -1249,6 +1250,7 @@ class MewCatalog extends React.Component<Any, Any> {
     const v: Any = this.renderVals();
     return (
       <div data-theme={v.theme} style={{ minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
+        {!v.gated && <VersionTag />}
         {v.gated && (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box", background: v.gateBg }}>
             <div style={{ position: "relative", width: 112, height: 112, flex: "0 0 auto" }}>

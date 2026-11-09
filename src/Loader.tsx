@@ -20,4 +20,9 @@ const Loader: React.FC<{ theme?: string; progress?: number; children?: React.Rea
   </div>
 );
 
+/** The site version, small and faint in the bottom-left corner of every page. */
+export const VersionTag: React.FC = () => (
+  <div aria-hidden="true" style={{ position: "fixed", left: 10, bottom: 8, zIndex: 40, pointerEvents: "none", fontFamily: "var(--font-data)", fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", color: "rgba(203, 151, 165, 0.55)" }}>v{D.APP_VERSION}</div>
+);
+
 export default Loader;

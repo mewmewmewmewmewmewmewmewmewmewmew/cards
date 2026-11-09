@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as D from "./mew-data";
 import { MewIcon, CameoIcon, IntlIcon } from "./icons";
 import WeeklyView from "./WeeklyView";
-import Loader from "./Loader";
+import Loader, { VersionTag } from "./Loader";
 import * as AC from "./alt-cache";
 import { loadFx, paidUSD, type Fx } from "./fx";
 import * as CL from "./custom-lists";
@@ -331,6 +331,7 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
   };
   return (
     <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
+      <VersionTag />
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: `${narrow ? 20 : 28}px ${pad}px 64px`, boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
@@ -1110,7 +1111,7 @@ export default function StatsPage() {
   }
 
   if (weekly) {
-    return <WeeklyView cards={cards} hist={hist} hidden={hiddenLists ? hiddenLists.all : new Set<string>()} done={histDone} mode={mode} setMode={setMode} lang={lang} onBack={closeWeekly} />;
+    return <><VersionTag /><WeeklyView cards={cards} hist={hist} hidden={hiddenLists ? hiddenLists.all : new Set<string>()} done={histDone} mode={mode} setMode={setMode} lang={lang} onBack={closeWeekly} /></>;
   }
 
   const pad = narrow ? 16 : 32;
@@ -1139,6 +1140,7 @@ export default function StatsPage() {
 
   return (
     <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
+      <VersionTag />
       {!histDone && totalCerts > 0 && (
         <span style={{ position: "fixed", top: 0, left: 0, height: 2, zIndex: 50, background: "var(--pink-700)", width: `${Math.round((loadedCerts / totalCerts) * 100)}%`, transition: "width 200ms linear" }} />
       )}
