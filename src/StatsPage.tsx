@@ -442,11 +442,8 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
               <div key={l.id} style={{ position: "relative", minWidth: 0 }}>
                 <a href={`#${l.id}`} onClick={(e) => { e.preventDefault(); open(l.id); }}
                   style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", boxSizing: "border-box", padding: 14, textDecoration: "none", background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
-                  <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 28, display: "flex", alignItems: "center", gap: 8 }}>
-                    <span aria-hidden="true" style={{ flex: "0 0 auto", width: 10, height: 10, borderRadius: "50%", background: l.color || "var(--pink-700)" }} />
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
-                  </span>
-                  <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 28 }}>{l.name}</span>
+                  <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: l.color || "var(--pink-700)", display: "flex", alignItems: "center", gap: 6 }}>
                     {l.locked && <Lock />}#{l.id} · {l.hidden ? l.count || 0 : l.items.length} cert{(l.hidden ? l.count : l.items.length) === 1 ? "" : "s"}
                   </span>
                   {seen.length > 0 && <span style={{ ...faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{seen.slice(0, 6).join(" · ")}</span>}
