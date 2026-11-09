@@ -936,7 +936,16 @@ export default function StatsPage() {
       return sign * cmp[by](a, b);
     });
     hiddenRows.sort((a, b) => name(a.card).localeCompare(name(b.card), "ja"));
-    return { charted, failed, pending, noCert, hidden: hiddenRows };
+    // Cards with nothing to chart (no sales / value history, or no cert) still show, after the
+    // charted ones, with "—" for their numbers.
+    const domain = [range ? shiftDate(today, range) : today, today] as [string, string];
+    const nodata = [
+      ...failed.map((x: Any) => ({ ...x, key: x.cert })),
+      ...noCert.map((c: Any) => ({ card: c, cert: null, key: `nc-${c.id}`, grade: personal ? D.pcGrade(c) : 10, error: "no cert in the sheet" })),
+    ].map((x: Any) => ({ ...x, nodata: true, value: null, change: null, dchange: null, last: null, pts: [], lead: null, tail: null, domain, paid: personal ? paidUSD(fx, x.card.paid) : null }))
+      .sort((a: Any, b: Any) => name(a.card).localeCompare(name(b.card), "ja"));
+    charted.forEach((x: Any) => { x.key = x.cert; });
+    return { charted, nodata, pending, hidden: hiddenRows };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, hist, histP, list, range, sort, dir, lang, mode, today, scope, hiddenSet, fx]);
 
@@ -948,7 +957,8 @@ export default function StatsPage() {
     const hay = [c.nameEN, c.nameJP, c.number, c.set, c.year, c.rarity, x.cert, x.grade ? `PSA ${x.grade}` : ""].filter(Boolean).join(" ").toLowerCase();
     return words.every((w) => hay.includes(w));
   };
-  const shown = useMemo(() => rows.charted.filter(matches), [rows, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shown = useMemo(() => [...rows.charted, ...rows.nodata].filter(matches), [rows, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const listed = rows.charted.length + rows.nodata.length;
   const shownPending = rows.pending.filter(matches);
 
   // Collection total: each card's value as of each day (its last sale, or ALT value), summed
@@ -1041,14 +1051,14 @@ export default function StatsPage() {
   // Personal adds a "P/L" column (today's price minus what you paid).
   const showPaid = list === "personal" && rows.charted.some((x: Any) => x.paid !== null && x.paid !== undefined);
   const listCols = narrow ? `24px minmax(0,1fr) auto 64px${showPaid ? " 76px" : ""}` : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}${showPaid ? " 150px" : ""}`;
-  const noMatch = q.trim() && rows.charted.length > 0 && shown.length === 0 ? (
+  const noMatch = q.trim() && listed > 0 && shown.length === 0 ? (
     <div style={{ gridColumn: "1 / -1", padding: "32px 16px", textAlign: "center", border: "1px dashed var(--line-strong)", ...eyebrow }}>No cards match "{q.trim()}"</div>
   ) : null;
-  const emptyState = histDone && rows.charted.length === 0 ? (
+  const emptyState = histDone && listed === 0 ? (
     <div style={{ gridColumn: "1 / -1", padding: "40px 24px", textAlign: "center", border: "1px dashed var(--line-strong)" }}>
       <div style={eyebrow}>{noScope && !custom ? "No scope selected" : "No cards to chart"}</div>
       <div style={{ marginTop: 8, fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
-        {custom ? (mode === "sales" ? "None of these certs has a recorded sale at its grade on ALT. Try ALT value, or check the certs under Not charted." : "None of these certs has ALT value history. Check the certs under Not charted.")
+        {custom ? "This list has no certs yet."
           : noScope ? "Turn on Mew, Cameo or Intl above."
           : list === "personal" && !cards.some((c: Any) => D.pcGrade(c) !== null) ? "No card in the sheet has a PSA grade in its pc column yet."
           : mode === "sales" ? `None of these cards has a recorded ${list === "personal" ? "" : "PSA 10 "}sale. Try ALT value, or another scope.` : "None of these cards has ALT value history."}
@@ -1231,7 +1241,7 @@ export default function StatsPage() {
                   style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-body)", fontSize: "var(--web-small)", color: "var(--text-title)" }} />
                 {q && <button type="button" onClick={() => setQ("")} aria-label="Clear search" data-hover-pink="1" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--font-data)", fontSize: "var(--web-small)" }}>×</button>}
               </label>
-              <span style={{ marginLeft: "auto", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>{q.trim() ? `${shown.length} of ${rows.charted.length}` : rows.charted.length} card{rows.charted.length === 1 ? "" : "s"}</span>
+              <span style={{ marginLeft: "auto", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>{q.trim() ? `${shown.length} of ${listed}` : listed} card{listed === 1 ? "" : "s"}</span>
               <span style={{ display: "flex", gap: 2 }}>
                 <button type="button" onClick={() => setView("grid")} aria-label="Grid view" aria-pressed={view === "grid"} title="Grid" style={viewBtn(view === "grid")}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="7" height="7" /><rect x="9" y="0" width="7" height="7" /><rect x="0" y="9" width="7" height="7" /><rect x="9" y="9" width="7" height="7" /></svg>
@@ -1245,11 +1255,11 @@ export default function StatsPage() {
             {view === "grid" ? (
             <div style={{ marginTop: 16, display: "grid", gap: narrow ? 10 : 14, gridTemplateColumns: `repeat(auto-fill, minmax(${narrow ? 150 : 220}px, 1fr))` }}>
               {shown.map((x: Any) => {
-                const on = x.cert === selected;
+                const on = !x.nodata && x.cert === selected;
                 return (
-                  <div key={x.cert} style={{ position: "relative", minWidth: 0 }}>
-                  <button type="button" onClick={() => { setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8, padding: 10, textAlign: "left", cursor: "pointer", minWidth: 0, background: on ? "var(--surface-tint)" : "var(--surface-card)", border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, borderRadius: "var(--web-radius)", transition: "border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)" }}>
+                  <div key={x.key} style={{ position: "relative", minWidth: 0 }}>
+                  <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { if (x.nodata) return; setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8, padding: 10, textAlign: "left", cursor: x.nodata ? "default" : "pointer", minWidth: 0, background: on ? "var(--surface-tint)" : "var(--surface-card)", border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, borderRadius: "var(--web-radius)", transition: "border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)" }}>
                     <span style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, paddingRight: hiddenSet ? 20 : 0 }}>
                       <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
@@ -1259,13 +1269,13 @@ export default function StatsPage() {
                     </span>
                     <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} />
                     <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-                      <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)" }}>{fmtUSD(x.value)}</span>
+                      <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)" }}>{x.value === null ? "—" : fmtUSD(x.value)}</span>
                       <Change pct={x.change} size="var(--web-label)" />
                     </span>
-                    {sales && <span style={{ ...faint, marginTop: -4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>last sale {fmtDate(x.last.date)}</span>}
-                    {list === "personal" && x.paid !== null && x.paid !== undefined && <PaidLine paid={x.paid} value={x.value} />}
+                    {sales && <span style={{ ...faint, marginTop: -4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>last sale {x.last ? fmtDate(x.last.date) : "—"}</span>}
+                    {list === "personal" && x.paid !== null && x.paid !== undefined && x.value !== null && <PaidLine paid={x.paid} value={x.value} />}
                   </button>
-                  {hiddenSet && (
+                  {hiddenSet && x.cert && (
                     <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), true)} aria-label={`Hide ${name(x.card)} from totals`} title="Hide from totals" data-hover-pink="1"
                       style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, border: "none", background: "transparent", cursor: "pointer" }}>
                       <EyeOff />
@@ -1295,27 +1305,27 @@ export default function StatsPage() {
                 </div>
               )}
               {shown.map((x: Any) => {
-                const on = x.cert === selected;
+                const on = !x.nodata && x.cert === selected;
                 return (
-                  <div key={x.cert} style={{ position: "relative" }}>
-                    <button type="button" onClick={() => { setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                      style={{ width: "100%", boxSizing: "border-box", display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `7px ${hiddenSet ? 36 : 8}px 7px 8px`, textAlign: "left", cursor: "pointer", background: on ? "var(--surface-tint)" : "transparent", border: "none", borderBottom: "1px solid var(--line-hairline)", transition: "background var(--dur-fast) var(--ease)" }}>
+                  <div key={x.key} style={{ position: "relative" }}>
+                    <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { if (x.nodata) return; setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      style={{ width: "100%", boxSizing: "border-box", display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `7px ${hiddenSet ? 36 : 8}px 7px 8px`, textAlign: "left", cursor: x.nodata ? "default" : "pointer", background: on ? "var(--surface-tint)" : "transparent", border: "none", borderBottom: "1px solid var(--line-hairline)", transition: "background var(--dur-fast) var(--ease)" }}>
                       <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", backgroundImage: x.card.image ? `url("${x.card.image}")` : "none", backgroundSize: "100% 100%" }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                         <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                       {!narrow && <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} height={28} />}
-                      <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{fmtUSD(x.value)}</span>
+                      <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{x.value === null ? "—" : fmtUSD(x.value)}</span>
                       <span style={{ textAlign: "right", whiteSpace: "nowrap" }}><Change pct={x.change} size="var(--web-label)" /></span>
-                      {sales && !narrow && <span style={{ ...faint, textAlign: "right", whiteSpace: "nowrap" }}>{fmtDate(x.last.date)}</span>}
-                      {showPaid && (x.paid !== null && x.paid !== undefined
+                      {sales && !narrow && <span style={{ ...faint, textAlign: "right", whiteSpace: "nowrap" }}>{x.last ? fmtDate(x.last.date) : "—"}</span>}
+                      {showPaid && (x.paid !== null && x.paid !== undefined && x.value !== null
                         ? <span title={`paid ${fmtUSD(x.paid)}`} style={{ textAlign: "right", whiteSpace: "nowrap", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", fontWeight: 600, color: x.value >= x.paid ? "#22a06b" : "#e5484d" }}>
                             {x.value >= x.paid ? "+" : "−"}{fmtUSD(Math.abs(x.value - x.paid))}{narrow ? "" : ` (${fmtPct(x.paid > 0 ? ((x.value - x.paid) / x.paid) * 100 : null)})`}
                           </span>
                         : <span style={{ ...faint, textAlign: "right" }}>—</span>)}
                     </button>
-                    {hiddenSet && (
+                    {hiddenSet && x.cert && (
                       <button type="button" onClick={() => toggleHidden(x.cert, name(x.card), true)} aria-label={`Hide ${name(x.card)} from totals`} title="Hide from totals" data-hover-pink="1"
                         style={{ position: "absolute", top: "50%", right: 6, transform: "translateY(-50%)", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, border: "none", background: "transparent", cursor: "pointer" }}>
                         <EyeOff />
@@ -1427,25 +1437,6 @@ export default function StatsPage() {
               );
             })()}
 
-            {(rows.failed.length > 0 || rows.noCert.length > 0) && histDone && (
-              <details key={`nc-${rows.charted.length === 0}`} open={rows.charted.length === 0} style={{ marginTop: 16, borderTop: "1px solid var(--line-hairline)", paddingTop: 14 }}>
-                <summary style={{ ...eyebrow, cursor: "pointer" }}>Not charted · {rows.failed.length + rows.noCert.length}</summary>
-                <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
-                  {rows.failed.map((x: Any) => (
-                    <div key={x.cert} style={{ display: "flex", gap: 12, fontSize: "var(--web-small)" }}>
-                      <span style={{ color: "var(--text-title)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}{x.card.number && <span style={{ ...faint, marginLeft: 8 }}>{x.card.number}</span>}<Edition e={x.card.edition} /></span>
-                      <span style={faint}>cert {x.cert} · {x.error}</span>
-                    </div>
-                  ))}
-                  {rows.noCert.map((c: Any) => (
-                    <div key={c.id} style={{ display: "flex", gap: 12, fontSize: "var(--web-small)" }}>
-                      <span style={{ color: "var(--text-title)", minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(c)}{c.number && <span style={{ ...faint, marginLeft: 8 }}>{c.number}</span>}<Edition e={c.edition} /></span>
-                      <span style={faint}>no cert in sheet</span>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            )}
           </>
         )}
       </div>
