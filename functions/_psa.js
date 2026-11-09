@@ -61,7 +61,8 @@ export async function lookupPsa(env, certs, max = 40) {
         const r = await get(PSA_IMAGES + c);
         if (r.stop) break;
         if (!r.ok && r.status !== 404) continue;
-        const imgs = Array.isArray(r.json) ? r.json : [];
+        // A list of { IsFrontImage, ImageURL } (or the same list inside an object).
+        const imgs = Array.isArray(r.json) ? r.json : r.json && typeof r.json === "object" ? (Object.values(r.json).find(Array.isArray) || []) : [];
         const front = imgs.find((x) => x && x.IsFrontImage && x.ImageURL) || imgs.find((x) => x && x.ImageURL);
         info[c] = { ...info[c], image: front ? String(front.ImageURL) : "", imgTried: true };
         await save(c);

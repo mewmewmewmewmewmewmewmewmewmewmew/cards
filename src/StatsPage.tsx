@@ -700,9 +700,12 @@ export default function StatsPage() {
     setPsa(snap ? { info: snap.psa || {}, token: snap.psaToken !== false, limited: !!snap.psaLimited } : null);
     setSnapAt(snap ? snap.at : null);
     setCards((cur) => cur.map((c: Any) => {
-      const i = snap && !c.fromSheet && snap.psa && snap.psa[D.certOf(c) as string];
+      const i = snap && snap.psa && snap.psa[D.certOf(c) as string];
       if (!i || i.notFound) return c;
-      return { ...c, number: c.number || i.number, year: c.year || i.year || undefined, set: c.set || [i.set, i.variety].filter(Boolean).join(" · "), psaSubject: i.subject, ...(!c.image && i.image ? { image: i.image, slab: true } : {}) };
+      // PSA's slab photo for any card without a picture; the details only for certs not in the sheet.
+      const photo = !c.image && i.image ? { image: i.image, slab: true } : {};
+      if (c.fromSheet) return { ...c, ...photo };
+      return { ...c, number: c.number || i.number, year: c.year || i.year || undefined, set: c.set || [i.set, i.variety].filter(Boolean).join(" · "), psaSubject: i.subject, ...photo };
     }));
   };
   /** Fetch new data on the server: "all" for Refresh, "missing" for certs the copy doesn't have. */
@@ -906,7 +909,7 @@ export default function StatsPage() {
       if (!r) { pending.push({ card, cert, grade }); return; }
       const series = seriesOf(r, mode);
       if (!series.length) {
-        failed.push({ card, cert, grade, error: mode === "sales" ? (r.salesError || r.error || `no PSA ${grade} sales on ALT`) : (r.error || "no value history") });
+        failed.push({ card, cert, grade, r, error: mode === "sales" ? (r.salesError || r.error || `no PSA ${grade} sales on ALT`) : (r.error || "no value history") });
         return;
       }
       const last = series[series.length - 1];
@@ -960,7 +963,7 @@ export default function StatsPage() {
     const nodata = [
       ...failed.map((x: Any) => ({ ...x, key: x.cert })),
       ...noCert.map((c: Any) => ({ card: c, cert: null, key: `nc-${c.id}`, grade: personal ? D.pcGrade(c) : 10, error: "no cert in the sheet" })),
-    ].map((x: Any) => ({ ...x, nodata: true, value: null, change: null, dchange: null, last: null, pts: [], lead: null, tail: null, domain, paid: personal ? paidUSD(fx, x.card.paid) : null }))
+    ].map((x: Any) => ({ ...x, nodata: true, value: null, change: null, dchange: null, last: null, series: [], pts: [], lead: null, tail: null, domain, paid: personal ? paidUSD(fx, x.card.paid) : null }))
       .sort((a: Any, b: Any) => name(a.card).localeCompare(name(b.card), "ja"));
     charted.forEach((x: Any) => { x.key = x.cert; });
     return { charted, nodata, pending, hidden: hiddenRows };
@@ -1002,7 +1005,7 @@ export default function StatsPage() {
     return { pts, backfilled: series.filter((h: Pt[]) => h[0].date > start).length, value, start };
   }, [rows, range, today]);
 
-  const sel = selected ? rows.charted.find((x: Any) => x.cert === selected) : null;
+  const sel = selected ? [...rows.charted, ...rows.nodata].find((x: Any) => x.key === selected) : null;
   // Loading progress and the Data check count every cert, whatever the scope toggles show.
   const allCerts = useMemo(() => new Set(cards.filter((c: Any) => c.customGrade === undefined || c.customGrade === 10).map((c: Any) => D.certOf(c)).filter(Boolean)), [cards]);
   const totalCerts = allCerts.size;
@@ -1188,16 +1191,16 @@ export default function StatsPage() {
                 </div>
                 <div style={{ marginTop: 4, fontFamily: "var(--font-body)", fontWeight: 600, fontSize: "var(--web-h3)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{headTitle}</div>
                 <div style={{ marginTop: 6, display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "var(--web-h1)", lineHeight: 1, color: "var(--text-title)" }}>{fmtUSD(headValue || 0)}</span>
+                  <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "var(--web-h1)", lineHeight: 1, color: "var(--text-title)" }}>{headValue === null ? "—" : fmtUSD(headValue || 0)}</span>
                   <Change pct={headChange} />
                 </div>
                 <div style={{ ...faint, marginTop: 6 }}>
                   {sel ? (
                     <>
-                      {sales ? `last sale ${fmtDate(sel.last.date)}${sel.last.house ? ` · ${sel.last.house}` : ""} · ${sel.series.length} sale${sel.series.length === 1 ? "" : "s"} · ` : ""}
-                      {list === "personal" && sel.paid !== null && sel.paid !== undefined ? `paid ${fmtUSD(sel.paid)}${sel.card.paid && sel.card.paid.currency !== "USD" ? ` (${sel.card.paid.raw})` : ""}${sel.card.paid && sel.card.paid.date ? ` on ${fmtDate(sel.card.paid.date)}` : ""} · ${sel.value >= sel.paid ? "+" : "−"}${fmtUSD(Math.abs(sel.value - sel.paid))} (${fmtPct(sel.paid > 0 ? ((sel.value - sel.paid) / sel.paid) * 100 : null)}) · ` : ""}
-                      cert {sel.cert}{sel.r.grade && parseFloat(sel.r.grade) !== 10 ? ` · grade ${sel.r.grade}` : ""}
-                      {sel.r.assetId && <> · <a href={`https://alt.xyz/itm/${sel.r.assetId}/research`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-accent)" }}>ALT ↗</a></>}
+                      {sel.nodata ? `${sel.error} · ` : sales ? `last sale ${fmtDate(sel.last.date)}${sel.last.house ? ` · ${sel.last.house}` : ""} · ${sel.series.length} sale${sel.series.length === 1 ? "" : "s"} · ` : ""}
+                      {list === "personal" && sel.paid !== null && sel.paid !== undefined && sel.value !== null ? `paid ${fmtUSD(sel.paid)}${sel.card.paid && sel.card.paid.currency !== "USD" ? ` (${sel.card.paid.raw})` : ""}${sel.card.paid && sel.card.paid.date ? ` on ${fmtDate(sel.card.paid.date)}` : ""} · ${sel.value >= sel.paid ? "+" : "−"}${fmtUSD(Math.abs(sel.value - sel.paid))} (${fmtPct(sel.paid > 0 ? ((sel.value - sel.paid) / sel.paid) * 100 : null)}) · ` : ""}
+                      {sel.cert ? `cert ${sel.cert}` : "no cert"}{sel.r && sel.r.grade && parseFloat(sel.r.grade) !== 10 ? ` · grade ${sel.r.grade}` : ""}
+                      {sel.r && sel.r.assetId && <> · <a href={`https://alt.xyz/itm/${sel.r.assetId}/research`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-accent)" }}>ALT ↗</a></>}
                     </>
                   ) : (
                     `${rows.charted.length} card${rows.charted.length === 1 ? "" : "s"}${list === "personal" && costs.n ? ` · paid ${fmtUSD(costs.paid)} for ${costs.n === rows.charted.length ? "them" : `${costs.n} of them`} · ${costs.worth >= costs.paid ? "+" : "−"}${fmtUSD(Math.abs(costs.worth - costs.paid))} (${fmtPct(costs.paid > 0 ? ((costs.worth - costs.paid) / costs.paid) * 100 : null)})` : ""}${total.backfilled ? ` · ${total.backfilled} with no ${sales ? "sale" : "data"} before ${fmtDate(total.start)} ${total.backfilled === 1 ? "counts at its" : "count at their"} first ${sales ? "sale" : "value"} until then` : ""}`
@@ -1217,7 +1220,7 @@ export default function StatsPage() {
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
                     {!narrow && <span style={{ flex: "0 0 auto", height: 260, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(sel.card), boxShadow: "var(--shadow-raised)" }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <LineChart pts={sel.pts} lead={sel.lead} tail={sel.tail} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={chartEmpty} />
+                      <LineChart pts={sel.pts} lead={sel.lead} tail={sel.tail} domain={sel.domain} height={narrow ? 180 : 260} dots={sales} empty={sel.nodata ? "NO DATA" : chartEmpty} />
                     </div>
                   </div>
                 )
@@ -1273,11 +1276,11 @@ export default function StatsPage() {
             {view === "grid" ? (
             <div style={{ marginTop: 16, display: "grid", gap: narrow ? 10 : 14, gridTemplateColumns: `repeat(auto-fill, minmax(${narrow ? 150 : 220}px, 1fr))` }}>
               {shown.map((x: Any) => {
-                const on = !x.nodata && x.cert === selected;
+                const on = x.key === selected;
                 return (
                   <div key={x.key} style={{ position: "relative", minWidth: 0 }}>
-                  <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { if (x.nodata) return; setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8, padding: 10, textAlign: "left", cursor: x.nodata ? "default" : "pointer", minWidth: 0, background: on ? "var(--surface-tint)" : "var(--surface-card)", border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, borderRadius: "var(--web-radius)", transition: "border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)" }}>
+                  <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { setSelected(on ? null : x.key); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    style={{ width: "100%", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 8, padding: 10, textAlign: "left", cursor: "pointer", minWidth: 0, background: on ? "var(--surface-tint)" : "var(--surface-card)", border: `1px solid ${on ? "var(--pink-700)" : "var(--line-hairline)"}`, borderRadius: "var(--web-radius)", transition: "border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)" }}>
                     <span style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, paddingRight: hiddenSet ? 20 : 0 }}>
                       <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
@@ -1323,11 +1326,11 @@ export default function StatsPage() {
                 </div>
               )}
               {shown.map((x: Any) => {
-                const on = !x.nodata && x.cert === selected;
+                const on = x.key === selected;
                 return (
                   <div key={x.key} style={{ position: "relative" }}>
-                    <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { if (x.nodata) return; setSelected(on ? null : x.cert); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                      style={{ width: "100%", boxSizing: "border-box", display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `7px ${hiddenSet ? 36 : 8}px 7px 8px`, textAlign: "left", cursor: x.nodata ? "default" : "pointer", background: on ? "var(--surface-tint)" : "transparent", border: "none", borderBottom: "1px solid var(--line-hairline)", transition: "background var(--dur-fast) var(--ease)" }}>
+                    <button type="button" title={x.nodata ? x.error : undefined} onClick={() => { setSelected(on ? null : x.key); if (!on) window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      style={{ width: "100%", boxSizing: "border-box", display: "grid", gridTemplateColumns: listCols, gap: narrow ? 10 : 14, alignItems: "center", padding: `7px ${hiddenSet ? 36 : 8}px 7px 8px`, textAlign: "left", cursor: "pointer", background: on ? "var(--surface-tint)" : "transparent", border: "none", borderBottom: "1px solid var(--line-hairline)", transition: "background var(--dur-fast) var(--ease)" }}>
                       <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
@@ -1423,6 +1426,11 @@ export default function StatsPage() {
                       return (
                         <>
                           <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited ? " · PSA's daily limit reached, the rest are queued and fill in on a later visit" : ""}</div>
+                          {(() => {
+                            const all = cards.map((c: Any) => psa.info[D.certOf(c) as string]).filter((i: Any) => i && !i.notFound);
+                            const withPhoto = all.filter((i: Any) => i.image).length, asked = all.filter((i: Any) => i.imgTried).length;
+                            return <div style={line}>PSA photos · {withPhoto} of {cards.length} certs have one · {asked} asked{asked < all.length ? ` · ${all.length - asked} queued` : ""}{asked > withPhoto ? ` · ${asked - withPhoto} with no photo on PSA` : ""}{psa.limited ? " · PSA's daily limit reached" : ""}</div>;
+                          })()}
                           {!psa.token && got.length < mine.length && <div style={hint}>Year, set and card number come from PSA: add a PSA_TOKEN secret to the mewcards project in Cloudflare (a free API token from psacard.com); they fill in on the next visit.</div>}
                           {off.length > 0 && <div style={hint}>Grade differs from PSA · {off.map((c: Any) => `cert ${D.certOf(c)} is a PSA ${psa.info[D.certOf(c) as string].grade}, listed at ${c.customGrade}`).join(" · ")}</div>}
                         </>
