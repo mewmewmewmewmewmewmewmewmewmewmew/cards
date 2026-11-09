@@ -1012,9 +1012,9 @@ export default function StatsPage() {
       const r = grade === 10 ? hist.get(cert) : histP.get(cert);
       // A custom cert that isn't in the sheet goes by ALT's name for it (the PSA label's subject).
       let card = card0.nameEN || card0.nameJP ? card0 : { ...card0, nameEN: (r && r.subject) || card0.psaSubject || `Cert ${cert}` };
-      // Set number, set and year from ALT when the Worker sends them (they fill gaps only).
-      if (r && (r.cardNumber || r.set || r.setName || r.year) && (!card.number || !card.set || !card.year)) {
-        card = { ...card, number: card.number || r.cardNumber || "", set: card.set || r.set || r.setName || "", year: card.year || Number(r.year) || undefined };
+      // Set number, set / variety and year from ALT when the Worker sends them (they fill gaps only).
+      if (r && (r.cardNumber || r.set || r.setName || r.year || r.variety) && (!card.number || !card.set || !card.year)) {
+        card = { ...card, number: card.number || r.cardNumber || "", set: card.set || [r.set || r.setName, r.variety].filter(Boolean).join(" · "), year: card.year || Number(r.year) || undefined };
       }
       if (hiddenSet && hiddenSet.has(cert)) {
         const s = r ? seriesOf(r, mode) : [];

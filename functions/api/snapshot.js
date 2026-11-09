@@ -29,7 +29,7 @@ const trim = (r) => ({
   sales: Array.isArray(r.sales) ? r.sales.map((s) => ({ date: s.date, price: s.price, ...(s.auctionHouse ? { auctionHouse: s.auctionHouse } : {}) })) : [],
   salesFilter: r.salesFilter, cachedAt: r.cachedAt, cache: r.cache, error: r.error,
   ...(r.population || r.pop ? { population: r.population || r.pop } : {}),
-  ...(r.cardNumber ? { cardNumber: r.cardNumber } : {}), ...(r.set || r.setName ? { set: r.set || r.setName } : {}), ...(r.year ? { year: r.year } : {}),
+  ...(r.cardNumber ? { cardNumber: r.cardNumber } : {}), ...(r.set || r.setName ? { set: r.set || r.setName } : {}), ...(r.year ? { year: r.year } : {}), ...(r.variety ? { variety: r.variety } : {}),
 });
 const useful = (r) => !!r && ((Array.isArray(r.history) && r.history.length > 0) || (Array.isArray(r.sales) && r.sales.length > 0));
 
