@@ -116,25 +116,30 @@ export function parseCerts(text: string): Item[] {
 /** The list as editable text, one cert per line (grade shown when it isn't 10). */
 export const certsText = (items: Item[]) => items.map((it) => (it.grade === 10 ? it.cert : `${it.cert} ${it.grade}`)).join("\n");
 
-/* ---------- what PSA says about a cert (year, set, number…) ---------- */
+/* ---------- saved ALT data + PSA details per list (/api/snapshot) ---------- */
 
 export type CertInfo = { year: number | null; set: string; number: string; subject: string; variety: string; grade: number | null; gradeText?: string; notFound?: boolean };
-const INFO = "mew_cert_info";
+/** results are keyed "<cert>|<grade>"; at = when the data was last fetched. */
+export type Snap = { at: number; tried?: number; results: Record<string, Any>; psa: Record<string, CertInfo>; psaToken?: boolean; psaLimited?: boolean; psaRetryAt?: number; errors?: string[] };
 
-/** PSA details for certs (from /api/certs, kept here too); token false = PSA_TOKEN isn't set. */
-export async function fetchCertInfo(certs: string[]): Promise<{ info: Record<string, CertInfo>; token: boolean; limited: boolean }> {
-  const info: Record<string, CertInfo> = readJSON(INFO, {}) || {};
-  const want = certs.filter((c) => !info[c]);
-  let token = true, limited = false;
-  for (let i = 0; i < want.length; i += 60) {
-    try {
-      const res = await fetch(`/api/certs?certs=${want.slice(i, i + 60).join(",")}`, { cache: "no-store" });
-      const j = await res.json();
-      if (j && j.certs) Object.assign(info, j.certs);
-      if (j && j.token === false) token = false;
-      if (j && j.limited) limited = true;
-    } catch (e) { break; }
-  }
-  writeJSON(INFO, info);
-  return { info, token, limited };
+export async function fetchSnapshot(id: string): Promise<Snap | null> {
+  const res = await fetch(`/api/snapshot?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+  const j = await res.json().catch(() => null);
+  if (!res.ok || !j) throw new Error((j && j.error) || `HTTP ${res.status}`);
+  return j.snap || null;
 }
+
+/**
+ * Fetch new data for a list on the server: "all" (Refresh) or only the certs it doesn't have yet.
+ * Sends the lists password when this browser knows it (no prompt), which skips the cooldown.
+ * → { snap, cooldown? (minutes until anyone can refresh again) }
+ */
+export async function refreshSnapshot(id: string, mode: "all" | "missing" | "psa"): Promise<{ snap: Snap; cooldown?: number }> {
+  const res = await fetch("/api/snapshot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, mode, password: password() || undefined }) });
+  const j = await res.json().catch(() => null);
+  if (!res.ok || !j || !j.snap) throw new Error((j && j.error) || `HTTP ${res.status}`);
+  return j;
+}
+
+/** Ask for (and check) the lists password before opening a form. Throws when it's wrong or cancelled. */
+export const checkPassword = () => change({ action: "check" });

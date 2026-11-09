@@ -303,7 +303,6 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
     <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--surface-page)", color: "var(--text-body)", fontFamily: "var(--font-body)" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: `${narrow ? 20 : 28}px ${pad}px 64px`, boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <a href="/stats/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Stats</a>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
             <button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} data-hover-pink="1" style={iconBtn} aria-label="Toggle theme">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .9 1.6h5.2c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z" /></svg>
@@ -317,7 +316,7 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
 
         <div style={{ marginTop: narrow ? 24 : 36, display: "flex", alignItems: "center", gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line-hairline)" }}>
           <span style={eyebrow}>{status === "cached" && !lists.length ? "Loading…" : `${lists.length} list${lists.length === 1 ? "" : "s"}`}</span>
-          {!adding && <button type="button" onClick={() => setAdding(true)} style={{ ...pill(true), marginLeft: "auto" }}>+ New list</button>}
+          {!adding && <button type="button" onClick={async () => { setErr(""); try { await CL.checkPassword(); setAdding(true); } catch (e) { setErr(errText(e)); } }} style={{ ...pill(true), marginLeft: "auto" }}>+ New list</button>}
         </div>
         {legacy.length > 0 && (
           <div style={{ ...faint, marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -379,6 +378,12 @@ export default function StatsPage() {
   const [copied, setCopied] = useState(false);
   // PSA's details for custom certs that aren't in the sheet (year, set, number…).
   const [psa, setPsa] = useState<{ info: Record<string, CL.CertInfo>; token: boolean; limited: boolean } | null>(null);
+  // A custom list's data is the copy saved on the server (/api/snapshot): viewing never calls ALT,
+  // only Refresh does. snapAt = when it was fetched.
+  const [snapAt, setSnapAt] = useState<number | null>(null);
+  const [snapBusy, setSnapBusy] = useState(false);
+  const [snapMsg, setSnapMsg] = useState("");
+  const fillMissing = useRef<string | null>(null); // list just made or edited: fetch its new certs
   const [theme, setTheme] = useState<string>(() => (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   const [lang, setLang] = useState<"EN" | "JP">(() => (/^ja\b/i.test(navigator.language || "") ? "JP" : "EN"));
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === "alt" ? "alt" : "sales"; } catch (e) { return "sales"; } });
@@ -669,6 +674,51 @@ export default function StatsPage() {
     });
     return { cards, hidden: null, diag: {} };
   };
+  /** Show a list's saved copy: ALT results per cert at its grade, and PSA's year/set/number. */
+  const showSnap = (cl: CL.List, snap: CL.Snap | null) => {
+    const h10 = new Map<string, Any>(), hP = new Map<string, Any>();
+    cl.items.forEach((it) => { const r = snap && snap.results[`${it.cert}|${it.grade}`]; if (r) (it.grade === 10 ? h10 : hP).set(it.cert, D.checkResult(r, it.grade)); });
+    setHist(h10); setHistP(hP);
+    setPsa(snap ? { info: snap.psa || {}, token: snap.psaToken !== false, limited: !!snap.psaLimited } : null);
+    setSnapAt(snap ? snap.at : null);
+    setCards((cur) => cur.map((c: Any) => {
+      const i = snap && !c.fromSheet && snap.psa && snap.psa[D.certOf(c) as string];
+      if (!i || i.notFound) return c;
+      return { ...c, number: c.number || i.number, year: c.year || i.year || undefined, set: c.set || [i.set, i.variety].filter(Boolean).join(" · "), psaSubject: i.subject };
+    }));
+  };
+  /** Fetch new data on the server: "all" for Refresh, "missing" for certs the copy doesn't have. */
+  const refreshCustom = async (cl: CL.List, mode: "all" | "missing") => {
+    setSnapBusy(true); setSnapMsg("");
+    try {
+      const { snap, cooldown } = await CL.refreshSnapshot(cl.id, mode);
+      showSnap(cl, snap);
+      if (cooldown) setSnapMsg(`Refreshed less than 15 minutes ago, so this is the saved copy. Try again in ${cooldown} min.`);
+      else if (snap.errors && snap.errors.length) setSnapMsg(`Some certs couldn't be fetched: ${[...new Set(snap.errors)].join("; ")}`);
+      D.trackEvent("custom_list_refresh", { mode, cooldown: !!cooldown });
+      CL.fetchLists().then(setLists).catch(() => {}); // names found by the refresh
+    } catch (e: Any) { setSnapMsg(`Couldn't refresh: ${(e && e.message) || e}`); }
+    setSnapBusy(false);
+  };
+  const loadCustom = async (cl: CL.List) => {
+    setPhase("loading");
+    try {
+      const [sheet, snap] = await Promise.all([customSheet(cl), CL.fetchSnapshot(cl.id).catch(() => null)]);
+      applySheet(sheet);
+      showSnap(cl, snap);
+      setHistDone(true); setHistPDone(true); setImgs({ done: 0, total: 0, finished: true });
+      setPhase("ready");
+      // A list that's never been fetched, or was just made or edited: fetch the certs it lacks.
+      const missing = cl.items.some((it) => !(snap && snap.results[`${it.cert}|${it.grade}`]));
+      if (missing && (!snap || fillMissing.current === cl.id)) refreshCustom(cl, "missing");
+      // PSA details still queued (PSA's daily limit, or no token earlier): top them up quietly,
+      // without calling ALT. The server holds off for an hour after PSA says the limit is used up.
+      else if (snap && (!snap.psaRetryAt || Date.now() > snap.psaRetryAt) && cl.items.some((it) => !(snap.psa || {})[it.cert])) {
+        CL.refreshSnapshot(cl.id, "psa").then(({ snap: s2 }) => showSnap(cl, s2)).catch(() => {});
+      }
+      fillMissing.current = null;
+    } catch (e) { console.error(e); setPhase("error"); }
+  };
   const resetData = () => {
     setHist(new Map()); setHistP(new Map()); setHistDone(false); setHistPDone(false);
     setImgs({ done: 0, total: 0, finished: false }); setDiag(null); setDiagP(null); setOldRun(null); setSelected(null);
@@ -761,27 +811,10 @@ export default function StatsPage() {
   useEffect(() => {
     if (!custom || !clist) return;
     resetData();
-    load("", clist);
+    setSnapMsg("");
+    loadCustom(clist);
     D.trackEvent("custom_list_view", { certs: clist.items.length });
   }, [clistKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Custom certs not in the sheet: fill in year, set and card number from PSA (in the background).
-  useEffect(() => {
-    if (!custom || !clist || phase !== "ready") return;
-    const want = cards.filter((c: Any) => !c.fromSheet).map((c: Any) => D.certOf(c)).filter(Boolean) as string[];
-    if (!want.length) return;
-    let live = true;
-    CL.fetchCertInfo(want).then((p) => {
-      if (!live) return;
-      setPsa(p);
-      setCards((cur) => cur.map((c: Any) => {
-        const i = !c.fromSheet && p.info[D.certOf(c) as string];
-        if (!i || i.notFound) return c;
-        return { ...c, number: c.number || i.number, year: c.year || i.year || undefined, set: c.set || [i.set, i.variety].filter(Boolean).join(" · "), psaSubject: i.subject };
-      }));
-    });
-    return () => { live = false; };
-  }, [clistKey, phase]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Remember the names found, for the hub.
   useEffect(() => {
     if (!clist) return;
@@ -1038,9 +1071,7 @@ export default function StatsPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           {custom ? (
             <>
-              <a href="/stats/" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← Stats</a>
-              <span aria-hidden="true" style={{ ...eyebrow, marginLeft: -4, marginRight: -4 }}>・</span>
-              <a href="/stats/custom/" onClick={(e) => { e.preventDefault(); history.pushState(null, "", location.pathname); setHashId(""); setEditing(false); }} data-hover-pink="1" style={{ ...eyebrow, textDecoration: "none" }}>All lists</a>
+              <a href="/stats/custom/" onClick={(e) => { e.preventDefault(); history.pushState(null, "", location.pathname); setHashId(""); setEditing(false); }} data-hover-pink="1" style={{ ...eyebrow, color: "var(--text-muted)", textDecoration: "none" }}>← All lists</a>
             </>
           ) : (
             <>
@@ -1070,7 +1101,11 @@ export default function StatsPage() {
           </div>
           {custom && clist && (
             <div role="group" aria-label="List" style={{ display: "flex", gap: 4, ...(narrow ? {} : { paddingLeft: 10, borderLeft: "1px solid var(--line-hairline)" }) }}>
-              <button type="button" aria-pressed={editing} onClick={() => setEditing(!editing)} style={pill(editing)}>Edit certs</button>
+              <button type="button" disabled={snapBusy} onClick={() => refreshCustom(clist, "all")} style={pill(false)}>{snapBusy ? "Refreshing…" : "Refresh"}</button>
+              <button type="button" aria-pressed={editing} onClick={async () => {
+                if (editing) { setEditing(false); return; }
+                try { await CL.checkPassword(); setEditing(true); } catch (e) { const m = errText(e); if (m) setSnapMsg(m); }
+              }} style={pill(editing)}>Edit certs</button>
               <button type="button" onClick={async () => {
                 const url = CL.listUrl(clist.id);
                 try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
@@ -1088,9 +1123,10 @@ export default function StatsPage() {
             ))}
           </div>}
           <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-muted)" }}>
-            {!histDone ? `loading ${loadedCerts}/${totalCerts}` : list === "personal" && !histPDone ? "loading your grades" : ""}
+            {custom ? (snapBusy ? "fetching from ALT…" : snapAt ? `updated ${ago(snapAt)}` : "") : !histDone ? `loading ${loadedCerts}/${totalCerts}` : list === "personal" && !histPDone ? "loading your grades" : ""}
           </span>
         </div>
+        {custom && snapMsg && <div role="status" style={{ ...faint, marginTop: 8, color: "var(--text-accent)" }}>{snapMsg}</div>}
 
         {custom && clist && editing && (
           <section style={{ marginTop: 16, padding: narrow ? 16 : 24, background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
@@ -1099,6 +1135,7 @@ export default function StatsPage() {
                 const known = CL.knownNames();
                 const l = { id, name, items: items.map((it) => ({ ...it, name: known[it.cert] })), at: Date.now() };
                 const all = await CL.saveList(l, { prevId: id !== clist.id ? clist.id : undefined });
+                fillMissing.current = id;
                 if (id !== clist.id) { history.replaceState(null, "", `#${id}`); setHashId(id); }
                 setLists(all); setEditing(false);
                 D.trackEvent("custom_list_edit", { certs: items.length });
@@ -1242,7 +1279,7 @@ export default function StatsPage() {
               {shownPending.map((x: Any) => (
                 <div key={x.cert} style={{ padding: 10, minHeight: 116, border: "1px dashed var(--line-hairline)", borderRadius: "var(--web-radius)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                  <span style={eyebrow}>Loading…</span>
+                  <span style={eyebrow}>{custom && !snapBusy ? "Not fetched yet" : "Loading…"}</span>
                 </div>
               ))}
             </div>
@@ -1292,7 +1329,7 @@ export default function StatsPage() {
               {shownPending.map((x: Any) => (
                 <div key={x.cert} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 8px", borderBottom: "1px dashed var(--line-hairline)" }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                  <span style={eyebrow}>Loading…</span>
+                  <span style={eyebrow}>{custom && !snapBusy ? "Not fetched yet" : "Loading…"}</span>
                 </div>
               ))}
             </div>
@@ -1332,11 +1369,11 @@ export default function StatsPage() {
                 <details key={String(empty)} open={empty} style={{ marginTop: 32, borderTop: "1px solid var(--line-hairline)", paddingTop: 14 }}>
                   <summary style={{ ...eyebrow, cursor: "pointer" }}>Data check</summary>
                   <div style={{ marginTop: 10, display: "grid", gap: 2 }}>
-                    <div style={line}>
+                    {custom ? <div style={line}>Saved data · {snapAt ? `fetched ${ago(snapAt)}` : "not fetched yet"} · {hist.size + histP.size} of {cards.length} certs · only Refresh fetches from ALT</div> : <div style={line}>
                       ALT data · {refreshing ? "refreshing…" : altAt ? `saved ${ago(altAt)}, refreshes after 12h` : "not saved yet"}
                       {workerAge && <> · Worker copy {workerAge}</>}
                       {!refreshing && altAt && <> · <button type="button" onClick={() => refreshAlt(true)} style={{ font: "inherit", color: "var(--text-accent)", background: "none", border: "none", padding: 0, cursor: "pointer" }}>Refresh now</button></>}
-                    </div>
+                    </div>}
                     {!custom && <div style={line}>Sheet · {cards.length} rows</div>}
                     {!custom && tabs.map((t) => {
                       const s = sheets[t];
@@ -1357,8 +1394,8 @@ export default function StatsPage() {
                       const off = got.filter((c: Any) => { const i = psa.info[D.certOf(c) as string]; return i.grade && i.grade !== c.customGrade; });
                       return (
                         <>
-                          <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited ? " · PSA's daily limit reached, the rest fill in tomorrow" : ""}</div>
-                          {!psa.token && got.length < mine.length && <div style={hint}>Year, set and card number come from PSA: add a PSA_TOKEN environment variable in Netlify (a free API token from psacard.com).</div>}
+                          <div style={line}>PSA details · {got.length} of {mine.length} certs not in the sheet{notFound.length ? ` · not found on PSA: ${notFound.join(", ")}` : ""}{psa.limited ? " · PSA's daily limit reached, the rest are queued and fill in on a later visit" : ""}</div>
+                          {!psa.token && got.length < mine.length && <div style={hint}>Year, set and card number come from PSA: add a PSA_TOKEN secret to the mewcards project in Cloudflare (a free API token from psacard.com); they fill in on the next visit.</div>}
                           {off.length > 0 && <div style={hint}>Grade differs from PSA · {off.map((c: Any) => `cert ${D.certOf(c)} is a PSA ${psa.info[D.certOf(c) as string].grade}, listed at ${c.customGrade}`).join(" · ")}</div>}
                         </>
                       );

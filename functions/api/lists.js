@@ -40,6 +40,7 @@ export async function onRequestPost({ request, env }) {
   if (body.action === "delete") {
     const next = lists.filter((l) => l.id !== body.id);
     await env.MEW_KV.put(KEY, JSON.stringify(next));
+    await env.MEW_KV.delete(`snap:${body.id}`);
     return json({ lists: next });
   }
   if (body.action === "save") {
@@ -51,6 +52,11 @@ export async function onRequestPost({ request, env }) {
     if ((prev || body.isNew) && lists.some((x) => x.id === l.id)) return json({ error: `#${l.id} is already used by another list.` }, 409);
     const next = [l, ...lists.filter((x) => x.id !== l.id && x.id !== prev)];
     await env.MEW_KV.put(KEY, JSON.stringify(next));
+    if (prev) {
+      // A new link keeps the list's saved data.
+      const snap = await env.MEW_KV.get(`snap:${prev}`);
+      if (snap) { await env.MEW_KV.put(`snap:${l.id}`, snap); await env.MEW_KV.delete(`snap:${prev}`); }
+    }
     return json({ lists: next });
   }
   return json({ error: "unknown action" }, 400);

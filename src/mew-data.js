@@ -3,7 +3,7 @@
 
 export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeuOPhbDRtfzwDes3xku0AQi4me0o2zgsSdEBMOKWArzai28lS-wHeOWuui8FI8pf81Q/exec";
 export const TAB_MAPPINGS = { mew: "Japanese", cameo: "Cameo", intl: "Unique" };
-export const APP_VERSION = "35.4";
+export const APP_VERSION = "35.5";
 export const CONFIG_CACHE_KEY = "mew_config_v1";
 export const LOGO = "https://mew.cards/img/logo.png";
 
@@ -415,7 +415,7 @@ const isGradeFilter = (f, grade) => {
 };
 
 /** Validate one API result: sales are only kept when the API says it filtered them at `grade` (PSA). */
-function checkResult(r, grade) {
+export function checkResult(r, grade) {
   const out = { ...r };
   if (!Array.isArray(out.history) || !out.history.length) out.history = null;
   const sales = Array.isArray(out.sales) ? out.sales : [];
