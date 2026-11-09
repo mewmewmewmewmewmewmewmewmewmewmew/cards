@@ -139,6 +139,25 @@ function seriesOf(r: Any, mode: Mode): Pt[] {
     .sort((a: Pt, b: Pt) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
+/**
+ * PSA population (10 and 9) for a card: ALT's, when the Worker sends it with the cert's result
+ * (population / pop, keyed psa10 or "10"), else the sheet's pop columns. null = unknown.
+ */
+type Pop = { p10: number | null; p9: number | null };
+function popOf(card: Any, r: Any): Pop | null {
+  const num = (v: Any) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+  const pick = (o: Any, ...keys: string[]) => { for (const k of keys) { const v = num(o && o[k]); if (v !== null) return v; } return null; };
+  const alt = r && (r.population || r.pop);
+  if (alt && typeof alt === "object") {
+    const p10 = pick(alt, "psa10", "10", "10.0", "PSA 10"), p9 = pick(alt, "psa9", "9", "9.0", "PSA 9");
+    if (p10 !== null || p9 !== null) return { p10, p9 };
+  }
+  const sh = card && card.population;
+  if (sh && (sh.psa10 > 0 || sh.psa9 > 0)) return { p10: num(sh.psa10), p9: num(sh.psa9) };
+  return null;
+}
+const popText = (n: number | null) => (n === null ? "—" : n.toLocaleString("en-US"));
+
 /* ---------- charts (x is spaced by date, so irregular sales read correctly) ---------- */
 
 function bounds(pts: Pt[]) {
@@ -1025,7 +1044,7 @@ export default function StatsPage() {
       const change = pts.length && base && base > 0 ? ((pts[pts.length - 1].value - base) / base) * 100 : null;
       const dchange = change === null || base === null ? null : pts[pts.length - 1].value - base; // in dollars
       const paid = personal ? paidUSD(fx, card.paid) : null; // what you paid, in USD
-      charted.push({ card, cert, grade, r, series, pts, lead, tail, last, value, change, dchange, paid, domain: [start, today] as [string, string] });
+      charted.push({ card, cert, grade, r, pop: popOf(card, r), series, pts, lead, tail, last, value, change, dchange, paid, domain: [start, today] as [string, string] });
     });
     // Ascending comparators; cards with no change ("—") always go last.
     const cmp: Record<SortKey, (a: Any, b: Any) => number> = {
@@ -1051,7 +1070,7 @@ export default function StatsPage() {
     const nodata = [
       ...failed.map((x: Any) => ({ ...x, key: x.cert })),
       ...noCert.map((c: Any) => ({ card: c, cert: null, key: `nc-${c.id}`, grade: personal ? D.pcGrade(c) : 10, error: "no cert in the sheet" })),
-    ].map((x: Any) => ({ ...x, nodata: true, value: null, change: null, dchange: null, last: null, series: [], pts: [], lead: null, tail: null, domain, paid: personal ? paidUSD(fx, x.card.paid) : null }))
+    ].map((x: Any) => ({ ...x, pop: popOf(x.card, x.r), nodata: true, value: null, change: null, dchange: null, last: null, series: [], pts: [], lead: null, tail: null, domain, paid: personal ? paidUSD(fx, x.card.paid) : null }))
       .sort((a: Any, b: Any) => name(a.card).localeCompare(name(b.card), "ja"));
     charted.forEach((x: Any) => { x.key = x.cert; });
     return { charted, nodata, pending, hidden: hiddenRows };
@@ -1179,7 +1198,9 @@ export default function StatsPage() {
   const pad = narrow ? 16 : 32;
   // Personal adds a "P/L" column (today's price minus what you paid).
   const showPaid = list === "personal" && rows.charted.some((x: Any) => x.paid !== null && x.paid !== undefined);
-  const listCols = narrow ? `24px minmax(0,1fr) auto 64px${showPaid ? " 76px" : ""}` : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}${showPaid ? " 150px" : ""}`;
+  // PSA 10 / 9 pop columns (desktop list) when any card has pop.
+  const showPop = !narrow && [...rows.charted, ...rows.nodata].some((x: Any) => x.pop);
+  const listCols = narrow ? `24px minmax(0,1fr) auto 64px${showPaid ? " 76px" : ""}` : `28px minmax(0,1fr) 96px 104px 80px${mode === "sales" ? " 104px" : ""}${showPop ? " 64px 64px" : ""}${showPaid ? " 150px" : ""}`;
   const noMatch = q.trim() && listed > 0 && shown.length === 0 ? (
     <div style={{ gridColumn: "1 / -1", padding: "32px 16px", textAlign: "center", border: "1px dashed var(--line-strong)", ...eyebrow }}>No cards match "{q.trim()}"</div>
   ) : null;
@@ -1305,7 +1326,7 @@ export default function StatsPage() {
                     <>
                       {sel.nodata ? `${sel.error} · ` : sales ? `last sale ${fmtDate(sel.last.date)}${sel.last.house ? ` · ${sel.last.house}` : ""} · ${sel.series.length} sale${sel.series.length === 1 ? "" : "s"} · ` : ""}
                       {list === "personal" && sel.paid !== null && sel.paid !== undefined && sel.value !== null ? `paid ${fmtUSD(sel.paid)}${sel.card.paid && sel.card.paid.currency !== "USD" ? ` (${sel.card.paid.raw})` : ""}${sel.card.paid && sel.card.paid.date ? ` on ${fmtDate(sel.card.paid.date)}` : ""} · ${sel.value >= sel.paid ? "+" : "−"}${fmtUSD(Math.abs(sel.value - sel.paid))} (${fmtPct(sel.paid > 0 ? ((sel.value - sel.paid) / sel.paid) * 100 : null)}) · ` : ""}
-                      {sel.cert ? `cert ${sel.cert}` : "no cert"}{sel.r && sel.r.grade && parseFloat(sel.r.grade) !== 10 ? ` · grade ${sel.r.grade}` : ""}
+                      {sel.pop ? `pop PSA 10 ${popText(sel.pop.p10)} · PSA 9 ${popText(sel.pop.p9)} · ` : ""}{sel.cert ? `cert ${sel.cert}` : "no cert"}{sel.r && sel.r.grade && parseFloat(sel.r.grade) !== 10 ? ` · grade ${sel.r.grade}` : ""}
                       {sel.r && sel.r.assetId && <> · <a href={`https://alt.xyz/itm/${sel.r.assetId}/research`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-accent)" }}>ALT ↗</a></>}
                     </>
                   ) : (
@@ -1400,6 +1421,7 @@ export default function StatsPage() {
                       <Change pct={x.change} size="var(--web-label)" />
                     </span>
                     {sales && <span style={{ ...faint, marginTop: -4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>last sale {x.last ? fmtDate(x.last.date) : "—"}</span>}
+                    {x.pop && <span style={{ ...faint, marginTop: -4, whiteSpace: "nowrap" }}>pop 10 · {popText(x.pop.p10)}  ·  9 · {popText(x.pop.p9)}</span>}
                     {list === "personal" && x.paid !== null && x.paid !== undefined && x.value !== null && <PaidLine paid={x.paid} value={x.value} />}
                   </button>
                   {hiddenSet && x.cert && (
@@ -1428,6 +1450,7 @@ export default function StatsPage() {
                   <span style={{ textAlign: "right" }}>{sales ? "Last sale" : "Value"}</span>
                   <span style={{ textAlign: "right" }}>Change</span>
                   {sales && !narrow && <span style={{ textAlign: "right" }}>Sold</span>}
+                  {showPop && <><span style={{ textAlign: "right" }}>Pop 10</span><span style={{ textAlign: "right" }}>Pop 9</span></>}
                   {showPaid && <span style={{ textAlign: "right" }}>P/L</span>}
                 </div>
               )}
@@ -1446,6 +1469,7 @@ export default function StatsPage() {
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{x.value === null ? "—" : fmtUSD(x.value)}</span>
                       <span style={{ textAlign: "right", whiteSpace: "nowrap" }}><Change pct={x.change} size="var(--web-label)" /></span>
                       {sales && !narrow && <span style={{ ...faint, textAlign: "right", whiteSpace: "nowrap" }}>{x.last ? fmtDate(x.last.date) : "—"}</span>}
+                      {showPop && <><span style={{ ...faint, textAlign: "right", whiteSpace: "nowrap", color: "var(--text-body)" }}>{popText(x.pop ? x.pop.p10 : null)}</span><span style={{ ...faint, textAlign: "right", whiteSpace: "nowrap" }}>{popText(x.pop ? x.pop.p9 : null)}</span></>}
                       {showPaid && (x.paid !== null && x.paid !== undefined && x.value !== null
                         ? <span title={`paid ${fmtUSD(x.paid)}`} style={{ textAlign: "right", whiteSpace: "nowrap", fontFamily: "var(--font-data)", fontSize: "var(--web-label)", fontWeight: 600, color: x.value >= x.paid ? "#22a06b" : "#e5484d" }}>
                             {x.value >= x.paid ? "+" : "−"}{fmtUSD(Math.abs(x.value - x.paid))}{narrow ? "" : ` (${fmtPct(x.paid > 0 ? ((x.value - x.paid) / x.paid) * 100 : null)})`}
