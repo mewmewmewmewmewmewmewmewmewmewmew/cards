@@ -7,8 +7,7 @@
  */
 type Any = any;
 
-/** label: your own text for the card (e.g. its set number), typed after the cert. */
-export type Item = { cert: string; grade: number; name?: string; label?: string };
+export type Item = { cert: string; grade: number; name?: string };
 /** color: its theme colour (#rrggbb, none = the site pink); locked: the list has a view password; hidden: this browser hasn't given it (no items sent, count = how many). */
 export type List = { id: string; name: string; items: Item[]; at: number; color?: string; locked?: boolean; hidden?: boolean; count?: number };
 
@@ -119,43 +118,34 @@ export function slugify(name: string) {
 export const listUrl = (id: string) => `${location.origin}/stats/custom/#${id}`;
 
 /**
- * Certs from pasted text: any run of 7+ digits is a cert; a grade may follow it on the same line
- * ("12345678 9", "12345678 PSA 9", "12345678, 9.5"). Without one it's PSA 10. Repeats are dropped.
+ * Certs from pasted text: any run of 7+ digits is a cert, and the grades after it on the line
+ * ("12345678 9", "12345678 PSA 9", "12345678 9 10") list it once per grade; with none it's a
+ * PSA 10. Anything else on the line is ignored. Repeats (same cert and grade) are dropped.
  */
 export function parseCerts(text: string): Item[] {
   const out: Item[] = [];
   const seen = new Set<string>();
+  const add = (cert: string, grade: number) => { const k = `${cert}|${grade}`; if (!seen.has(k)) { seen.add(k); out.push({ cert, grade }); } };
   for (const line of String(text || "").split(/\n/)) {
-    // One cert on the line: an optional grade, then anything else is the card's label
-    // ("12345678 9 205/165"). A grade only counts as a number on its own, so "5/34" is a label.
-    if ((line.match(/\d{7,12}/g) || []).length === 1) {
-      const m = /^\s*#?(\d{7,12})(?:[\s,;]+(?:psa\s*)?(\d{1,2}(?:\.5)?)(?=[\s,;]|$))?(?:[\s,;]+(.*))?$/i.exec(line);
-      if (m) {
-        const g = m[2] ? parseFloat(m[2]) : 10;
-        const label = (m[3] || "").trim().slice(0, 40);
-        if (!seen.has(m[1])) { seen.add(m[1]); out.push({ cert: m[1], grade: g >= 1 && g <= 10 ? g : 10, ...(label ? { label } : {}) }); }
-        continue;
-      }
+    let cert = "", grades: number[] = [];
+    const flush = () => { if (cert) (grades.length ? grades : [10]).forEach((g) => add(cert, g)); cert = ""; grades = []; };
+    for (const raw of line.split(/[\s,;|]+/).filter(Boolean)) {
+      const t = raw.replace(/^#/, "");
+      if (/^\d{7,12}$/.test(t)) { flush(); cert = t; continue; }
+      const g = cert ? /^(?:psa|g)?(\d{1,2}(?:\.5)?)$/i.exec(t) : null;
+      if (g && parseFloat(g[1]) >= 1 && parseFloat(g[1]) <= 10) grades.push(parseFloat(g[1]));
     }
-    const toks = line.split(/[\s,;|/]+/).filter(Boolean);
-    for (let i = 0; i < toks.length; i++) {
-      const t = toks[i].replace(/^#/, "");
-      if (!/^\d{7,12}$/.test(t)) continue;
-      let grade = 10;
-      let j = i + 1;
-      if (toks[j] && /^psa$/i.test(toks[j])) j++;
-      const g = toks[j] ? /^(?:psa|g)?(\d{1,2}(?:\.5)?)$/i.exec(toks[j]) : null;
-      if (g && parseFloat(g[1]) >= 1 && parseFloat(g[1]) <= 10) { grade = parseFloat(g[1]); i = j; }
-      if (seen.has(t)) continue;
-      seen.add(t);
-      out.push({ cert: t, grade });
-    }
+    flush();
   }
   return out;
 }
 
-/** The list as editable text, one cert per line (grade shown when it isn't 10, then the label). */
-export const certsText = (items: Item[]) => items.map((it) => [it.cert, it.grade === 10 ? "" : String(it.grade), it.label || ""].filter(Boolean).join(" ")).join("\n");
+/** The list as editable text: one line per cert, with its grades unless it's only a PSA 10. */
+export function certsText(items: Item[]) {
+  const byCert = new Map<string, number[]>();
+  items.forEach((it) => { if (!byCert.has(it.cert)) byCert.set(it.cert, []); byCert.get(it.cert)!.push(it.grade); });
+  return [...byCert].map(([c, gs]) => (gs.length === 1 && gs[0] === 10 ? c : `${c} ${gs.join(" ")}`)).join("\n");
+}
 
 /* ---------- saved ALT data + PSA details per list (/api/snapshot) ---------- */
 

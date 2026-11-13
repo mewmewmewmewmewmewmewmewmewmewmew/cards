@@ -302,7 +302,7 @@ const Change: React.FC<{ pct: number | null; size?: string }> = ({ pct, size = "
 /* ---------- /stats/custom hub ---------- */
 
 const field: React.CSSProperties = { boxSizing: "border-box", width: "100%", padding: "8px 10px", background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: "var(--web-radius-sm)", fontFamily: "var(--font-data)", fontSize: "var(--web-small)", color: "var(--text-title)", outline: "none" };
-const CERTS_HINT = "One cert per line. Add a grade after a cert for anything that isn't a PSA 10, then anything else as the card's label, e.g. 12345678 9 205/165.";
+const CERTS_HINT = "One cert per line. Add a grade after a cert for anything that isn't a PSA 10 (12345678 9), or several grades to list it once per grade (12345678 9 10).";
 const errText = (e: Any) => (e && e.message === "cancelled" ? "" : (e && e.message) || "Couldn't save.");
 
 /** Name, link id and certs, for a new list and for editing one. onSave throws to show an error. */
@@ -787,15 +787,17 @@ export default function StatsPage() {
     (saved ? saved.cards : []).forEach((c: Any) => String(c.certs || "").split(/[^A-Za-z0-9-]+/).forEach((t) => { if (t && !mine.has(t)) mine.set(t, c); }));
     const cards = cl.items.map((it) => {
       const c = mine.get(it.cert);
-      return { ...(c || {}), ...(it.label ? { number: it.label } : {}), id: `custom-${it.cert}`, certs: it.cert, customGrade: it.grade, fromSheet: !!c, nameEN: (c && c.nameEN) || (c && c.nameJP ? "" : it.name || ""), paid: null, pc: "", isMew: true };
+      const repeats = cl.items.filter((x) => x.cert === it.cert).length > 1;
+      return { ...(c || {}), id: `custom-${it.cert}-${it.grade}`, certs: it.cert, customKey: `${it.cert}|${it.grade}`, customGrade: it.grade, showGrade: repeats, fromSheet: !!c, nameEN: (c && c.nameEN) || (c && c.nameJP ? "" : it.name || ""), paid: null, pc: "", isMew: true };
     });
     return { cards, hidden: null, diag: {} };
   };
   /** Show a list's saved copy: ALT results per cert at its grade, and PSA's year/set/number. */
   const showSnap = (cl: CL.List, snap: CL.Snap | null) => {
-    const h10 = new Map<string, Any>(), hP = new Map<string, Any>();
-    cl.items.forEach((it) => { const r = snap && snap.results[`${it.cert}|${it.grade}`]; if (r) (it.grade === 10 ? h10 : hP).set(it.cert, D.checkResult(r, it.grade)); });
-    setHist(h10); setHistP(hP);
+    // Keyed cert|grade (the cards' customKey), so one cert can be listed at several grades.
+    const h = new Map<string, Any>();
+    cl.items.forEach((it) => { const k = `${it.cert}|${it.grade}`, r = snap && snap.results[k]; if (r) h.set(k, D.checkResult(r, it.grade)); });
+    setHist(h); setHistP(new Map());
     const pp = snap && snap.psaProblem;
     setPsa(snap ? { info: snap.psa || {}, token: !(pp && pp.text === "no-token"), limited: !!(pp && pp.status === 429), problem: pp && pp.text !== "no-token" ? pp : null, photosRefused: snap.psaPhotosRefused || null } : null);
     setSnapAt(snap ? snap.at : null);
@@ -952,7 +954,7 @@ export default function StatsPage() {
     if (!clist) return;
     const names = new Map<string, string>();
     cards.forEach((c: Any) => {
-      const cert = D.certOf(c), r = cert ? (c.customGrade === 10 ? hist : histP).get(cert) : null;
+      const cert = D.certOf(c), r = c.customKey ? hist.get(c.customKey) : null;
       const n = c.nameEN || c.nameJP || (r && r.subject);
       if (cert && n) names.set(cert, n);
     });
@@ -1000,16 +1002,19 @@ export default function StatsPage() {
     for (const c of cards) {
       const cert = D.certOf(c);
       if (!cert) { if (inScope(c)) noCert.push(c); continue; }
-      const prev = byCert.get(cert);
-      if (!prev) byCert.set(cert, { ...c });
+      // A custom list can hold one cert at several grades: each is its own card (customKey = cert|grade).
+      const k = c.customKey || cert;
+      const prev = byCert.get(k);
+      if (!prev) byCert.set(k, { ...c });
       else if (!D.pcGrade(prev) && D.pcGrade(c)) prev.pc = c.pc;
       else { if (c.isMew) prev.isMew = true; if (c.isCameo) prev.isCameo = true; if (c.isIntl) prev.isIntl = true; }
     }
     const charted: Any[] = [], failed: Any[] = [], pending: Any[] = [], hiddenRows: Any[] = [];
-    byCert.forEach((card0, cert) => {
+    byCert.forEach((card0, k) => {
       if (!inScope(card0)) return;
+      const cert = card0.customKey ? (D.certOf(card0) as string) : k;
       const grade = card0.customGrade !== undefined ? card0.customGrade : personal ? (D.pcGrade(card0) as number) : 10;
-      const r = grade === 10 ? hist.get(cert) : histP.get(cert);
+      const r = card0.customKey ? hist.get(card0.customKey) : grade === 10 ? hist.get(cert) : histP.get(cert);
       // A custom cert that isn't in the sheet goes by ALT's name for it (the PSA label's subject).
       let card = card0.nameEN || card0.nameJP ? card0 : { ...card0, nameEN: (r && r.subject) || card0.psaSubject || `Cert ${cert}` };
       // Set number, set / variety and year from ALT when the Worker sends them (they fill gaps only).
@@ -1076,11 +1081,11 @@ export default function StatsPage() {
     // charted ones, with "—" for their numbers.
     const domain = [range ? shiftDate(today, range) : today, today] as [string, string];
     const nodata = [
-      ...failed.map((x: Any) => ({ ...x, key: x.cert })),
+      ...failed.map((x: Any) => ({ ...x, key: x.card.customKey || x.cert })),
       ...noCert.map((c: Any) => ({ card: c, cert: null, key: `nc-${c.id}`, grade: personal ? D.pcGrade(c) : 10, error: "no cert in the sheet" })),
     ].map((x: Any) => ({ ...x, pop: popOf(x.card, x.r), nodata: true, value: null, change: null, dchange: null, last: null, series: [], pts: [], lead: null, tail: null, domain, paid: personal ? paidUSD(fx, x.card.paid) : null }))
       .sort((a: Any, b: Any) => name(a.card).localeCompare(name(b.card), "ja"));
-    charted.forEach((x: Any) => { x.key = x.cert; });
+    charted.forEach((x: Any) => { x.key = x.card.customKey || x.cert; });
     return { charted, nodata, pending, hidden: hiddenRows };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, hist, histP, list, range, sort, dir, lang, mode, today, scope, hiddenSet, fx]);
@@ -1422,7 +1427,7 @@ export default function StatsPage() {
                       {x.card.image && <span style={{ flex: "0 0 auto", width: 34, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />}
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && (x.grade !== 10 || x.card.showGrade)) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                     </span>
                     <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} />
@@ -1446,7 +1451,7 @@ export default function StatsPage() {
               {emptyState}
               {noMatch}
               {shownPending.map((x: Any) => (
-                <div key={x.cert} style={{ padding: 10, minHeight: 116, border: "1px dashed var(--line-hairline)", borderRadius: "var(--web-radius)", display: "flex", flexDirection: "column", gap: 6 }}>
+                <div key={x.card.customKey || x.cert} style={{ padding: 10, minHeight: 116, border: "1px dashed var(--line-hairline)", borderRadius: "var(--web-radius)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                   <span style={eyebrow}>{custom && !snapBusy ? "Not fetched yet" : "Loading…"}</span>
                 </div>
@@ -1473,7 +1478,7 @@ export default function StatsPage() {
                       {anyImg && <span style={{ width: narrow ? 24 : 28, aspectRatio: "63 / 88", borderRadius: "4.72% / 3.37%", background: "var(--surface-image)", ...cardImg(x.card) }} />}
                       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                         <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
-                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && x.grade !== 10) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
+                        <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: "var(--pink-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[x.card.number || (custom ? `cert ${x.cert}` : ""), x.card.year || "", list === "personal" || (custom && (x.grade !== 10 || x.card.showGrade)) ? `PSA ${x.grade}` : ""].filter(Boolean).join(" · ")}<Edition e={x.card.edition} /></span>
                       </span>
                       {!narrow && <Sparkline pts={x.pts} lead={x.lead} tail={x.tail} domain={x.domain} dots={sales} height={28} />}
                       <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-small)", fontWeight: 600, color: "var(--text-title)", textAlign: "right", whiteSpace: "nowrap" }}>{x.value === null ? "—" : fmtUSD(x.value)}</span>
@@ -1498,7 +1503,7 @@ export default function StatsPage() {
               {emptyState && <div style={{ marginTop: 4 }}>{emptyState}</div>}
               {noMatch}
               {shownPending.map((x: Any) => (
-                <div key={x.cert} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 8px", borderBottom: "1px dashed var(--line-hairline)" }}>
+                <div key={x.card.customKey || x.cert} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 8px", borderBottom: "1px dashed var(--line-hairline)" }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-small)", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name(x.card)}</span>
                   <span style={eyebrow}>{custom && !snapBusy ? "Not fetched yet" : "Loading…"}</span>
                 </div>
