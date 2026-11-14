@@ -1602,6 +1602,17 @@ export default function StatsPage() {
                     })()}
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
+                    {(() => {
+                      // ALT's card number for a cert against the sheet's: a different one means the cert
+                      // was matched to the wrong ALT card (or the sheet has the wrong cert on that row).
+                      const num = (v: Any) => { const m = /\d+/.exec(String(v || "")); return m ? parseInt(m[0], 10) : null; };
+                      const wrong = [...rows.charted, ...rows.nodata].filter((x: Any) => {
+                        const a = x.r && num(x.r.cardNumber), b = num(x.card.number);
+                        return a !== null && b !== null && a !== b;
+                      });
+                      if (!wrong.length) return null;
+                      return <div style={hint}>ALT card doesn't match the sheet · {wrong.length} · {wrong.slice(0, 8).map((x: Any) => `${name(x.card)} ${x.card.number} (cert ${x.cert}) got ALT's ${x.r.subject || "card"} ${x.r.cardNumber}`).join(" · ")}{wrong.length > 8 ? " · …" : ""}</div>;
+                    })()}
                     {mismatch > 0 && <div style={line}>Wrong-grade sales filter from the API · {mismatch} (their sales are left out) · {mismatchCerts.slice(0, 6).map((c) => { const k = cardOf(c); const why = String((hist.get(c) as Any)?.salesError || "").replace(/^sales came back /, ""); return `${k ? `${name(k)}${k.number ? ` ${k.number}` : ""}` : "?"} (cert ${c}, ${why})`; }).join(" · ")}</div>}
                     {oldRun && <div style={line}>Old-data refresh this visit · {oldRun.asked ? `${oldRun.asked} asked for fresh, ${oldRun.got} answered, ${oldRun.newer} came back newer, ${oldRun.unusable} unusable (kept the old copy)` : "nothing over 6h old"}</div>}
                     {oldest.over12 > 0 && <div style={line}>Over 12h old · {oldest.over12} · oldest: {oldest.list.filter((x) => Date.now() - x.t > 12 * 3600e3).map((x) => `${x.card ? name(x.card) : "?"}${x.card && x.card.number ? ` ${x.card.number}` : ""} (cert ${x.cert}, ${ago(x.t)})`).join(" · ")}</div>}
