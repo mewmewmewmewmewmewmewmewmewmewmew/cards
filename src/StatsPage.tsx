@@ -1607,7 +1607,7 @@ export default function StatsPage() {
                       // was matched to the wrong ALT card (or the sheet has the wrong cert on that row).
                       const num = (v: Any) => { const m = /\d+/.exec(String(v || "")); return m ? parseInt(m[0], 10) : null; };
                       const wrong = [...rows.charted, ...rows.nodata].filter((x: Any) => {
-                        const a = x.r && num(x.r.cardNumber), b = num(x.card.number);
+                        const a = x.r ? num(x.r.cardNumber) : null, b = num(x.card.number); // sheet rows without a cert have no ALT data
                         return a !== null && b !== null && a !== b;
                       });
                       if (!wrong.length) return null;
