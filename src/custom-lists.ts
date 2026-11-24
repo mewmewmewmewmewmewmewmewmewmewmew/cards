@@ -9,7 +9,9 @@ type Any = any;
 
 export type Item = { cert: string; grade: number; name?: string };
 /** color: its theme colour (#rrggbb, none = the site pink); locked: the list has a view password; hidden: this browser hasn't given it (no items sent, count = how many). */
-export type List = { id: string; name: string; items: Item[]; at: number; color?: string; locked?: boolean; hidden?: boolean; count?: number };
+/** summary: its value when last refreshed (sum of each cert's latest sale / ALT value, and how many had one). */
+export type Summary = { sales: number; salesN: number; alt: number; altN: number; at: number };
+export type List = { id: string; name: string; items: Item[]; at: number; summary?: Summary; color?: string; locked?: boolean; hidden?: boolean; count?: number };
 
 const API = "/api/lists";
 const CACHE = "mew_custom_lists_cache";

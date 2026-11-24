@@ -125,11 +125,23 @@ export async function onRequestPost({ request, env }) {
 
 /** Card names for the hub (ALT's, else PSA's), saved on the list. */
 async function nameItems(env, lists, list, snap) {
-  let named = false;
+  let changed = false;
   list.items.forEach((it) => {
     const r = snap.results[`${it.cert}|${it.grade}`], p = (snap.psa || {})[it.cert];
     const n = (r && r.subject) || (p && !p.notFound && p.subject);
-    if (n && !it.name) { it.name = n; named = true; }
+    if (n && !it.name) { it.name = n; changed = true; }
   });
-  if (named) await env.MEW_KV.put("custom-lists", JSON.stringify(lists));
+  // The list's value for the hub: each cert's latest sale (and latest ALT value), summed.
+  let sales = 0, salesN = 0, alt = 0, altN = 0;
+  list.items.forEach((it) => {
+    const r = snap.results[`${it.cert}|${it.grade}`];
+    if (!r) return;
+    const last = (arr, key) => (Array.isArray(arr) ? arr.filter((x) => x && Number(x[key]) > 0 && x.date).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).pop() : null);
+    const s = last(r.sales, "price"), h = last(r.history, "value");
+    if (s) { sales += Number(s.price); salesN++; }
+    if (h) { alt += Number(h.value); altN++; }
+  });
+  const summary = { sales: Math.round(sales * 100) / 100, salesN, alt: Math.round(alt * 100) / 100, altN, at: snap.at || Date.now() };
+  if (JSON.stringify(list.summary) !== JSON.stringify(summary)) { list.summary = summary; changed = true; }
+  if (changed) await env.MEW_KV.put("custom-lists", JSON.stringify(lists));
 }

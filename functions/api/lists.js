@@ -71,6 +71,7 @@ export async function onRequestPost({ request, env }) {
     const vp = String(body.list.viewPassword || "");
     if (vp) l.viewHash = await hashPw(vp);
     else if (!body.list.removeViewPassword && before && before.viewHash) l.viewHash = before.viewHash;
+    if (before && before.summary) l.summary = before.summary; // kept until the list's next refresh
     const next = [l, ...lists.filter((x) => x.id !== l.id && x.id !== prev)];
     await env.MEW_KV.put(KEY, JSON.stringify(next));
     if (prev) {

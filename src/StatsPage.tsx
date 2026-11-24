@@ -466,6 +466,12 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
                 <a href={`#${l.id}`} onClick={(e) => { e.preventDefault(); open(l.id); }}
                   style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", boxSizing: "border-box", padding: 14, textDecoration: "none", background: "var(--surface-card)", border: "1px solid var(--line-hairline)", borderRadius: "var(--web-radius)" }}>
                   <span style={{ fontWeight: 600, fontSize: "var(--web-body)", color: "var(--text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 28 }}>{l.name}</span>
+                  {l.summary && (l.summary.salesN > 0 || l.summary.altN > 0) && (
+                    <span title={`ALT value ${fmtUSD(l.summary.alt)} · updated ${ago(l.summary.at)}`} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                      <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "var(--web-h3)", color: "var(--text-title)" }}>{fmtUSD(l.summary.salesN ? l.summary.sales : l.summary.alt)}</span>
+                      <span style={faint}>{l.summary.salesN ? `${l.summary.salesN} priced by last sale` : "ALT value"}</span>
+                    </span>
+                  )}
                   <span style={{ fontFamily: "var(--font-data)", fontSize: "var(--web-label)", color: l.color || "var(--pink-700)", display: "flex", alignItems: "center", gap: 6 }}>
                     {l.locked && <Lock />}#{l.id} · {l.hidden ? l.count || 0 : l.items.length} cert{(l.hidden ? l.count : l.items.length) === 1 ? "" : "s"}
                   </span>
