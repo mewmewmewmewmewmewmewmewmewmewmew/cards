@@ -1626,6 +1626,13 @@ export default function StatsPage() {
                     {errs.map(([e, n]) => <div key={e} style={line}>  {e}{(n as number) > 1 ? ` ×${n}` : ""}</div>)}
                     {diag && <div style={line}>With sales · {withSales} of {totalCerts} · with ALT value · {withHist} of {totalCerts}</div>}
                     {(() => {
+                      // How many certs came back with the Worker's card details (number, pop).
+                      const rs = [...rows.charted, ...rows.nodata].map((x: Any) => x.r).filter(Boolean);
+                      if (!rs.length) return null;
+                      const withNum = rs.filter((r: Any) => r.cardNumber).length, withPop = rs.filter((r: Any) => r.population || r.pop).length;
+                      return <div style={line}>ALT details · card number for {withNum} of {rs.length} certs · pop for {withPop} of {rs.length}{withNum < rs.length ? " · the rest have none from ALT yet (an older saved copy, or ALT has no number for that card)" : ""}</div>;
+                    })()}
+                    {(() => {
                       // ALT's card number for a cert against the sheet's: a different one means the cert
                       // was matched to the wrong ALT card (or the sheet has the wrong cert on that row).
                       const num = (v: Any) => { const m = /\d+/.exec(String(v || "")); return m ? parseInt(m[0], 10) : null; };
