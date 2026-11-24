@@ -378,6 +378,26 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
   const [legacy, setLegacy] = useState<CL.List[]>(() => CL.readLegacy());
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // Refresh all (unlocked only): every list fresh from ALT, one after another; the lists password
+  // skips each list's cooldown.
+  const [allRun, setAllRun] = useState<{ done: number; total: number; failed: string[]; finished: boolean } | null>(null);
+  const refreshAll = async () => {
+    const todo = lists.filter((l) => !l.hidden);
+    if (!todo.length || (allRun && !allRun.finished)) return;
+    const failed: string[] = [];
+    setErr("");
+    setAllRun({ done: 0, total: todo.length, failed, finished: false });
+    for (let i = 0; i < todo.length; i++) {
+      try {
+        const { snap } = await CL.refreshSnapshot(todo[i].id, "all");
+        if (snap.errors && snap.errors.length) failed.push(todo[i].name);
+      } catch (e) { failed.push(todo[i].name); }
+      setAllRun({ done: i + 1, total: todo.length, failed: [...failed], finished: false });
+    }
+    setAllRun({ done: todo.length, total: todo.length, failed, finished: true });
+    D.trackEvent("custom_refresh_all", { lists: todo.length, failed: failed.length });
+    CL.fetchLists().then(setLists).catch(() => {}); // names found by the refreshes
+  };
   useEffect(() => { document.title = "mew cards · custom lists"; D.trackEvent("custom_hub_view"); }, []);
   const names = CL.knownNames();
   const pad = narrow ? 16 : 32;
@@ -413,8 +433,11 @@ const CustomHub: React.FC<{ theme: string; setTheme: (t: string) => void; narrow
 
         <div style={{ marginTop: narrow ? 24 : 36, display: "flex", alignItems: "center", gap: 8, paddingBottom: 12, borderBottom: "1px solid var(--line-hairline)" }}>
           <span style={eyebrow}>{status === "cached" && !lists.length ? "Loading…" : `${lists.length} list${lists.length === 1 ? "" : "s"}`}</span>
-          {unlocked && !adding && <button type="button" onClick={async () => { setErr(""); try { await CL.checkPassword(); setAdding(true); } catch (e) { setErr(errText(e)); } }} style={{ ...pill(true), marginLeft: "auto" }}>+ New list</button>}
+          {unlocked && allRun && <span style={faint}>{allRun.finished ? `refreshed ${allRun.total - allRun.failed.length} of ${allRun.total}` : `refreshing ${allRun.done + 1} of ${allRun.total}…`}</span>}
+          {unlocked && lists.some((l) => !l.hidden) && <button type="button" disabled={!!allRun && !allRun.finished} onClick={refreshAll} style={{ ...pill(false), marginLeft: "auto", opacity: allRun && !allRun.finished ? 0.6 : 1 }}>{allRun && !allRun.finished ? "Refreshing…" : "Refresh all"}</button>}
+          {unlocked && !adding && <button type="button" onClick={async () => { setErr(""); try { await CL.checkPassword(); setAdding(true); } catch (e) { setErr(errText(e)); } }} style={{ ...pill(true), marginLeft: lists.some((l) => !l.hidden) ? 0 : "auto" }}>+ New list</button>}
         </div>
+        {unlocked && allRun && allRun.finished && allRun.failed.length > 0 && <div role="alert" style={{ ...faint, marginTop: 10, color: "var(--text-accent)" }}>Some certs couldn't be fetched in: {allRun.failed.join(", ")}. Open the list and press Refresh to try again.</div>}
         {unlocked && legacy.length > 0 && (
           <div style={{ ...faint, marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             {legacy.length} list{legacy.length === 1 ? "" : "s"} saved only in this browser ({legacy.map((l) => l.name).join(", ")})
