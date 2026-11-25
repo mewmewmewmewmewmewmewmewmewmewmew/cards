@@ -560,6 +560,10 @@ export default function StatsPage() {
   // Saved ALT data: when the last full refresh finished, and whether one is running now.
   const [altAt, setAltAt] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Background updates still running after the page opened (old data, the sheet, a full refresh):
+  // the weekly poster waits for them, so it's drawn from settled data.
+  const [bgJobs, setBgJobs] = useState(0);
+  const track = (p: Promise<unknown>) => { setBgJobs((n) => n + 1); p.finally(() => setBgJobs((n) => n - 1)); };
   const altJob = useRef<{ certs: string[]; pairs: Array<{ cert: string; grade: number }> } | null>(null);
   const [imgs, setImgs] = useState<{ done: number; total: number; finished: boolean }>({ done: 0, total: 0, finished: false });
   const [diagP, setDiagP] = useState<Any>(null);
@@ -933,8 +937,8 @@ export default function StatsPage() {
       }
       setHistPDone(true);
       if (first) setAltAt(Date.now());
-      else if (!cl && (saved.at === null || Date.now() - saved.at > AC.ALT_MAX_AGE)) refreshAlt(); // in the background
-      else refreshOld(have10, haveP, pairs); // anything over 6h old, fresh from ALT (in the background)
+      else if (!cl && (saved.at === null || Date.now() - saved.at > AC.ALT_MAX_AGE)) track(refreshAlt()); // in the background
+      else track(refreshOld(have10, haveP, pairs)); // anything over 6h old, fresh from ALT (in the background)
       // Card images too, so the grid (and the weekly poster) open fully drawn. A slow or broken
       // image gives up after 8s rather than holding the page.
       const urls = [...new Set(all.filter((c: Any) => D.certOf(c)).map((c: Any) => c.image).filter((u: Any) => typeof u === "string" && /^https?:/i.test(u)))] as string[];
@@ -948,8 +952,9 @@ export default function StatsPage() {
         im.onload = im.onerror = () => { window.clearTimeout(t); fin(); };
         im.src = u;
       })));
+      // (counted before the page opens, so the weekly poster never catches a gap between jobs)
+      if (savedSheet) track(refreshSheet(password, JSON.stringify(savedSheet.cards)));
       setImgs({ done: urls.length, total: urls.length, finished: true });
-      if (savedSheet) refreshSheet(password, JSON.stringify(savedSheet.cards));
     } catch (e: Any) {
       if (e && e.message === "auth") { setPw(""); rememberPw(""); AC.saveSheet(null); setPhase("password"); }
       else { console.error(e); setPhase("error"); }
@@ -1234,7 +1239,7 @@ export default function StatsPage() {
   }
 
   if (weekly) {
-    return <><VersionTag /><WeeklyView cards={cards} hist={hist} hidden={hiddenLists ? hiddenLists.all : new Set<string>()} done={histDone} mode={mode} setMode={setMode} lang={lang} onBack={closeWeekly} /></>;
+    return <><VersionTag /><WeeklyView cards={cards} hist={hist} hidden={hiddenLists ? hiddenLists.all : new Set<string>()} done={histDone} settled={bgJobs === 0 && !refreshing} mode={mode} setMode={setMode} lang={lang} onBack={closeWeekly} /></>;
   }
 
   const pad = narrow ? 16 : 32;

@@ -378,13 +378,37 @@ export type WeeklyProps = {
   hist: Map<string, Any>;
   hidden: Set<string>;
   done: boolean;            // every cert's ALT data has loaded
+  settled?: boolean;        // the page's background updates (old data, sheet, full refresh) are over
   mode: Mode;
   setMode: (m: Mode) => void;
   lang: "EN" | "JP";
   onBack: () => void;
 };
 
-export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, lang, onBack }: WeeklyProps) {
+export default function WeeklyView({ cards: liveCards, hist: liveHist, hidden: liveHidden, done, settled = true, mode, setMode, lang, onBack }: WeeklyProps) {
+  // The poster is drawn from a frozen copy of the data, taken once the page's background updates
+  // have settled (or after 20s), so it can't change between looking at it and saving it. Newer
+  // data after that shows an Update button instead.
+  type Data = { cards: Any[]; hist: Map<string, Any>; hidden: Set<string> };
+  const [frozen, setFrozen] = useState<Data | null>(null);
+  const live = useRef<Data>({ cards: liveCards, hist: liveHist, hidden: liveHidden });
+  live.current = { cards: liveCards, hist: liveHist, hidden: liveHidden };
+  useEffect(() => { if (done && settled && !frozen) setFrozen(live.current); }, [done, settled, frozen]);
+  useEffect(() => {
+    if (!done || frozen) return;
+    const t = window.setTimeout(() => setFrozen(live.current), 20000);
+    return () => window.clearTimeout(t);
+  }, [done, frozen]);
+  // What the data says, ignoring copies that changed nothing (sales, values, cards, hidden cards).
+  const print = (d: Data) => {
+    const parts: string[] = [];
+    d.hist.forEach((r: Any, c: string) => { const sl = (r && r.sales) || [], hs = (r && r.history) || []; parts.push(`${c}:${sl.length}:${sl.length ? sl[0].date : ""}:${hs.length}:${hs.length ? hs[hs.length - 1].value : ""}`); });
+    return `${parts.sort().join(",")}|${d.cards.map((c: Any) => `${D.certOf(c)}:${c.isMew ? 1 : 0}`).join(",")}|${[...d.hidden].sort().join(",")}`;
+  };
+  const stale = useMemo(() => !!frozen && settled && print(frozen) !== print(live.current), [frozen, settled, liveCards, liveHist, liveHidden]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cards = frozen ? frozen.cards : liveCards;
+  const hist = frozen ? frozen.hist : liveHist;
+  const hidden = frozen ? frozen.hidden : liveHidden;
   const shotRef = useRef<HTMLDivElement>(null);
   const [shot, setShot] = useState<"" | "busy" | "copy-ok" | "copy-err" | "save-ok" | "save-err" | "video-ok" | "video-err">("");
   const [vt, setVt] = useState<number | null>(null); // video clock while a video is being made
@@ -558,9 +582,10 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
   }, [shotKey, shareFiles, done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- still loading the ALT data (normally /stats has already waited for it) ---------- */
-  if (!done) {
+  if (!done || !frozen) {
     const totalCerts = new Set(cards.map((c: Any) => D.certOf(c)).filter(Boolean)).size;
-    return <Loader progress={totalCerts ? (100 * Math.min(hist.size, totalCerts)) / totalCerts : 0} />;
+    // All loaded but the background updates still running: almost there.
+    return <Loader progress={!done ? (totalCerts ? (90 * Math.min(hist.size, totalCerts)) / totalCerts : 0) : 95} />;
   }
 
   const sales = mode === "sales";
@@ -1232,6 +1257,7 @@ export default function WeeklyView({ cards, hist, hidden, done, mode, setMode, l
       {/* controls (outside the poster, so images of it stay clean) */}
       <div style={{ width: Math.max(SHOT_W * scale, Math.min(vw[0] - 24, 560)), display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <button type="button" onClick={onBack} style={{ ...mono, color: C.muted, background: "none", border: "none", padding: 0, cursor: "pointer" }}>← Stats</button>
+        {stale && <button type="button" onClick={() => setFrozen(live.current)} title="Newer sales or values came in since this poster was drawn" style={{ ...pill(true) }}>New data · Update</button>}
         <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           <button type="button" className="wk-nav" onClick={() => setEnd(addDays(end, -7))} aria-label="Previous week">‹</button>
           <button type="button" className="wk-nav" onClick={() => setEnd(addDays(end, 7))} disabled={end >= latest} aria-label="Next week">›</button>
